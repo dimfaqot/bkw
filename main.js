@@ -25,7 +25,7 @@ const menu_profile=(menu)=>{
    
    let html='';
     res.profile.forEach(e => {  
-     html+=` <a class="btn_get_data_profile" data-tabel="${e.url}" href="${api+"general/profile/"+e.url}">
+     html+=` <a class="btn_get_data_profile" data-db="${e.url}" href="${api+"general/profile/"+e.url}">
             <div><i class="${e.icon} ${(menu==e.url?"text-pink":"")}"></i></div>
             <label><span class="${(menu==e.url?"text-pink":"")}">${e.menu}</span></label>
         </a>`;
@@ -35,7 +35,7 @@ const menu_profile=(menu)=>{
   .catch(error => console.error('Gagal ambil data:', error));
 }
 
- async function get_menu_profile() {
+ async function get_datas() {
                 try {
                     const response = await fetch('data.json');
                     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -86,5 +86,21 @@ function int_to_tgl(timestamp, format = "d-m-Y") {
 
 function angka(angka) {
   return Number(angka).toLocaleString('id-ID');
+}
+
+function tgl_now(order="d") {
+  const now = new Date();
+
+  const tanggal = String(now.getDate()).padStart(2, '0');
+  const bulan = String(now.getMonth() + 1).padStart(2, '0'); // bulan dimulai dari 0
+  const tahun = String(now.getFullYear());
+
+  if(order=="d"){
+    return tanggal;
+  }else if(order=="m"){
+    return bulan;
+  }else if(order=="y"){
+    return tahun;
+  }
 }
 

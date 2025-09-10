@@ -73,5 +73,19 @@
       "icon":"fa-solid fa-motorcycle",
       "unit":[]
     }
+  ],
+  "bulans":[
+    { "bulan": "Januari", "angka": "01" },
+    { "bulan": "Februari", "angka": "02" },
+    { "bulan": "Maret", "angka": "03" },
+    { "bulan": "April", "angka": "04" },
+    { "bulan": "Mei", "angka": "05" },
+    { "bulan": "Juni", "angka": "06" },
+    { "bulan": "Juli", "angka": "07" },
+    { "bulan": "Agustus", "angka": "08" },
+    { "bulan": "September", "angka": "09" },
+    { "bulan": "Oktober", "angka": "10" },
+    { "bulan": "November", "angka": "11" },
+    { "bulan": "Desember", "angka": "12" }
   ]
 }

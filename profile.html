@@ -49,7 +49,7 @@
     <script src="main.js"></script>
     <script>
         let data=[];
-        let tabel='';
+        let db='';
        menu(judul);
        menu_profile();
 
@@ -58,8 +58,8 @@
         `
             <div class="bg-grey border border-secondary rounded p-4">
                 <div class="text-center">
-                    <img width="70" src="files/${tabel}.png"></img>
-                    <div class="mt-3">${tabel.toUpperCase()}</div>
+                    <img width="70" src="files/${db}.png"></img>
+                    <div class="mt-3">${db.toUpperCase()}</div>
                     <div class="text-secondary" style="font-size: small;">${int_to_tgl(data.data.tgl_berdiri, "d M Y")}</div>
                 </div>
                 <hr>
@@ -101,7 +101,7 @@
             `
                 <div class="bg-grey border border-secondary rounded p-2 d-flex gap-3" style="font-size: x-small;">
                     <div class="text-center">
-                        <img width="50" src="files/${tabel}.png"></img>
+                        <img width="50" src="files/${db}.png"></img>
                         <div class="mt-1">${int_to_tgl(data.data.tgl_berdiri, "d M Y")}</div>
                     </div>
                     <div>
@@ -152,9 +152,9 @@
 
        $(document).on("click", ".btn_get_data_profile", function(e){
             e.preventDefault();
-            tabel=$(this).data("tabel");
-            menu_profile(tabel);
-            fetchData(api + "general/profile/"+tabel).then(res => {
+            db=$(this).data("db");
+            menu_profile(db);
+            fetchData(api + "general/profile/"+db).then(res => {
                     data=res;
                     let html='<div class="mt-3"></div>';
                     html+= detail_profile_big();

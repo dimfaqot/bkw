@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Home</title>
+    <script src="https://code.jquery.com/jquery-3.7.1.js" integrity="sha256-eKhayi8LEQwp4NKxN+CfCh+3qOVUtJn3QNZ0TciWLP4="
+        crossorigin="anonymous"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65" crossorigin="anonymous">
+        <script src="https://kit.fontawesome.com/a193ca89ae.js" crossorigin="anonymous"></script>
+
+        <link rel="stylesheet" href="style.css">
+        <script>let judul="Pemasukan";</script>
+    </head>
+
+<body class="bg-dark text-light">
+    <div class="d-flex justify-content-between bg-grey p-2">
+        <div>BKW</div>
+        <div class="judul">Pemasukan</div>
+        <div>
+            <a href="" class="" type="button" data-bs-toggle="offcanvas" data-bs-target="#canvas_menu"
+                aria-controls="offcanvasStart"><i class="fa-solid fa-bars text-light"></i></a>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-center sub_menu gap-3 sub_menu"></div>
+
+    <div class="container mt-1 detail_profile">
+        <h6 class="text-pink" style="font-size: x-small;">Klik sub menu untuk melihat</h6>
+    </div>
+<div class="container">
+    <div class="offcanvas offcanvas-start bg-dark" tabindex="-1" id="canvas_menu" aria-labelledby="offcanvasStartLabel">
+        <div class="offcanvas-header bg-grey p-2">
+            <h6 class="offcanvas-title">Menu</h6>
+            <a href="" class="btn_close" type="button" data-bs-dismiss="offcanvas" aria-label="Close"><i class="fa-solid fa-xmark"></i></a>
+        </div>
+        <div class="offcanvas-body canvas_menu p-0 mt-2">
+           
+        </div>
+    </div>
+
+</div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-kenU1KFdBIe4zVF0s0G1M5b4hcpxyD9F7jL+jjXkk+Q2h455rYXK/7HAuoJl+0I4"
+        crossorigin="anonymous"></script>
+
+    <script src="main.js"></script>
+    <script>
+        let data=[];
+        let datas=[];
+        let sub_menu={};
+        let db='';
+       menu(judul);
+       menu_profile();
+
+        get_datas().then(res => {
+            datas=res;
+        })
+
+       let child_menu_big=()=>{
+        let html=
+        `
+            <div class="d-flex justify-content-center gap-4 bg-grey p-3 rounded">`;
+            sub_menu.unit.forEach(e=>{
+                html+=`<div class="text-center border rounded p-3 text-grey child_menu" data-unit="${e}" style="font-size: x-small;width:80px">
+                    <div><i class="fa-solid fa-user"></i></div>
+                    <div>${e.toUpperCase()}</div>
+                </div>`;
+
+            })
+            html+=`</div>
+            <h6 class="text-pink" style="font-size: x-small;">Klik sub menu untuk melihat</h6>
+        `;
+        return html;
+       }
+       let child_menu_small=()=>{
+        let html=
+        `
+            <div class="bg-grey p-3 rounded">
+                    <div class="text-pink"><i class="fa-solid fa-user"></i> ${unit}</div>
+            </div>
+            <div class="detail_child_menu"></div>
+        `;
+        return html;
+       }
+
+
+
+       let table_detail=(db)=>{
+       
+        let html=
+            `
+            <div class="table-responsive">
+                <table class="table table-dark table-bordered table-sm" style="font-size: xx-small;">
+                    <thead>
+                        <tr>
+                            <th class="text-center">#</th>
+                            <th class="text-center">Tgl</th>
+                            <th class="text-center">Barang</th>
+                            <th class="text-center">Qty</th>
+                            <th class="text-center">Biaya</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+                        data.data.forEach((e,i) => {
+                           
+                        html += `<tr>
+                                <td class="text-center">${(i + 1)}</td>
+                                <td>${int_to_tgl(e.tgl)}</td>
+                                <td>${e.barang}</td>
+                                <td class="text-end">${angka(e.qty)}</td>
+                                <td class="text-end">${angka(e.biaya)}</td>
+                            </tr>`;
+                                                      
+                        });
+                    html+=`</tbody>
+                </table>
+            </div>
+            `;
+
+            return html;
+       }
+
+       let tggl='';
+       let bln='';
+       let thn='';
+       let unit='';
+
+       let tanggal=(order="")=>{
+
+        let html=
+        `
+            <div class="bg-grey rounded py-2">
+                <div class="d-flex justify-content-center gap-2">
+                    <div class="form-floating" style="width: 90px;">
+                        <select class="form-select bg-dark text-light border border-secondary tgl" style="font-size: small;">`;
+                            for (let i = 1; i <= 31; i++) {
+                                let tgl = String(i).padStart(2, '0');
+                                if(tggl==''){
+                                    html+=`<option ${(tgl_now("d")==tgl?"selected":"")} value="${tgl}">${tgl}</option>`;
+                                }else{
+                                    html+=`<option ${(tggl ==tgl?"selected":"")} value="${tgl}">${tgl}</option>`;
+                                }
+                            }
+                        html+=`</select>
+                        <label style="font-size: x-small;">Tgl</label>
+                    </div>
+                    <div class="form-floating" style="width: 120px;">
+                        <select class="form-select bg-dark text-light border border-secondary bulan" style="font-size: small;">`;
+                            datas.bulans.forEach(e=>{
+                                if (bln == '') {
+                                    html+=`<option ${(tgl_now("m") == e.angka ? "selected" : "")} value="${e.angka}">${e.bulan}</option>`;
+                                }else{
+                                    html+=`<option ${(bln == e.angka ? "selected" : "")} value="${e.angka}">${e.bulan}</option>`;
+                                }
+                            })
+                        html+=`</select>
+                        <label style="font-size: x-small;">Bulan</label>
+                    </div>
+                    <div class="form-floating" style="width: 90px;">
+                        <select class="form-select bg-dark text-light border border-secondary tahun" style="font-size: small;">`;
+                            for (let i = 2018; i <= tgl_now("y"); i++) {
+                                 if (thn == '') {
+                                        html += `<option ${(tgl_now("y") == i ? "selected" : "")} value="${i}">${i}</option>`;
+                                }else{
+                                        html += `<option ${(thn == i ? "selected" : "")} value="${i}">${i}</option>`;
+                                    }
+                                }
+                        html+=`</select>
+                        <label style="font-size: x-small;">Tahun</label>
+                    </div>
+                </div>
+                <div class="text-center mt-2">
+                    <button data-order="tgl" class="get_data btn btn-sm btn-secondary"><i class="fa-solid fa-arrow-up-right-from-square"></i> By Tanggal</button>
+                    <button data-order="bulan" class="get_data btn btn-sm btn-secondary mx-2"><i class="fa-solid fa-arrow-up-right-from-square"></i> By Bulan</button>
+                    <button data-order="tahun" class="get_data btn btn-sm btn-secondary"><i class="fa-solid fa-arrow-up-right-from-square"></i> By Tahun</button>
+                </div>
+            </div>
+            <div class="body_data"></div>
+        `;
+        return html;
+       }
+
+       $(document).on("click", ".btn_get_data_profile", function(e){
+            e.preventDefault();
+            db=$(this).data("db");
+            menu_profile(db);
+           
+           datas.profile.forEach(e=>{
+                if(e.url==db){
+                    sub_menu=e;
+                }
+           })
+
+         if(sub_menu.unit.length>0){
+           $(".detail_profile").html(child_menu_big());
+         }else{
+            unit=sub_menu.menu;
+             $(".detail_profile").html(tanggal());
+                       
+         }
+
+        })
+
+        $(document).on("click", ".child_menu", function (e) {
+            e.preventDefault();
+            let usaha=$(this).data("unit");
+            unit=usaha;
+
+            fetchData(api + "general/data/"+db+"/barang/"+usaha).then(res => {
+                data=res;
+                let html=`<div class="back text-grey" data-order="child" style="font-size:small"><i class="fa-solid fa-arrow-left"></i> Back</div>`;
+                html += child_menu_small();
+                html += '<div class="mt-2" style="font-size:x-small"></div>';
+                html += tanggal();
+                $(".detail_profile").html(html);
+            });
+            
+         
+
+        })
+
+        $(document).on("click", ".get_data", function (e) {
+            e.preventDefault();
+            let order=$(this).data("order");
+            let tgl=$(".tgl").val();
+            let bulan=$(".bulan").val();
+            let tahun=$(".tahun").val();
+
+            tggl=tgl;
+            bln=bulan;
+            thn=tahun;
+
+            let url=tahun+"-"+bulan+"-"+tgl;
+            if(order=="bulan"){
+                url= tahun + "-" + bulan;
+            }else if(order=="tahun"){
+                url= tahun;
+            }
+              fetchData(api + "general/data/" + db + "/transaksi/"+url).then(res => {
+                 data = res;
+                 let html=`<div class="back text-grey" data-order="${(sub_menu.unit.length>0?"sub":"tgl")}" style="font-size:small"><i class="fa-solid fa-arrow-left"></i> Back</div>`;
+                 html += child_menu_small();
+                 html += `<div class="mt-2" style="font-size:x-small">TOTAL: ${(angka(res.data2))}</div>`;
+                 html += table_detail(db);
+                 $(".detail_profile").html(html);
+             });
+
+        })
+
+        $(document).on("click", ".back", function (e) {
+            e.preventDefault();
+            let order=$(this).data("order");
+
+            if(order=="tgl"){
+               $(".detail_profile").html(tanggal());
+            }else if (order == "child") {
+                $(".detail_profile").html(child_menu_big());
+            } else if (order == "sub") {
+                 let html = `<div class="back text-grey" data-order="child" style="font-size:small"><i class="fa-solid fa-arrow-left"></i> Back</div>`;
+                html += child_menu_small();
+                html += '<div class="mt-2" style="font-size:x-small"></div>';
+                html += tanggal();
+                $(".detail_profile").html(html);
+            }
+        })
+    </script>
+
+</body>
+
+</html>
