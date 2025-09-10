@@ -1,0 +1,77 @@
+{
+  "menu": [
+    {
+      "id": "1",
+      "menu": "Home",
+      "url": "home",
+      "icon": "fa-solid fa-house"
+    },
+     {
+      "id": "2",
+      "menu": "Profile",
+      "url": "profile",
+      "icon":"fa-solid fa-address-card"
+    },
+    {
+      "id": "3",
+      "menu": "Stok",
+      "url": "stok",
+      "icon": "fa-solid fa-truck"
+    },
+    {
+      "id": "4",
+      "menu": "Pemasukan",
+      "url": "pemasukan",
+      "icon":"fa-solid fa-angles-down"
+    },
+    {
+      "id": "5",
+      "menu": "Pengeluaran",
+      "url": "pengeluaran",
+      "icon": "fa-solid fa-angles-up"
+    },
+    {
+      "id": "5",
+      "menu": "Rangkuman",
+      "url": "rangkuman",
+      "icon": "fa-solid fa-circle-notch"
+    }
+  ],
+  "profile": [
+    {
+      "id": "1",
+      "menu": "Batea",
+      "url": "batea",
+      "icon": "fa-solid fa-mug-hot",
+      "unit":["Djana", "Yayasan"]
+    },
+     {
+      "id": "2",
+      "menu": "Grosir",
+      "url": "grosir",
+      "icon":"fa-solid fa-box-open",
+      "unit":[]
+    },
+    {
+      "id": "3",
+      "menu": "Playbox",
+      "url": "playbox",
+      "icon": "fa-solid fa-gamepad",
+      "unit":[]
+    },
+    {
+      "id": "4",
+      "menu": "Pground",
+      "url": "playground",
+      "icon": "fa-solid fa-gamepad",
+      "unit":[]
+    },
+    {
+      "id": "5",
+      "menu": "9Clean",
+      "url": "nineclean",
+      "icon":"fa-solid fa-motorcycle",
+      "unit":[]
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Home</title>
+    <script src="https://code.jquery.com/jquery-3.7.1.js" integrity="sha256-eKhayi8LEQwp4NKxN+CfCh+3qOVUtJn3QNZ0TciWLP4="
+        crossorigin="anonymous"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65" crossorigin="anonymous">
+        <script src="https://kit.fontawesome.com/a193ca89ae.js" crossorigin="anonymous"></script>
+
+        <link rel="stylesheet" href="style.css">
+        <script>let judul = "Home";</script>
+    </head>
+
+<body class="bg-dark text-light">
+    <div class="d-flex justify-content-between bg-grey p-2">
+        <div>BKW</div>
+        <div class="judul">Home</div>
+        <div>
+            <a href="" class="" type="button" data-bs-toggle="offcanvas" data-bs-target="#canvas_menu"
+                aria-controls="offcanvasStart"><i class="fa-solid fa-bars text-light"></i></a>
+        </div>
+    </div>
+<div class="container">
+    <div class="offcanvas offcanvas-start bg-dark" tabindex="-1" id="canvas_menu" aria-labelledby="offcanvasStartLabel">
+        <div class="offcanvas-header bg-grey p-2">
+            <h6 class="offcanvas-title">Menu</h6>
+            <a href="" class="btn_close" type="button" data-bs-dismiss="offcanvas" aria-label="Close"><i class="fa-solid fa-xmark"></i></a>
+        </div>
+        <div class="offcanvas-body canvas_menu p-0 mt-2">
+           
+        </div>
+    </div>
+
+</div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-kenU1KFdBIe4zVF0s0G1M5b4hcpxyD9F7jL+jjXkk+Q2h455rYXK/7HAuoJl+0I4"
+        crossorigin="anonymous"></script>
+
+    <script src="main.js"></script>
+    <script>
+       menu(judul);
+        // async function fetchData(url) {
+        //         try {
+        //             const response = await fetch(url);
+        //             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        //             const data = await response.json();
+        //             return data;
+        //         } catch (err) {
+        //             console.error('Error fetching data:', err);
+        //             return null;
+        //         }
+        //     }
+
+        //     // Contoh penggunaan
+        //     const apiUrl = 'https://api.walisongosragen.com/nota/by_no_nota/grosir/2025-09-0012';
+        //     fetchData(apiUrl).then(res => {
+              
+        //             console.log(res.data);
+        //             console.log(res.data2);
+        //     });
+    </script>
+
+</body>
+
+</html>

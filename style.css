@@ -1,0 +1,52 @@
+.bg-grey{
+    background-color: rgb(48, 57, 66);
+}
+.bg-pink {
+    background-color: rgb(150, 75, 138);
+}
+.text-pink {
+    color: rgb(150, 75, 138);
+}
+.text-grey{
+color:rgb(140, 142, 142)
+}
+.bg-grey_light{
+    background-color: rgb(186, 199, 213);
+}
+.btn_close, .menu_circle{
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background-color: rgb(239, 191, 218);
+    color: rgb(188, 80, 166);
+    font-size: 13px;
+    text-align: center;
+}
+.main_menu, .main_menu_active{
+    background-color: rgb(66, 76, 88);
+    display: block;
+    text-decoration: none;
+    color: rgb(163, 163, 163);
+    margin-bottom: 1px;
+    padding: 8px 12px;
+    font-size: 12px;
+}
+.main_menu_active{
+    background-color :rgb(150, 75, 138);
+    color: white;
+}
+
+.sub_menu{
+    background-color: rgb(52, 60, 65);
+    padding: 5px;
+}
+.sub_menu div{
+    color: rgb(102, 106, 104);
+    text-align: center;
+    margin-bottom: -8px;
+}
+.sub_menu label{
+    color: rgb(102, 106, 104);
+    text-align: center;
+    font-size: 10px;
+}

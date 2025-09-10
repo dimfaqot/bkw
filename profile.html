@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Home</title>
+    <script src="https://code.jquery.com/jquery-3.7.1.js" integrity="sha256-eKhayi8LEQwp4NKxN+CfCh+3qOVUtJn3QNZ0TciWLP4="
+        crossorigin="anonymous"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65" crossorigin="anonymous">
+        <script src="https://kit.fontawesome.com/a193ca89ae.js" crossorigin="anonymous"></script>
+
+        <link rel="stylesheet" href="style.css">
+        <script>let judul="Profile";</script>
+    </head>
+
+<body class="bg-dark text-light">
+    <div class="d-flex justify-content-between bg-grey p-2">
+        <div>BKW</div>
+        <div class="judul">Home</div>
+        <div>
+            <a href="" class="" type="button" data-bs-toggle="offcanvas" data-bs-target="#canvas_menu"
+                aria-controls="offcanvasStart"><i class="fa-solid fa-bars text-light"></i></a>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-center sub_menu gap-3 sub_menu"></div>
+
+    <div class="container mt-1 detail_profile">
+        <h6 class="text-pink" style="font-size: x-small;">Klik sub menu untuk melihat</h6>
+    </div>
+<div class="container">
+    <div class="offcanvas offcanvas-start bg-dark" tabindex="-1" id="canvas_menu" aria-labelledby="offcanvasStartLabel">
+        <div class="offcanvas-header bg-grey p-2">
+            <h6 class="offcanvas-title">Menu</h6>
+            <a href="" class="btn_close" type="button" data-bs-dismiss="offcanvas" aria-label="Close"><i class="fa-solid fa-xmark"></i></a>
+        </div>
+        <div class="offcanvas-body canvas_menu p-0 mt-2">
+           
+        </div>
+    </div>
+
+</div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-kenU1KFdBIe4zVF0s0G1M5b4hcpxyD9F7jL+jjXkk+Q2h455rYXK/7HAuoJl+0I4"
+        crossorigin="anonymous"></script>
+
+    <script src="main.js"></script>
+    <script>
+        let data=[];
+        let tabel='';
+       menu(judul);
+       menu_profile();
+
+       let detail_profile_big=()=>{
+        let html=
+        `
+            <div class="bg-grey border border-secondary rounded p-4">
+                <div class="text-center">
+                    <img width="70" src="files/${tabel}.png"></img>
+                    <div class="mt-3">${tabel.toUpperCase()}</div>
+                    <div class="text-secondary" style="font-size: small;">${int_to_tgl(data.data.tgl_berdiri, "d M Y")}</div>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between gap-2 text-secondary mb-4" style="font-size: small;">
+                        <div class="text-center">
+                            <div class="border-bottom border-secondary fw-bold text-grey">PENDIRI</div>
+                            <div>${data.data.pendiri}</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="border-bottom border-secondary fw-bold text-grey">SUB UNIT</div>
+                            <div>${(data.data.sub_unit == "" ? "-" : data.data.sub_unit)}</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="border-bottom border-secondary fw-bold text-grey">MANAGER</div>
+                            <div>${data.data.manager}</div>
+                        </div>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between gap-2 text-secondary" style="font-size: small;">
+                        <div class="text-center">
+                            <div class="border-bottom border-secondary fw-bold text-grey">MODAL</div>
+                            <div>${angka(data.data3)}</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="border-bottom border-secondary fw-bold text-grey">SUMBER MODAL</div>
+                            <div>${data.data.modal_asal}</div>
+                        </div>
+                        <div class="text-center bg-pink text-light border border-light" style="width: 83px;height:83px;border-radius: 50%;padding:11px">
+                        <div class="detail_modal"><b>DETAIL</b> MODAL <div><i class="fa-solid fa-arrow-up-right-from-square"></i></div></div>
+                        </div>
+                </div>
+            </div>
+        `;
+        return html;
+       }
+
+       let detail_profile_small=()=>{
+            let html=
+            `
+                <div class="bg-grey border border-secondary rounded p-2 d-flex gap-3" style="font-size: x-small;">
+                    <div class="text-center">
+                        <img width="50" src="files/${tabel}.png"></img>
+                        <div class="mt-1">${int_to_tgl(data.data.tgl_berdiri, "d M Y")}</div>
+                    </div>
+                    <div>
+                        <div>Pendiri        : ${data.data.pendiri}</div>
+                        <div>Manager        : ${data.data.manager}</div>
+                        <div>Sumber Modal   : ${data.data.modal_asal}</div>
+                        <div>Modal          : ${angka(data.data3)}</div>
+                    </div>
+
+                </div>
+            `;
+
+            return html;
+       }
+
+       let table_detail=()=>{
+        let html=
+            `
+            <div class="table-responsive">
+                <table class="table table-dark table-bordered table-sm" style="font-size: xx-small;">
+                    <thead>
+                        <tr>
+                            <th class="text-center">#</th>
+                            <th class="text-center">Barang</th>
+                            <th class="text-center">Harga</th>
+                            <th class="text-center">Qty</th>
+                            <th class="text-center">Biaya</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+                        data.data2.forEach((e,i) => {
+                            html+=`<tr>
+                                <td class="text-center">${(i+1)}</td>
+                                <td>${e.barang}</td>
+                                <td class="text-end">${angka(e.harga)}</td>
+                                <td class="text-end">${angka(e.qty)}</td>
+                                <td class="text-end">${angka(e.biaya)}</td>
+                            </tr>`;
+                            
+                        });
+                    html+=`</tbody>
+                </table>
+            </div>
+            `;
+
+            return html;
+       }
+
+       $(document).on("click", ".btn_get_data_profile", function(e){
+            e.preventDefault();
+            tabel=$(this).data("tabel");
+            menu_profile(tabel);
+            fetchData(api + "general/profile/"+tabel).then(res => {
+                    data=res;
+                    let html='<div class="mt-3"></div>';
+                    html+= detail_profile_big();
+                    $(".detail_profile").html(html);
+                });
+            })
+
+        $(document).on("click", ".detail_modal", function (e) {
+            e.preventDefault();
+            let html='<div class="back text-grey" style="font-size:small"><i class="fa-solid fa-arrow-left"></i> Back</div>';
+            html+=detail_profile_small();
+            html+='<div class="mt-2" style="font-size:x-small">DETAIL</div>';
+            html+=table_detail();
+            $(".detail_profile").html(html);
+
+        })
+
+        $(document).on("click", ".back", function (e) {
+            e.preventDefault();
+           let html = '<div class="mt-3"></div>';
+            html += detail_profile_big();
+            $(".detail_profile").html(html);
+        })
+    </script>
+
+</body>
+
+</html>
