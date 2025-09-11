@@ -197,7 +197,7 @@
          if(sub_menu.unit.length>0){
            $(".detail_profile").html(child_menu_big());
          }else{
-            unit=sub_menu.menu;
+            unit='';
              $(".detail_profile").html(tanggal());
                        
          }
@@ -209,17 +209,12 @@
             let usaha=$(this).data("unit");
             unit=usaha;
 
-            fetchData(api + "general/data/"+db+"/barang/"+usaha).then(res => {
-                data=res;
-                let html=`<div class="back text-grey" data-order="child" style="font-size:small"><i class="fa-solid fa-arrow-left"></i> Back</div>`;
-                html += child_menu_small();
-                html += '<div class="mt-2" style="font-size:x-small"></div>';
-                html += tanggal();
-                $(".detail_profile").html(html);
-            });
+            let html=`<div class="back text-grey" data-order="child" style="font-size:small"><i class="fa-solid fa-arrow-left"></i> Back</div>`;
+            html += child_menu_small();
+            html += '<div class="mt-2" style="font-size:x-small"></div>';
+            html += tanggal();
+            $(".detail_profile").html(html);
             
-         
-
         })
 
         $(document).on("click", ".get_data", function (e) {
@@ -238,6 +233,10 @@
                 url= tahun + "-" + bulan;
             }else if(order=="tahun"){
                 url= tahun;
+            }
+
+            if(unit !==''){
+                url+='/'+unit;
             }
               fetchData(api + "general/data/" + db + "/transaksi/"+url).then(res => {
                  data = res;

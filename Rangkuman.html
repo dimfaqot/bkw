@@ -12,13 +12,13 @@
         <script src="https://kit.fontawesome.com/a193ca89ae.js" crossorigin="anonymous"></script>
 
         <link rel="stylesheet" href="style.css">
-        <script>let judul="Pengeluaran";</script>
+        <script>let judul="Rangkuman";</script>
     </head>
 
 <body class="bg-dark text-light">
     <div class="d-flex justify-content-between bg-grey p-2">
         <div>BKW</div>
-        <div class="judul">Pengeluaran</div>
+        <div class="judul">Rangkuman</div>
         <div>
             <a href="" class="" type="button" data-bs-toggle="offcanvas" data-bs-target="#canvas_menu"
                 aria-controls="offcanvasStart"><i class="fa-solid fa-bars text-light"></i></a>
@@ -97,24 +97,30 @@
                     <thead>
                         <tr>
                             <th class="text-center">#</th>
-                            <th class="text-center">Tgl</th>
-                            <th class="text-center">Barang</th>
-                            <th class="text-center">Qty</th>
-                            <th class="text-center">Biaya</th>
+                            <th class="text-center">Bulan</th>
+                            <th class="text-center">Masuk</th>
+                            <th class="text-center">Keluar</th>
+                            <th class="text-center">Laba</th>
                         </tr>
                     </thead>
                     <tbody>`;
+                        let total=0;
                         data.data.forEach((e,i) => {
-                           
+                           total+= e.masuk - e.keluar;
                         html += `<tr>
-                                <td class="text-center">${(i + 1)}</td>
-                                <td>${int_to_tgl(e.tgl)}</td>
-                                <td>${e.barang}</td>
-                                <td class="text-end">${angka(e.qty)}</td>
-                                <td class="text-end">${angka(e.biaya)}</td>
-                            </tr>`;
+                                    <td class="text-center">${(i + 1)}</td>
+                                    <td>${e.bulan}</td>
+                                    <td class="text-end">${angka(e.masuk)}</td>
+                                    <td class="text-end">${angka(e.keluar)}</td>
+                                    <td class="text-end">${angka(e.masuk-e.keluar)}</td>
+                                </tr>`;
                                                       
                         });
+
+                        html += `<tr>
+                                    <th colspan="4" class="text-center">TOTAL</th>
+                                    <th class="text-end">${angka(total)}</th>
+                                </tr>`;
                     html+=`</tbody>
                 </table>
             </div>
@@ -123,59 +129,29 @@
             return html;
        }
 
-       let tggl='';
-       let bln='';
        let thn='';
        let unit='';
 
-       let tanggal=(order="")=>{
+       let tanggal=()=>{
 
         let html=
         `
-            <div class="bg-grey rounded py-2">
-                <div class="d-flex justify-content-center gap-2">
+            <div class="bg-grey rounded">
+                <div class="input-group p-3">
                     <div class="form-floating" style="width: 90px;">
-                        <select class="form-select bg-dark text-light border border-secondary tgl" style="font-size: small;">`;
-                            for (let i = 1; i <= 31; i++) {
-                                let tgl = String(i).padStart(2, '0');
-                                if(tggl==''){
-                                    html+=`<option ${(tgl_now("d")==tgl?"selected":"")} value="${tgl}">${tgl}</option>`;
-                                }else{
-                                    html+=`<option ${(tggl ==tgl?"selected":"")} value="${tgl}">${tgl}</option>`;
-                                }
-                            }
-                        html+=`</select>
-                        <label style="font-size: x-small;">Tgl</label>
-                    </div>
-                    <div class="form-floating" style="width: 120px;">
-                        <select class="form-select bg-dark text-light border border-secondary bulan" style="font-size: small;">`;
-                            datas.bulans.forEach(e=>{
-                                if (bln == '') {
-                                    html+=`<option ${(tgl_now("m") == e.angka ? "selected" : "")} value="${e.angka}">${e.bulan}</option>`;
-                                }else{
-                                    html+=`<option ${(bln == e.angka ? "selected" : "")} value="${e.angka}">${e.bulan}</option>`;
-                                }
-                            })
-                        html+=`</select>
-                        <label style="font-size: x-small;">Bulan</label>
-                    </div>
-                    <div class="form-floating" style="width: 90px;">
-                        <select class="form-select bg-dark text-light border border-secondary tahun" style="font-size: small;">`;
-                            for (let i = 2018; i <= tgl_now("y"); i++) {
-                                 if (thn == '') {
-                                        html += `<option ${(tgl_now("y") == i ? "selected" : "")} value="${i}">${i}</option>`;
-                                }else{
-                                        html += `<option ${(thn == i ? "selected" : "")} value="${i}">${i}</option>`;
+                            <select class="form-select bg-dark text-light border border-secondary tahun" style="font-size: small;">`;
+                                for (let i = 2018; i <= tgl_now("y"); i++) {
+                                    if (thn == '') {
+                                            html += `<option ${(tgl_now("y") == i ? "selected" : "")} value="${i}">${i}</option>`;
+                                    }else{
+                                            html += `<option ${(thn == i ? "selected" : "")} value="${i}">${i}</option>`;
+                                        }
                                     }
-                                }
-                        html+=`</select>
-                        <label style="font-size: x-small;">Tahun</label>
+                            html+=`</select>
+                            <label style="font-size: x-small;">Tahun</label>
                     </div>
-                </div>
-                <div class="text-center mt-2">
-                    <button data-order="tgl" class="get_data btn btn-sm btn-secondary"><i class="fa-solid fa-arrow-up-right-from-square"></i> By Tanggal</button>
-                    <button data-order="bulan" class="get_data btn btn-sm btn-secondary mx-2"><i class="fa-solid fa-arrow-up-right-from-square"></i> By Bulan</button>
-                    <button data-order="tahun" class="get_data btn btn-sm btn-secondary"><i class="fa-solid fa-arrow-up-right-from-square"></i> By Tahun</button>
+                    <button class="get_data btn btn-sm btn-secondary"><i class="fa-solid fa-arrow-up-right-from-square"></i> Get Data</button>
+           
                 </div>
             </div>
             <div class="body_data"></div>
@@ -198,8 +174,7 @@
            $(".detail_profile").html(child_menu_big());
          }else{
             unit='';
-             $(".detail_profile").html(tanggal());
-                       
+            $(".detail_profile").html(tanggal());       
          }
 
         })
@@ -213,35 +188,26 @@
             html += child_menu_small();
             html += '<div class="mt-2" style="font-size:x-small"></div>';
             html += tanggal();
-            $(".detail_profile").html(html);
-    
+            $(".detail_profile").html(html);         
+         
         })
 
         $(document).on("click", ".get_data", function (e) {
             e.preventDefault();
             let order=$(this).data("order");
-            let tgl=$(".tgl").val();
-            let bulan=$(".bulan").val();
             let tahun=$(".tahun").val();
 
-            tggl=tgl;
-            bln=bulan;
             thn=tahun;
+            let url=thn;
+            if(unit !==''){
+                url+='/'+unit;
+            }
 
-            let url=tahun+"-"+bulan+"-"+tgl;
-            if(order=="bulan"){
-                url= tahun + "-" + bulan;
-            }else if(order=="tahun"){
-                url= tahun;
-            }
-             if (unit !== '') {
-                url += '/' + unit;
-            }
-              fetchData(api + "general/data/" + db + "/pengeluaran/"+url).then(res => {
+              fetchData(api + "general/rangkuman/" + db + "/"+url).then(res => {
                  data = res;
-                 let html=`<div class="back text-grey" data-order="${(sub_menu.unit.length>0?"sub":"tgl")}" style="font-size:small"><i class="fa-solid fa-arrow-left"></i> Back</div>`;
+                 let html=`<div class="back text-grey" data-order="${(sub_menu.unit.length>0?"child":"")}" style="font-size:small"><i class="fa-solid fa-arrow-left"></i> Back</div>`;
                  html += child_menu_small();
-                 html += `<div class="mt-2" style="font-size:x-small">TOTAL: ${(angka(res.data2))}</div>`;
+                 html += `<div class="mt-2" style="font-size:x-small">TAHUN ${thn}</div>`;
                  html += table_detail(db);
                  $(".detail_profile").html(html);
              });
@@ -252,16 +218,14 @@
             e.preventDefault();
             let order=$(this).data("order");
 
-            if(order=="tgl"){
-               $(".detail_profile").html(tanggal());
-            }else if (order == "child") {
-                $(".detail_profile").html(child_menu_big());
-            } else if (order == "sub") {
-                 let html = `<div class="back text-grey" data-order="child" style="font-size:small"><i class="fa-solid fa-arrow-left"></i> Back</div>`;
+            if (order == "child") {
+                let html = `<div class="back text-grey" data-order="" style="font-size:small"><i class="fa-solid fa-arrow-left"></i> Back</div>`;
                 html += child_menu_small();
                 html += '<div class="mt-2" style="font-size:x-small"></div>';
                 html += tanggal();
                 $(".detail_profile").html(html);
+            } else {
+                $(".detail_profile").html(child_menu_big());
             }
         })
     </script>
