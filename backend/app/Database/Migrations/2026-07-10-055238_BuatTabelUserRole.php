@@ -24,6 +24,7 @@ class BuatTabelUserRole extends Migration
                 'type'       => 'INT',
                 'constraint' => 11,
                 'unsigned'   => true,
+                'null'       => true,
             ],
             'unit_id' => [
                 'type'       => 'INT',

@@ -34,6 +34,11 @@ $db = \Config\Database::connect();
 header('Content-Type: text/plain');
 
 try {
+    // Alter table user_role to make usaha_id nullable (fixes migration discrepancy)
+    echo "Altering user_role schema...\n";
+    $db->query("ALTER TABLE user_role MODIFY COLUMN usaha_id INT(11) UNSIGNED NULL");
+    echo "user_role schema updated successfully.\n\n";
+
     // 1. Insert User Dim
     $userExists = $db->table('users')->where('wa', '085175006585')->countAllResults();
     if ($userExists === 0) {
