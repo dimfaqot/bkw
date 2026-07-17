@@ -26,6 +26,11 @@ define('WRITEPATH', realpath(rtrim($paths->writableDirectory, '\\/ ')) . DIRECTO
 // Load Composer autoloader
 require ROOTPATH . 'vendor/autoload.php';
 
+// Load path constants defined by application
+if (file_exists(APPPATH . 'Config/Constants.php')) {
+    require APPPATH . 'Config/Constants.php';
+}
+
 // Load Common functions
 require SYSTEMPATH . 'Common.php';
 
