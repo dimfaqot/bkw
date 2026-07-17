@@ -4,7 +4,7 @@ import { useTheme } from '../contexts/ThemeContext.jsx';
 import { useUI, LazyLoading } from '../contexts/UIContext.jsx';
 import { 
   LogOut, User, Users, Shield, Briefcase, Phone, Mail, Sun, Moon, Edit3, HelpCircle, 
-  Layers, Menu, Home, ShoppingCart, BarChart2, Settings, Database, Trash2, Plus, Calendar, MapPin, RefreshCw, UserCheck,
+  Layers, Menu, Home, ShoppingCart, BarChart2, Settings, Database, Trash2, Plus, Calendar, MapPin, RefreshCw, UserCheck, Clock,
   ChevronDown, ChevronRight, Folder, Grid, Box, FileText, Monitor, CheckSquare, Search, GripVertical, Bell
 } from 'lucide-react';
 import { MapContainer, TileLayer, Circle, Marker, useMapEvents, useMap } from 'react-leaflet';
@@ -537,9 +537,120 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
       if (!dataAkhir.tanggal) { onError('Tanggal lembur wajib diisi.'); return; }
       if (!dataAkhir.jam_mulai) { onError('Jam mulai lembur wajib diisi.'); return; }
       if (!dataAkhir.jam_selesai) { onError('Jam selesai lembur wajib diisi.'); return; }
+
+      // Validasi tabrakan shift
+      const dateParts = dataAkhir.tanggal.split('-');
+      const y = parseInt(dateParts[0], 10);
+      const m = parseInt(dateParts[1], 10) - 1;
+      const d = parseInt(dateParts[2], 10);
+      const dateObj = new Date(y, m, d);
+      const namaHari = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][dateObj.getDay()];
+
+      const liburHariIni = opsiJadwal.find(
+        j => j.karyawan_id == dataAkhir.karyawan_id && j.hari === namaHari
+      );
+
+      if (!liburHariIni) {
+        const jadwalRutin = opsiJadwal.find(
+          j => j.karyawan_id == dataAkhir.karyawan_id && (!j.hari || j.hari === '')
+        );
+        if (jadwalRutin) {
+          const shiftObj = opsiShift.find(s => s.id == jadwalRutin.shift_id);
+          if (shiftObj) {
+            const timeToMinutes = (t) => {
+              if (!t) return 0;
+              const [h, m] = t.split(':').map(Number);
+              return h * 60 + m;
+            };
+            const s1 = timeToMinutes(shiftObj.jam_mulai);
+            let e1 = timeToMinutes(shiftObj.jam_selesai);
+            const s2 = timeToMinutes(dataAkhir.jam_mulai);
+            let e2 = timeToMinutes(dataAkhir.jam_selesai);
+
+            if (e1 < s1) e1 += 1440;
+            if (e2 < s2) e2 += 1440;
+
+            if (s1 < e2 && s2 < e1) {
+              onError(`Gagal menyimpan: Jam lembur bertabrakan dengan jadwal shift kerja karyawan (${shiftObj.nama_shift}: ${shiftObj.jam_mulai.substring(0, 5)} - ${shiftObj.jam_selesai.substring(0, 5)})!`);
+              return;
+            }
+          }
+        }
+      }
     }
     onSimpan(dataAkhir);
   };
+
+  // Dynamic overlap check for lembur warning
+  let infoTabrakanShift = null;
+  if (tabel === 'lembur' && formState?.karyawan_id && formState?.tanggal && formState?.jam_mulai && formState?.jam_selesai) {
+    const dateParts = formState.tanggal.split('-');
+    const y = parseInt(dateParts[0], 10);
+    const m = parseInt(dateParts[1], 10) - 1;
+    const d = parseInt(dateParts[2], 10);
+    const dateObj = new Date(y, m, d);
+    const namaHari = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][dateObj.getDay()];
+
+    const liburHariIni = opsiJadwal.find(
+      j => j.karyawan_id == formState.karyawan_id && j.hari === namaHari
+    );
+
+    if (!liburHariIni) {
+      const jadwalRutin = opsiJadwal.find(
+        j => j.karyawan_id == formState.karyawan_id && (!j.hari || j.hari === '')
+      );
+      if (jadwalRutin) {
+        const shiftObj = opsiShift.find(s => s.id == jadwalRutin.shift_id);
+        if (shiftObj) {
+          const timeToMinutes = (t) => {
+            if (!t) return 0;
+            const [h, m] = t.split(':').map(Number);
+            return h * 60 + m;
+          };
+          const s1 = timeToMinutes(shiftObj.jam_mulai);
+          let e1 = timeToMinutes(shiftObj.jam_selesai);
+          const s2 = timeToMinutes(formState.jam_mulai);
+          let e2 = timeToMinutes(formState.jam_selesai);
+
+          if (e1 < s1) e1 += 1440;
+          if (e2 < s2) e2 += 1440;
+
+          if (s1 < e2 && s2 < e1) {
+            infoTabrakanShift = `${shiftObj.nama_shift} (${shiftObj.jam_mulai.substring(0, 5)} - ${shiftObj.jam_selesai.substring(0, 5)})`;
+          }
+        }
+      }
+    }
+  }
+
+  // Dynamic shift guide for lembur
+  let petunjukShift = null;
+  let isShiftExist = false;
+  if (tabel === 'lembur' && formState?.karyawan_id && formState?.tanggal) {
+    const dateParts = formState.tanggal.split('-');
+    const y = parseInt(dateParts[0], 10);
+    const m = parseInt(dateParts[1], 10) - 1;
+    const d = parseInt(dateParts[2], 10);
+    const dateObj = new Date(y, m, d);
+    const namaHari = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][dateObj.getDay()];
+
+    const liburHariIni = opsiJadwal.find(
+      j => j.karyawan_id == formState.karyawan_id && j.hari === namaHari
+    );
+
+    if (!liburHariIni) {
+      const jadwalRutin = opsiJadwal.find(
+        j => j.karyawan_id == formState.karyawan_id && (!j.hari || j.hari === '')
+      );
+      if (jadwalRutin) {
+        const shiftObj = opsiShift.find(s => s.id == jadwalRutin.shift_id);
+        if (shiftObj) {
+          isShiftExist = true;
+          petunjukShift = `Shift Kerja: ${shiftObj.nama_shift} (${shiftObj.jam_mulai.substring(0, 5)} - ${shiftObj.jam_selesai.substring(0, 5)})`;
+        }
+      }
+    }
+  }
 
   return (
     <form onSubmit={handleSubmit} className="d-flex flex-column">
@@ -1105,6 +1216,15 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
               </div>
             </div>
 
+            {isShiftExist && petunjukShift && (
+              <div className="alert alert-info p-2 mt-2 mb-0 d-flex align-items-center gap-2" style={{ fontSize: '0.75rem', borderRadius: '8px', border: '1px dashed var(--warna-utama)' }}>
+                <span>ℹ️</span>
+                <span>
+                  <strong>Panduan Shift:</strong> {petunjukShift}
+                </span>
+              </div>
+            )}
+
             <div className="row g-2 mt-2">
               <div className="col-6">
                 <label className="form-label small fw-semibold">Jam Mulai</label>
@@ -1127,6 +1247,15 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
                 />
               </div>
             </div>
+
+            {infoTabrakanShift && (
+              <div className="alert alert-danger p-2 mt-2 mb-0 d-flex align-items-center gap-2" style={{ fontSize: '0.75rem', borderRadius: '8px', border: '1px dashed var(--warna-bahaya)' }}>
+                <span>⚠️</span>
+                <span>
+                  <strong>Peringatan:</strong> Jam lembur bertabrakan dengan jadwal shift kerja karyawan: <strong>{infoTabrakanShift}</strong>!
+                </span>
+              </div>
+            )}
 
             <div className="mt-3">
               <label className="form-label small fw-semibold">Keterangan / Tugas Lembur</label>
@@ -2472,6 +2601,7 @@ const Dashboard = () => {
   const [gpsError, setGpsError] = useState('');
   const [gpsDistance, setGpsDistance] = useState(null); // meter
   const [todayAbsensi, setTodayAbsensi] = useState(null);
+  const [tipeAbsenAktif, setTipeAbsenAktif] = useState('rutin'); // 'rutin' atau 'lembur'
   const [absenLoading, setAbsenLoading] = useState(false);
   const [absenFetching, setAbsenFetching] = useState(false);
   const [totalPoin, setTotalPoin] = useState(null);
@@ -2847,13 +2977,14 @@ const Dashboard = () => {
   }, [filterPoin]);
 
   // ===== FUNGSI ABSENSI =====
-  const bukaAbsenModal = async () => {
+  const bukaAbsenModal = async (defaultTipe = 'rutin') => {
     // Cek apakah ada koordinat toko
     const usahaData = opsiUsaha.find(u => u.id == profile?.usaha_id);
     const tokoLat = parseFloat(usahaData?.latitude);
     const tokoLng = parseFloat(usahaData?.longitude);
     const radiusAbsen = parseFloat(usahaData?.radius_absen) || 100;
 
+    setTipeAbsenAktif(typeof defaultTipe === 'string' ? defaultTipe : 'rutin');
     setShowAbsenModal(true);
     setGpsLoading(true);
     setGpsError('');
@@ -2913,7 +3044,7 @@ const Dashboard = () => {
   };
 
   const tanganiAbsenMasuk = async (absenLemburId = null) => {
-    const lemburId = (absenLemburId && typeof absenLemburId === 'number') ? absenLemburId : null;
+    const lemburId = absenLemburId ? parseInt(absenLemburId, 10) : null;
 
     if (!gpsCoords) {
       ui.notif('gagal', 'Koordinat GPS belum tersedia.');
@@ -2944,11 +3075,46 @@ const Dashboard = () => {
       // Absen Lembur
       const lemburObj = tugasHariIni?.lembur_aktif;
       if (lemburObj) {
+        let tolSebelum = 120; // default 2 jam
+        let tolTerlambat = 15; // default 15 menit
+
+        // Cari toleransi dari shift rutin hari ini (jika ada)
+        const rutinObj = tugasHariIni?.jadwal_rutin || tugasHariIni?.jadwal_pengganti;
+        if (rutinObj) {
+          tolSebelum = parseInt(rutinObj.toleransi_sebelum) || 0;
+          tolTerlambat = parseInt(rutinObj.toleransi_terlambat) || 0;
+        } else {
+          // Cari shift rutin default dari opsiJadwal (mengikuti namaHari bisnis hari ini)
+          const dateParts = lemburObj.tanggal.split('-');
+          const y = parseInt(dateParts[0], 10);
+          const m = parseInt(dateParts[1], 10) - 1;
+          const d = parseInt(dateParts[2], 10);
+          const dateObj = new Date(y, m, d);
+          const namaHari = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][dateObj.getDay()];
+
+          const liburHariIni = opsiJadwal.find(
+            j => j.karyawan_id == profile?.user_id && j.hari === namaHari
+          );
+
+          if (!liburHariIni) {
+            const jadwalRutin = opsiJadwal.find(
+              j => j.karyawan_id == profile?.user_id && (!j.hari || j.hari === '')
+            );
+            if (jadwalRutin) {
+              const shiftObj = opsiShift.find(s => s.id == jadwalRutin.shift_id);
+              if (shiftObj) {
+                tolSebelum = parseInt(shiftObj.toleransi_sebelum) || 0;
+                tolTerlambat = parseInt(shiftObj.toleransi_terlambat) || 0;
+              }
+            }
+          }
+        }
+
         targetShift = {
           jam_mulai: lemburObj.jam_mulai,
           jam_selesai: lemburObj.jam_selesai,
-          toleransi_sebelum: 120, // toleransi default lembur 2 jam sebelum
-          toleransi_terlambat: 15 // toleransi default terlambat 15 menit
+          toleransi_sebelum: tolSebelum,
+          toleransi_terlambat: tolTerlambat
         };
       }
     } else {
@@ -2992,7 +3158,11 @@ const Dashboard = () => {
         const statusLabel = { tepat_waktu: 'Tepat Waktu', lebih_awal: 'Lebih Awal', terlambat: 'Terlambat' }[statusKehadiran] || statusKehadiran;
         const infoPoin = json.nilai_poin ? ` (${json.nilai_poin > 0 ? '+' : ''}${json.nilai_poin} poin)` : '';
         ui.notif('sukses', `Absen Masuk berhasil! Status: ${statusLabel}${infoPoin}`);
-        setTodayAbsensi({ id: json.id_baru, karyawan_id: profile?.user_id, jam_masuk: nowLocalStr, jam_pulang: null, status_kehadiran: statusKehadiran, lembur_id: lemburId });
+        if (Array.isArray(todayAbsensi)) {
+          setTodayAbsensi(prev => [...prev, { id: json.id_baru, karyawan_id: profile?.user_id, jam_masuk: nowLocalStr, jam_pulang: null, status_kehadiran: statusKehadiran, lembur_id: lemburId }]);
+        } else {
+          setTodayAbsensi([{ id: json.id_baru, karyawan_id: profile?.user_id, jam_masuk: nowLocalStr, jam_pulang: null, status_kehadiran: statusKehadiran, lembur_id: lemburId }]);
+        }
         ambilTugasHariIni();
         if (tabelTerpilih === 'absensi') ambilDataTabel('absensi', true);
         if (tabelTerpilih === 'points') ambilDataTabel('points', true);
@@ -3007,8 +3177,12 @@ const Dashboard = () => {
     }
   };
 
-  const tanganiAbsenPulang = async () => {
-    if (!todayAbsensi?.id) {
+  const tanganiAbsenPulang = async (targetId = null) => {
+    const activeAbsen = targetId 
+      ? (Array.isArray(todayAbsensi) ? todayAbsensi.find(a => a.id === targetId) : todayAbsensi)
+      : (Array.isArray(todayAbsensi) ? todayAbsensi.find(a => tipeAbsenAktif === 'lembur' ? !!a.lembur_id : !a.lembur_id) : todayAbsensi);
+
+    if (!activeAbsen?.id) {
       ui.notif('gagal', 'Data absensi hari ini tidak ditemukan.');
       return;
     }
@@ -3018,7 +3192,7 @@ const Dashboard = () => {
     let statusPulang = null;
     let targetShift = null;
 
-    if (todayAbsensi?.lembur_id) {
+    if (activeAbsen?.lembur_id) {
       targetShift = tugasHariIni?.lembur_aktif;
     } else {
       targetShift = tugasHariIni?.jadwal_pengganti || tugasHariIni?.jadwal_rutin;
@@ -3033,7 +3207,7 @@ const Dashboard = () => {
     setAbsenLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:8080/api/absen/pulang/${todayAbsensi.id}`, {
+      const res = await fetch(`http://localhost:8080/api/absen/pulang/${activeAbsen.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ jam_pulang: nowLocalStr, status_pulang: statusPulang })
@@ -3042,7 +3216,11 @@ const Dashboard = () => {
       if (res.ok && json.status === 'sukses') {
         const infoPoin = json.nilai_poin ? ` (${json.nilai_poin > 0 ? '+' : ''}${json.nilai_poin} poin)` : '';
         ui.notif('sukses', `Absen Pulang berhasil!${infoPoin}`);
-        setTodayAbsensi(prev => ({ ...prev, jam_pulang: nowLocalStr }));
+        if (Array.isArray(todayAbsensi)) {
+          setTodayAbsensi(prev => prev.map(a => a.id === activeAbsen.id ? { ...a, jam_pulang: nowLocalStr } : a));
+        } else {
+          setTodayAbsensi(prev => ({ ...prev, jam_pulang: nowLocalStr }));
+        }
         ambilTugasHariIni();
         if (tabelTerpilih === 'absensi') ambilDataTabel('absensi', true);
         if (tabelTerpilih === 'points') ambilDataTabel('points', true);
@@ -3245,6 +3423,7 @@ const Dashboard = () => {
   };
 
   const bukaModalForm = (dataSblm = null, targetTabel = tabelTerpilih) => {
+    fetchGlobalOptions();
     const isEdit = dataSblm !== null;
     let nilaiAwal = {};
 
@@ -3758,7 +3937,11 @@ const Dashboard = () => {
         <>
           <td>{noUrut}</td>
           <td className="fw-bold text-main">{namaKaryawan}</td>
-          <td><span className="badge bg-light text-dark">{shiftNama}</span></td>
+          <td>
+            {shiftNama === 'Lembur' 
+              ? <span className="badge bg-warning text-dark">Lembur</span> 
+              : <span className="badge bg-light text-dark">{shiftNama}</span>}
+          </td>
           <td><code>{batasKerja}</code></td>
           <td><code>{formatWaktu(baris.jam_masuk)}</code></td>
           <td><code>{formatWaktu(baris.jam_pulang)}</code></td>
@@ -4523,7 +4706,7 @@ const Dashboard = () => {
                                 </div>
                               )}
                               <button
-                                onClick={() => tanganiAbsenMasuk(tugasHariIni.lembur_aktif.id)}
+                                onClick={() => bukaAbsenModal('lembur')}
                                 className="tombol-premium mt-3 w-100 py-2 d-flex align-items-center justify-content-center gap-2"
                                 style={{ fontSize: '0.8rem', background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}
                               >
@@ -5919,8 +6102,12 @@ const Dashboard = () => {
         if (adaKoordToko && gpsDistance !== null && !isRoot) {
           lokasiValid = gpsDistance <= radiusAbsen;
         }
-        const sudahAbsenMasuk = !!todayAbsensi?.jam_masuk;
-        const sudahAbsenPulang = !!todayAbsensi?.jam_pulang;
+        const targetAbsen = Array.isArray(todayAbsensi)
+          ? todayAbsensi.find(a => tipeAbsenAktif === 'lembur' ? !!a.lembur_id : !a.lembur_id)
+          : (tipeAbsenAktif === 'lembur' ? (todayAbsensi?.lembur_id ? todayAbsensi : null) : (!todayAbsensi?.lembur_id ? todayAbsensi : null));
+
+        const sudahAbsenMasuk = !!targetAbsen?.jam_masuk;
+        const sudahAbsenPulang = !!targetAbsen?.jam_pulang;
 
         const formatWaktu = (dt) => {
           if (!dt) return '-';
@@ -5965,6 +6152,75 @@ const Dashboard = () => {
                 <div>
                   <div className="fw-bold text-main" style={{ fontSize: '0.82rem' }}>{profile?.nama || '-'}</div>
                   <div className="text-muted" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{profile?.role || '-'} · {usahaData?.nama_usaha || 'Semua Usaha'}</div>
+                </div>
+              </div>
+
+              {/* TABS TIPE ABSENSI (RUTIN VS LEMBUR) */}
+              {(tugasHariIni?.jadwal_rutin || tugasHariIni?.jadwal_pengganti || tugasHariIni?.lembur_aktif) && (
+                <div className="d-flex gap-2 mb-3">
+                  {(tugasHariIni?.jadwal_rutin || tugasHariIni?.jadwal_pengganti) && (
+                    <button
+                      className="flex-fill py-2 px-3 text-center border-0"
+                      onClick={() => setTipeAbsenAktif('rutin')}
+                      style={{
+                        fontSize: '0.72rem',
+                        borderRadius: '8px',
+                        transition: 'all 0.2s',
+                        fontWeight: 600,
+                        backgroundColor: tipeAbsenAktif === 'rutin' ? 'var(--warna-utama)' : 'rgba(255,255,255,0.04)',
+                        color: tipeAbsenAktif === 'rutin' ? '#fff' : 'var(--warna-teks-sekunder)',
+                        boxShadow: tipeAbsenAktif === 'rutin' ? '0 2px 8px rgba(99,102,241,0.25)' : 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      💼 Shift Reguler
+                    </button>
+                  )}
+                  {tugasHariIni?.lembur_aktif && (
+                    <button
+                      className="flex-fill py-2 px-3 text-center border-0"
+                      onClick={() => setTipeAbsenAktif('lembur')}
+                      style={{
+                        fontSize: '0.72rem',
+                        borderRadius: '8px',
+                        transition: 'all 0.2s',
+                        fontWeight: 600,
+                        backgroundColor: tipeAbsenAktif === 'lembur' ? '#f59e0b' : 'rgba(255,255,255,0.04)',
+                        color: tipeAbsenAktif === 'lembur' ? '#fff' : 'var(--warna-teks-sekunder)',
+                        boxShadow: tipeAbsenAktif === 'lembur' ? '0 2px 8px rgba(245,158,11,0.25)' : 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      ⚡ Lembur
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Detail Acuan Kerja Aktif */}
+              <div className="mb-3 p-2 rounded-2" style={{ border: '1px solid var(--warna-border)', backgroundColor: 'rgba(255,255,255,0.01)' }}>
+                <div className="mb-1" style={{ fontSize: '0.68rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--warna-teks-sekunder)' }}>
+                  📌 Acuan Tugas / Jam Kerja
+                </div>
+                <div className="fw-bold text-main" style={{ fontSize: '0.78rem' }}>
+                  {tipeAbsenAktif === 'lembur' ? (
+                    tugasHariIni?.lembur_aktif ? (
+                      <div className="d-flex flex-column gap-0.5">
+                        <span className="text-warning">Lembur: {tugasHariIni.lembur_aktif.jam_mulai.substring(0, 5)} - {tugasHariIni.lembur_aktif.jam_selesai.substring(0, 5)}</span>
+                        {tugasHariIni.lembur_aktif.keterangan && <span className="text-muted fw-normal" style={{ fontSize: '0.7rem' }}>Ket: {tugasHariIni.lembur_aktif.keterangan}</span>}
+                      </div>
+                    ) : (
+                      <span className="text-muted italic">Tidak ada tugas lembur hari ini.</span>
+                    )
+                  ) : (
+                    (tugasHariIni?.jadwal_rutin || tugasHariIni?.jadwal_pengganti) ? (
+                      <span>
+                        Shift: {tugasHariIni?.jadwal_rutin?.nama_shift || tugasHariIni?.jadwal_pengganti?.nama_shift} ({tugasHariIni?.jadwal_rutin?.jam_mulai?.substring(0, 5) || tugasHariIni?.jadwal_pengganti?.jam_mulai?.substring(0, 5)} - {tugasHariIni?.jadwal_rutin?.jam_selesai?.substring(0, 5) || tugasHariIni?.jadwal_pengganti?.jam_selesai?.substring(0, 5)})
+                      </span>
+                    ) : (
+                      <span className="text-muted italic">Tidak ada shift reguler terjadwal.</span>
+                    )
+                  )}
                 </div>
               </div>
 
@@ -6026,13 +6282,13 @@ const Dashboard = () => {
                     <div>
                       <div style={{ fontSize: '0.68rem', color: 'var(--warna-teks-sekunder)' }}>Masuk</div>
                       <div style={{ fontSize: '0.8rem', fontWeight: 700, color: sudahAbsenMasuk ? '#16a34a' : 'var(--warna-teks-sekunder)', fontFamily: 'monospace' }}>
-                        {sudahAbsenMasuk ? formatWaktu(todayAbsensi.jam_masuk) : '--:--'}
+                        {sudahAbsenMasuk ? formatWaktu(targetAbsen.jam_masuk) : '--:--'}
                       </div>
                     </div>
                     <div>
                       <div style={{ fontSize: '0.68rem', color: 'var(--warna-teks-sekunder)' }}>Pulang</div>
                       <div style={{ fontSize: '0.8rem', fontWeight: 700, color: sudahAbsenPulang ? '#6366f1' : 'var(--warna-teks-sekunder)', fontFamily: 'monospace' }}>
-                        {sudahAbsenPulang ? formatWaktu(todayAbsensi.jam_pulang) : '--:--'}
+                        {sudahAbsenPulang ? formatWaktu(targetAbsen.jam_pulang) : '--:--'}
                       </div>
                     </div>
                     {sudahAbsenMasuk && (
@@ -6043,7 +6299,7 @@ const Dashboard = () => {
                             tepat_waktu: <span style={{ color: '#16a34a', fontWeight: 600 }}>Tepat Waktu</span>,
                             lebih_awal: <span style={{ color: '#0891b2', fontWeight: 600 }}>Lebih Awal</span>,
                             terlambat: <span style={{ color: '#dc2626', fontWeight: 600 }}>Terlambat</span>,
-                          }[todayAbsensi.status_kehadiran] || <span>{todayAbsensi.status_kehadiran}</span>}
+                          }[targetAbsen.status_kehadiran] || <span>{targetAbsen.status_kehadiran}</span>}
                         </div>
                       </div>
                     )}
@@ -6055,7 +6311,7 @@ const Dashboard = () => {
               <div className="d-flex flex-column gap-2">
                 {!sudahAbsenMasuk && (
                   <button
-                    onClick={tanganiAbsenMasuk}
+                    onClick={() => tanganiAbsenMasuk(tipeAbsenAktif === 'lembur' ? tugasHariIni?.lembur_aktif?.id : null)}
                     disabled={absenLoading || gpsLoading || (!lokasiValid && adaKoordToko && !isRoot)}
                     className="tombol-premium w-100 d-flex align-items-center justify-content-center gap-2"
                     style={{ fontSize: '0.82rem', padding: '0.6rem', opacity: (absenLoading || gpsLoading || (!lokasiValid && adaKoordToko && !isRoot)) ? 0.5 : 1 }}
@@ -6067,7 +6323,7 @@ const Dashboard = () => {
 
                 {sudahAbsenMasuk && !sudahAbsenPulang && (
                   <button
-                    onClick={tanganiAbsenPulang}
+                    onClick={() => tanganiAbsenPulang(targetAbsen?.id)}
                     disabled={absenLoading || gpsLoading}
                     className="tombol-premium w-100 d-flex align-items-center justify-content-center gap-2"
                     style={{ fontSize: '0.82rem', padding: '0.6rem', background: 'linear-gradient(135deg, #7c3aed, #a855f7)', opacity: (absenLoading || gpsLoading) ? 0.5 : 1 }}

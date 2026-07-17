@@ -229,11 +229,26 @@ class Absen extends ResourceController
         $pointsId  = null;
 
         if ($lemburId) {
-            // Lembur mendapatkan poin dengan kode khusus ABSEN_LEMBUR (atau default ke HADIR_TEPAT_WAKTU jika tidak diset khusus)
+            // Lembur mendapatkan poin dengan kode khusus ABSEN_LEMBUR, atau TERLAMBAT jika terlambat
+            $kodeSistem = 'ABSEN_LEMBUR';
+            if ($statusKehadiran === 'terlambat') {
+                $kodeSistem = 'TERLAMBAT';
+            } else if ($statusKehadiran === 'terlambat_toleransi') {
+                $kodeSistem = 'TERLAMBAT_TOLERANSI';
+            }
+
             $kriteria = $db->table('kriteria_poin')
                 ->where('usaha_id', $usahaId)
-                ->where('kode_sistem', 'ABSEN_LEMBUR')
+                ->where('kode_sistem', $kodeSistem)
                 ->get()->getRow();
+
+            if (!$kriteria && ($statusKehadiran === 'terlambat' || $statusKehadiran === 'terlambat_toleransi')) {
+                // Fallback ke ABSEN_LEMBUR jika kriteria denda terlambat tidak ada
+                $kriteria = $db->table('kriteria_poin')
+                    ->where('usaha_id', $usahaId)
+                    ->where('kode_sistem', 'ABSEN_LEMBUR')
+                    ->get()->getRow();
+            }
 
             if (!$kriteria) {
                 $kriteria = $db->table('kriteria_poin')
@@ -248,7 +263,7 @@ class Absen extends ResourceController
                     'jumlah_poin'  => $kriteria->nilai_poin,
                     'sumber'       => 'absensi',
                     'referensi_id' => $idBaru,
-                    'keterangan'   => 'Absen Lembur',
+                    'keterangan'   => 'Absen Lembur' . ($statusKehadiran !== 'tepat_waktu' && $statusKehadiran !== 'lebih_awal' ? ' - ' . ucwords(str_replace('_', ' ', $statusKehadiran)) : ''),
                     'tanggal'      => $today,
                     'created_at'   => $now,
                     'updated_at'   => $now,
@@ -454,11 +469,11 @@ class Absen extends ResourceController
         $absensi = $db->table('absensi')
             ->where('karyawan_id', $userId)
             ->where("DATE(jam_masuk)", $today)
-            ->get()->getRowArray();
+            ->get()->getResultArray();
 
         return $this->respond([
             'status' => 'sukses',
-            'data'   => $absensi ?: null,
+            'data'   => $absensi,
         ]);
     }
 
@@ -552,7 +567,7 @@ class Absen extends ResourceController
         $lemburKemarin = $db->table('lembur')
                             ->where('karyawan_id', $userId)
                             ->where('tanggal', $yesterday)
-                            ->where('status', 'diterima_karyawan')
+                            ->whereIn('status', ['ditunjuk', 'diterima_karyawan'])
                             ->get()->getRow();
 
         $nowTime = time();
@@ -662,7 +677,7 @@ class Absen extends ResourceController
         $lembur = $db->table('lembur')
                      ->where('karyawan_id', $userId)
                      ->where('tanggal', $today)
-                     ->where('status', 'diterima_karyawan')
+                     ->whereIn('status', ['ditunjuk', 'diterima_karyawan'])
                      ->get()->getRow();
 
         // 4. Cek apakah ada orang lain yang diizinkan menggantikan user ini hari ini untuk shift ini

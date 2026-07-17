@@ -380,10 +380,15 @@ class Manajemen extends ResourceController
 
         // JOIN relasi untuk absensi
         if ($tabel === 'absensi') {
-            $builder->select('absensi.*, karyawan.nama as nama_karyawan, shift.nama_shift, shift.jam_mulai as shift_jam_mulai, shift.jam_selesai as shift_jam_selesai, usaha.nama_usaha, ur_format.usaha_id')
+            $builder->select('absensi.*, karyawan.nama as nama_karyawan, 
+                              IF(absensi.lembur_id IS NOT NULL, \'Lembur\', shift.nama_shift) as nama_shift, 
+                              IF(absensi.lembur_id IS NOT NULL, lembur.jam_mulai, shift.jam_mulai) as shift_jam_mulai, 
+                              IF(absensi.lembur_id IS NOT NULL, lembur.jam_selesai, shift.jam_selesai) as shift_jam_selesai, 
+                              usaha.nama_usaha, ur_format.usaha_id')
                     ->join('users as karyawan', 'karyawan.id = absensi.karyawan_id', 'left')
                     ->join('jadwal_karyawan', 'jadwal_karyawan.id = absensi.jadwal_karyawan_id', 'left')
                     ->join('shift', 'shift.id = jadwal_karyawan.shift_id', 'left')
+                    ->join('lembur', 'lembur.id = absensi.lembur_id', 'left')
                     ->join('user_role as ur_format', 'ur_format.user_id = absensi.karyawan_id', 'left')
                     ->join('usaha', 'usaha.id = ur_format.usaha_id', 'left')
                     ->groupBy('absensi.id');
