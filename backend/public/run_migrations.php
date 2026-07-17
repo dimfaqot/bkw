@@ -3,34 +3,46 @@
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
-use CodeIgniter\Boot;
+// Define path constants manually so CI4 migrations service can load
+define('ENVIRONMENT', 'development');
+
 use Config\Paths;
 
-// Set FCPATH
+// Load Paths
 define('FCPATH', __DIR__ . DIRECTORY_SEPARATOR);
-if (getcwd() . DIRECTORY_SEPARATOR !== FCPATH) {
-    chdir(FCPATH);
-}
-
-// Load paths
 if (file_exists(FCPATH . '../app/Config/Paths.php')) {
     require FCPATH . '../app/Config/Paths.php';
 } else {
     require FCPATH . '../../repositories/bkw/backend/app/Config/Paths.php';
 }
-
 $paths = new Paths();
-require $paths->systemDirectory . '/Boot.php';
 
-// Define ENVIRONMENT constant directly as development to force detailed error display for this script
-if (!defined('ENVIRONMENT')) {
-    define('ENVIRONMENT', 'development');
-}
+// Define necessary CI4 constants manually
+define('APPPATH', realpath(rtrim($paths->appDirectory, '\\/ ')) . DIRECTORY_SEPARATOR);
+define('SYSTEMPATH', realpath(rtrim($paths->systemDirectory, '\\/ ')) . DIRECTORY_SEPARATOR);
+define('ROOTPATH', realpath(APPPATH . '../') . DIRECTORY_SEPARATOR);
+define('WRITEPATH', realpath(rtrim($paths->writableDirectory, '\\/ ')) . DIRECTORY_SEPARATOR);
 
-// Bootstrap the CI4 framework in console context
-Boot::bootConsole($paths);
+// Load Composer autoloader
+require ROOTPATH . 'vendor/autoload.php';
+
+// Load Common functions
+require SYSTEMPATH . 'Common.php';
+
+// Load Config\Services
+require APPPATH . 'Config/Services.php';
+
+// Load the DotEnv class and load .env manually
+$dotenv = new \CodeIgniter\Config\DotEnv(ROOTPATH);
+$dotenv->load();
+
+// Load autoloader helper
+$loader = \Config\Services::autoloader();
+$loader->initialize(new \Config\Autoload(), new \Config\Modules());
+$loader->register();
+
+// Run migrations programmatically
 $runner = \Config\Services::migrations();
-
 header('Content-Type: text/plain');
 
 try {
