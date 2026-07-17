@@ -1,0 +1,24 @@
+# Node.js
+node_modules/
+npm-debug.log*
+
+# Environment and secrets
+.env
+backend/.env
+backend/app/Config/Secrets.php
+
+# CodeIgniter 4 writable folders
+backend/writable/*
+!backend/writable/index.html
+!backend/writable/keep
+
+# Development tools and ZIP files
+arduino-cli/
+arduino-cli.zip
+.agents/
+.gemini/
+.idea/
+.vscode/
+*.log
+*.zip
+*.rar

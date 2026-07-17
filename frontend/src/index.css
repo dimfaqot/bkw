@@ -1,0 +1,637 @@
+/* Google Fonts: Outfit */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+:root {
+  /* Font Family */
+  --font-utama: 'Outfit', sans-serif;
+
+  /* Spacing */
+  --jarak-kecil: 0.5rem;
+  --jarak-sedang: 1rem;
+  --jarak-besar: 1.5rem;
+
+  /* Tema Terang (Light Mode) */
+  --bg-halaman: #f4f6fa;
+  --bg-kartu: #ffffff;
+  --warna-utama: #6366f1; /* Premium Indigo */
+  --warna-utama-rgb: 99, 102, 241;
+  --warna-utama-hover: #4f46e5;
+  --warna-teks-utama: #1e293b;
+  --warna-teks-redup: #64748b;
+  --warna-border: #e2e8f0;
+  --warna-bayangan: rgba(99, 102, 241, 0.05) 0px 8px 30px;
+  --warna-sukses: #10b981;
+  --warna-peringatan: #f59e0b;
+  --warna-bahaya: #ef4444;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  /* Tema Gelap (Dark Mode) */
+  --bg-halaman: #0b0f19; /* Sleeker, deeper dark navy */
+  --bg-kartu: #161f30; /* Darker Slate Blue card */
+  --warna-utama: #818cf8; /* Light Indigo */
+  --warna-utama-rgb: 129, 140, 248;
+  --warna-utama-hover: #6366f1;
+  --warna-teks-utama: #e2e8f0;
+  --warna-teks-redup: #94a3b8;
+  --warna-border: #243049; /* Softer, matching dark border */
+  --warna-bayangan: rgba(0, 0, 0, 0.3) 0px 8px 30px;
+}
+
+[data-theme='dark'] select,
+[data-theme='dark'] select option {
+  background-color: var(--bg-kartu) !important;
+  color: var(--warna-teks-utama) !important;
+  color-scheme: dark !important;
+}
+
+/* Base Styles */
+body {
+  font-family: var(--font-utama);
+  background-color: var(--bg-halaman);
+  color: var(--warna-teks-utama);
+  margin: 0;
+  padding: 0;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  min-height: 100vh;
+}
+
+/* Custom Elegant Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4); /* subtle grey/blue */
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--warna-utama);
+}
+[data-theme='dark'] ::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+}
+[data-theme='dark'] ::-webkit-scrollbar-thumb:hover {
+  background: var(--warna-utama);
+}
+
+/* Typography & Label Adjustments for Dark Mode */
+.form-label {
+  color: var(--warna-teks-redup) !important;
+  font-weight: 500;
+  transition: color 0.3s ease;
+}
+
+.text-muted {
+  color: var(--warna-teks-redup) !important;
+  transition: color 0.3s ease;
+}
+
+.text-main {
+  color: var(--warna-teks-utama) !important;
+}
+
+/* Theme Toggle Button (Perfect Circle) */
+.theme-toggle {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  padding: 0 !important;
+  border: 1px solid var(--warna-border) !important;
+  background-color: var(--bg-kartu) !important;
+  color: var(--warna-teks-utama) !important;
+  cursor: pointer;
+  box-shadow: var(--warna-bayangan);
+  transition: transform 0.2s ease, background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.theme-toggle:hover {
+  background-color: var(--warna-border) !important;
+  transform: rotate(30deg) scale(1.05);
+}
+
+.theme-toggle:active {
+  transform: scale(0.95);
+}
+
+/* Premium Glassmorphism Cards */
+.kartu-premium {
+  background-color: var(--bg-kartu);
+  border: 1px solid var(--warna-border);
+  border-radius: 16px;
+  box-shadow: var(--warna-bayangan);
+  padding: var(--jarak-besar);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.kartu-premium:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--warna-bayangan);
+}
+
+/* Inputs & Input Groups (Clean Blend & Soft Backgrounds) */
+.input-premium {
+  background-color: var(--bg-halaman) !important;
+  border: 1px solid var(--warna-border) !important;
+  color: var(--warna-teks-utama) !important;
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.3s ease;
+}
+
+[data-theme='dark'] .input-premium {
+  background-color: rgba(11, 15, 25, 0.4) !important; /* Soft dark blend, not too harsh */
+  border-color: #243049 !important;
+}
+
+.opsi-dropdown-item {
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.opsi-dropdown-item:hover {
+  background-color: var(--warna-utama);
+  color: #fff;
+}
+
+.input-premium::placeholder {
+  color: var(--warna-teks-redup) !important;
+  opacity: 0.5; /* Good visibility in light & dark mode */
+}
+
+/* Input Group Styles */
+.input-group {
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.input-group-text {
+  background-color: var(--bg-halaman) !important;
+  border: 1px solid var(--warna-border) !important;
+  color: var(--warna-teks-redup) !important;
+  border-right: none !important;
+  padding-left: 1rem;
+  padding-right: 0.75rem;
+  transition: border-color 0.2s ease, background-color 0.3s ease, color 0.3s ease;
+}
+
+[data-theme='dark'] .input-group-text {
+  background-color: rgba(11, 15, 25, 0.4) !important;
+  border-color: #243049 !important;
+}
+
+/* Single focus state for the entire input-group */
+.input-group:focus-within .input-group-text {
+  border-color: var(--warna-utama) !important;
+  color: var(--warna-utama) !important;
+}
+
+.input-group:focus-within .input-premium {
+  border-color: var(--warna-utama) !important;
+  box-shadow: none !important;
+  background-color: var(--bg-kartu) !important;
+}
+
+/* Premium Buttons */
+.tombol-premium {
+  background-color: var(--warna-utama);
+  border: none;
+  color: #ffffff;
+  border-radius: 10px;
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.tombol-premium:hover {
+  background-color: var(--warna-utama-hover);
+  color: #ffffff;
+}
+
+.tombol-premium:active {
+  transform: scale(0.98);
+}
+
+.tombol-sekunder-premium {
+  background-color: transparent;
+  border: 1px solid var(--warna-border);
+  color: var(--warna-teks-utama);
+  border-radius: 10px;
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.tombol-sekunder-premium:hover {
+  background-color: var(--warna-border);
+  color: var(--warna-teks-utama);
+}
+
+/* Table responsive font */
+.tabel-font {
+  font-size: 0.95rem;
+}
+.tabel-font th {
+  font-size: 0.85rem;
+}
+.tabel-font td, .tabel-font tr {
+  font-size: 0.9rem;
+}
+
+/* Spacing & Font Sizing Rules for Mobile View (Wajib 0.5rem - 1rem) */
+@media (max-width: 575.98px) {
+  :root {
+    --jarak-kecil: 0.5rem;
+    --jarak-sedang: 0.75rem;
+    --jarak-besar: 1rem;
+  }
+  
+  /* Batasan ketat ukuran font mobile wajib 0.5rem - 1rem */
+  body, p, span, input, label, select, textarea, a, strong, small {
+    font-size: clamp(0.5rem, 3.8vw, 0.95rem);
+  }
+  
+  h1, .h1, .fs-1 { font-size: 1rem !important; }
+  h2, .h2, .fs-2 { font-size: 0.95rem !important; }
+  h3, .h3, .fs-3 { font-size: 0.9rem !important; }
+  h4, .h4, .fs-4 { font-size: 0.85rem !important; }
+  h5, .h5, .fs-5 { font-size: 0.8rem !important; }
+  h6, .h6, .fs-6 { font-size: 0.75rem !important; }
+  
+  .judul-halaman-bkw {
+    font-size: 1rem !important;
+  }
+  .judul-dashboard-bkw {
+    font-size: 1rem !important;
+  }
+  
+  .tabel-font {
+    font-size: 0.75rem !important;
+  }
+  .tabel-font th {
+    font-size: 0.65rem !important;
+  }
+  .tabel-font td, .tabel-font tr {
+    font-size: 0.6rem !important;
+  }
+  
+  .kartu-premium {
+    padding: var(--jarak-besar) !important;
+    border-radius: 12px;
+  }
+  
+  .input-premium {
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.85rem !important;
+  }
+  
+  /* Tombol: tanpa !important agar inline style bisa override per-tombol */
+  .tombol-premium, .tombol-sekunder-premium {
+    padding: 0.45rem 0.9rem;
+    font-size: 0.82rem;
+  }
+
+  /* Penyesuaian margin/padding agar padat dan rapi */
+  .mb-4 {
+    margin-bottom: var(--jarak-sedang) !important;
+  }
+  .mb-3 {
+    margin-bottom: var(--jarak-kecil) !important;
+  }
+  .p-4 {
+    padding: var(--jarak-sedang) !important;
+  }
+}
+
+/* Micro Animations */
+.transisi-lambat {
+  transition: all 0.3s ease;
+}
+
+.fade-in {
+  animation: fadeIn 0.4s ease forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.teks-pelangi {
+  background: linear-gradient(135deg, #818cf8 0%, #c084fc 40%, #f472b6 60%, #6366f1 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent !important;
+  animation: pelangiShift 4s linear infinite;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+@keyframes pelangiShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translate(-50%, 100%);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+
+.btn-ikon-premium {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--warna-border);
+  background-color: transparent;
+  color: var(--warna-teks-utama);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-ikon-premium:hover {
+  background-color: var(--warna-border);
+  transform: translateY(-2px);
+  color: var(--warna-utama);
+}
+
+.btn-ikon-premium.bahaya {
+  color: var(--warna-bahaya);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.btn-ikon-premium.bahaya:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-color: var(--warna-bahaya);
+  color: var(--warna-bahaya);
+}
+
+.judul-halaman-bkw {
+  font-size: 1.75rem;
+}
+
+.judul-dashboard-bkw {
+  font-size: 1.5rem;
+}
+
+.btn-notif-kecil {
+  font-size: 0.68rem !important;
+  padding: 0.25rem 0.65rem !important;
+  border-radius: 8px !important;
+  font-weight: 600;
+  border: none;
+  background-color: var(--warna-utama);
+  color: #ffffff !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  line-height: 1.2 !important;
+}
+
+.btn-notif-kecil:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.btn-notif-kecil-sekunder {
+  font-size: 0.68rem !important;
+  padding: 0.25rem 0.65rem !important;
+  border-radius: 8px !important;
+  font-weight: 600;
+  border: 1px solid var(--warna-border) !important;
+  background-color: transparent;
+  color: var(--warna-teks-utama) !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  line-height: 1.2 !important;
+}
+
+.btn-notif-kecil-sekunder:hover {
+  background-color: var(--warna-border);
+  transform: translateY(-1px);
+}
+
+/* Sidebar & Navbar Layout System */
+.topbar-premium {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background-color: var(--warna-kartu-bg);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--warna-border);
+  z-index: 1030;
+}
+
+.leftbar-premium {
+  position: fixed;
+  top: 56px;
+  bottom: 0;
+  left: 0;
+  width: 240px;
+  background-color: var(--warna-kartu-bg);
+  border-right: 1px solid var(--warna-border);
+  z-index: 1020;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-top: 1rem;
+}
+
+.leftbar-premium.hidden {
+  transform: translateX(-100%);
+  width: 0;
+}
+
+.konten-utama-wrapper {
+  margin-top: 56px;
+  transition: margin-left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  min-height: calc(100vh - 56px);
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 576px) {
+  .konten-utama-wrapper.with-sidebar {
+    margin-left: 240px;
+  }
+}
+
+/* Bottom Bar (Mobile Only) */
+.bottombar-premium {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background-color: var(--warna-kartu-bg);
+  backdrop-filter: blur(16px);
+  border-top: 1px solid var(--warna-border);
+  z-index: 1030;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 0.5rem;
+}
+
+/* Menu Item Styles */
+.menu-item-premium {
+  display: flex;
+  align-items: center;
+  padding: 0.6rem 0.8rem !important;
+  margin: 0.25rem 0.5rem;
+  border-radius: 8px;
+  color: var(--warna-teks-redup) !important;
+  text-decoration: none;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  background: transparent;
+  width: calc(100% - 1rem);
+  text-align: left;
+}
+
+.menu-item-premium:hover {
+  background-color: var(--warna-border);
+  color: var(--warna-teks-utama) !important;
+}
+
+.menu-item-premium.aktif {
+  background-color: rgba(99, 102, 241, 0.1);
+  color: var(--warna-utama) !important;
+  font-weight: 600;
+}
+
+.menu-item-premium svg {
+  margin-right: 0.5rem;
+  transition: transform 0.2s ease;
+}
+
+.menu-item-premium:hover svg {
+  transform: scale(1.1);
+}
+
+/* Bottombar Item Styles */
+.bottombar-item-premium {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--warna-teks-redup) !important;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: transparent;
+  border: none;
+  padding: 0.25rem;
+  flex: 1;
+}
+
+.bottombar-item-premium.aktif {
+  color: var(--warna-utama) !important;
+}
+
+.bottombar-item-premium span {
+  font-size: 0.55rem !important;
+  margin-top: 2px;
+  font-weight: 500;
+}
+
+/* Hide / Show helper styles */
+@media (max-width: 575.98px) {
+  .leftbar-premium {
+    display: none !important;
+  }
+}
+
+/* Mobile Submenu Overlay */
+.mobile-submenu-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  z-index: 1040;
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+.mobile-submenu-overlay {
+  position: fixed;
+  bottom: 80px; /* Above bottombar */
+  left: 1rem;
+  right: 1rem;
+  background-color: var(--bg-kartu);
+  border: 1px solid var(--warna-border);
+  border-radius: 16px;
+  padding: 1rem;
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.2);
+  z-index: 1045;
+  animation: slideUpFade 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes poinPulse {
+  0%   { transform: scale(1); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
+  50%  { transform: scale(1.12); box-shadow: 0 0 0 6px rgba(99, 102, 241, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+}

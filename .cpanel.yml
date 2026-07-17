@@ -1,0 +1,10 @@
+deployment:
+  tasks:
+    - export FRONTEND_PATH=/home/u1733924/public_html/bkw.walisongosragen.com/
+    - export BACKEND_PATH=/home/u1733924/public_html/api-bkw.walisongosragen.com/
+    
+    # 1. Salin seluruh asset hasil build frontend ke folder subdomain frontend
+    - /bin/rsync -av --delete frontend/dist/ $FRONTEND_PATH
+    
+    # 2. Salin isi folder public backend ke folder subdomain API
+    - /bin/rsync -av --delete backend/public/ $BACKEND_PATH
