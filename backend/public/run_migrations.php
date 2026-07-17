@@ -22,9 +22,9 @@ if (file_exists(FCPATH . '../app/Config/Paths.php')) {
 $paths = new Paths();
 require $paths->systemDirectory . '/Boot.php';
 
-// Define ENVIRONMENT constant because CI4's bootConsole method misses defining it
+// Define ENVIRONMENT constant directly as development to force detailed error display for this script
 if (!defined('ENVIRONMENT')) {
-    define('ENVIRONMENT', $_ENV['CI_ENVIRONMENT'] ?? $_SERVER['CI_ENVIRONMENT'] ?? getenv('CI_ENVIRONMENT') ?: 'production');
+    define('ENVIRONMENT', 'development');
 }
 
 // Bootstrap the CI4 framework in console context
