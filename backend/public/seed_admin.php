@@ -19,6 +19,7 @@ $paths = new Paths();
 define('APPPATH', realpath(rtrim($paths->appDirectory, '\\/ ')) . DIRECTORY_SEPARATOR);
 define('SYSTEMPATH', realpath(rtrim($paths->systemDirectory, '\\/ ')) . DIRECTORY_SEPARATOR);
 define('ROOTPATH', realpath(APPPATH . '../') . DIRECTORY_SEPARATOR);
+define('WRITEPATH', realpath(rtrim($paths->writableDirectory, '\\/ ')) . DIRECTORY_SEPARATOR);
 
 require ROOTPATH . 'vendor/autoload.php';
 require SYSTEMPATH . 'Common.php';
