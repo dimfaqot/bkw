@@ -1,5 +1,7 @@
 <?php
 
+// Uji coba deployment manual via UI cPanel - 17 Juli 2026
+
 use CodeIgniter\Boot;
 use Config\Paths;
 
