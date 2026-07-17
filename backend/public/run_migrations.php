@@ -22,8 +22,8 @@ if (file_exists(FCPATH . '../app/Config/Paths.php')) {
 $paths = new Paths();
 require $paths->systemDirectory . '/Boot.php';
 
-// Bootstrap the CI4 framework
-Boot::setup($paths);
+// Bootstrap the CI4 framework in console context
+Boot::bootConsole($paths);
 $runner = \Config\Services::migrations();
 
 header('Content-Type: text/plain');
