@@ -1,4 +1,7 @@
 <?php
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
 // Script Webhook Deployment Otomatis BKW
 // Ambil token dari query string untuk keamanan
 $tokenRahasia = 'bkw_auto_deploy_key_2026_super_aman';
@@ -10,6 +13,10 @@ if ($tokenRequest !== $tokenRahasia) {
 }
 
 header('Content-Type: text/plain');
+
+if (!function_exists('shell_exec')) {
+    exit("Error: Fungsi PHP 'shell_exec' dinonaktifkan di server web Niagahoster Anda demi keamanan. Kita tidak bisa menggunakan PHP shell_exec di browser.");
+}
 echo "=== MEMULAI AUTO DEPLOYMENT ===\n\n";
 
 // 1. Tarik perubahan terbaru dari GitHub
