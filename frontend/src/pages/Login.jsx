@@ -4,6 +4,8 @@ import { useTheme } from '../contexts/ThemeContext.jsx';
 import { useUI } from '../contexts/UIContext.jsx';
 import { Phone, Lock, Sun, Moon, Layers } from 'lucide-react';
 
+import { API_BASE_URL } from '../config';
+
 const Login = () => {
   const { theme, toggleTheme } = useTheme();
   const ui = useUI();
@@ -29,7 +31,7 @@ const Login = () => {
     ui.loading(true, 'fullscreen', 'Memverifikasi kredensial Anda...');
 
     try {
-      const response = await fetch('http://localhost:8080/api/auth/login', {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),

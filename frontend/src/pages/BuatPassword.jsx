@@ -4,6 +4,8 @@ import { useTheme } from '../contexts/ThemeContext.jsx';
 import { useUI } from '../contexts/UIContext.jsx';
 import { Lock, AlertCircle, Sun, Moon, Layers } from 'lucide-react';
 
+import { API_BASE_URL } from '../config';
+
 const BuatPassword = () => {
   const { theme, toggleTheme } = useTheme();
   const ui = useUI();
@@ -35,7 +37,7 @@ const BuatPassword = () => {
     const token = sessionStorage.getItem('temp_token');
 
     try {
-      const response = await fetch('http://localhost:8080/api/auth/buat-password', {
+      const response = await fetch(`${API_BASE_URL}/auth/buat-password`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

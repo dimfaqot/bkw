@@ -4,6 +4,8 @@ import { useTheme } from '../contexts/ThemeContext.jsx';
 import { useUI } from '../contexts/UIContext.jsx';
 import { Building, ArrowRight, Sun, Moon, LayoutGrid, LogOut } from 'lucide-react';
 
+import { API_BASE_URL } from '../config';
+
 const PilihUsaha = () => {
   const { theme, toggleTheme } = useTheme();
   const ui = useUI();
@@ -36,7 +38,7 @@ const PilihUsaha = () => {
     ui.loading(true, 'fullscreen', 'Menghubungkan ke konteks usaha...');
 
     try {
-      const response = await fetch('http://localhost:8080/api/auth/pilih-usaha', {
+      const response = await fetch(`${API_BASE_URL}/auth/pilih-usaha`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

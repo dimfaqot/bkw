@@ -4,6 +4,8 @@ import { useTheme } from '../contexts/ThemeContext.jsx';
 import { useUI } from '../contexts/UIContext.jsx';
 import { User, Mail, Phone, Lock, Sun, Moon, Layers } from 'lucide-react';
 
+import { API_BASE_URL } from '../config';
+
 const Daftar = () => {
   const { theme, toggleTheme } = useTheme();
   const ui = useUI();
@@ -37,7 +39,7 @@ const Daftar = () => {
     ui.loading(true, 'fullscreen', 'Mendaftarkan akun Anda...');
 
     try {
-      const response = await fetch('http://localhost:8080/api/auth/daftar', {
+      const response = await fetch(`${API_BASE_URL}/auth/daftar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),

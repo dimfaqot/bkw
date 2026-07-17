@@ -10,6 +10,7 @@ import {
 import { MapContainer, TileLayer, Circle, Marker, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { API_BASE_URL } from '../config';
 
 // Fix for default Leaflet marker icons in React
 import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
