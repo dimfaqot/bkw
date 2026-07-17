@@ -1,6 +1,7 @@
 <?php
 
 // Uji coba deployment manual via UI cPanel - 17 Juli 2026
+// Uji coba kedua: 100% murni tanpa menggunakan terminal server
 
 use CodeIgniter\Boot;
 use Config\Paths;
