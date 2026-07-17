@@ -6,6 +6,7 @@ error_reporting(E_ALL);
 use Config\Paths;
 
 define('ENVIRONMENT', 'development');
+defined('CI_DEBUG') || define('CI_DEBUG', true);
 define('FCPATH', __DIR__ . DIRECTORY_SEPARATOR);
 
 if (file_exists(FCPATH . '../app/Config/Paths.php')) {
