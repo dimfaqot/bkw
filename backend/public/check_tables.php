@@ -31,6 +31,23 @@ $db = \Config\Database::connect();
 header('Content-Type: text/plain');
 echo "Database terhubung: " . $db->getDatabase() . "\n";
 
+// TEST WRITE TO WRITABLE/CACHE
+$cachePath = WRITEPATH . 'cache/';
+echo "Menguji tulis ke: " . $cachePath . "\n";
+$testFile = $cachePath . 'test_write.txt';
+
+// Clear previous errors
+error_clear_last();
+$result = @file_put_contents($testFile, 'test');
+
+if ($result === false) {
+    $err = error_get_last();
+    echo "Uji Tulis GAGAL! Detail: " . ($err ? $err['message'] : 'Tidak ada pesan error PHP') . "\n\n";
+} else {
+    echo "Uji Tulis SUKSES!\n\n";
+    @unlink($testFile);
+}
+
 try {
     $tables = $db->listTables();
     echo "Jumlah tabel ditemukan: " . count($tables) . "\n\n";
