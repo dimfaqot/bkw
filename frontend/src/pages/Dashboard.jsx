@@ -352,6 +352,8 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
   const [loadingShift, setLoadingShift] = useState(false);
   const [pesanLibur, setPesanLibur] = useState('');
 
+  const isRoot = profile?.role?.toLowerCase() === 'root';
+
   const isPerizinanLoading = tabel === 'perizinan' && !formState.id && (
     loadingShift || 
     opsiUsers.length === 0 || 
@@ -463,6 +465,9 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
       }
     } else if (tabel === 'kebersihan') {
       dataAkhir.usaha_id = ekstrakId(dataAkhir.usaha_id, opsiUsaha.map(u => ({ value: u.id, label: u.nama_usaha })));
+    } else if (tabel === 'lembur') {
+      dataAkhir.karyawan_id = ekstrakId(dataAkhir.karyawan_id, opsiUsers.map(u => ({ value: u.id, label: u.nama })));
+      dataAkhir.usaha_id = ekstrakId(dataAkhir.usaha_id, opsiUsaha.map(u => ({ value: u.id, label: u.nama_usaha })));
     }
 
 
@@ -526,6 +531,12 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
       if (!dataAkhir.jam_selesai) { onError('Jam selesai wajib diisi.'); return; }
     } else if (tabel === 'kebersihan_tugas') {
       if (!dataAkhir.status) { onError('Status wajib dipilih.'); return; }
+    } else if (tabel === 'lembur') {
+      if (!dataAkhir.karyawan_id) { onError('Silakan pilih Karyawan.'); return; }
+      if (!dataAkhir.usaha_id) { onError('Silakan pilih Usaha.'); return; }
+      if (!dataAkhir.tanggal) { onError('Tanggal lembur wajib diisi.'); return; }
+      if (!dataAkhir.jam_mulai) { onError('Jam mulai lembur wajib diisi.'); return; }
+      if (!dataAkhir.jam_selesai) { onError('Jam selesai lembur wajib diisi.'); return; }
     }
     onSimpan(dataAkhir);
   };
@@ -3287,6 +3298,18 @@ const Dashboard = () => {
           disetujui_oleh: '', 
           catatan_atasan: '' 
         };
+      } else if (targetTabel === 'lembur') {
+        const today = new Date().toISOString().substring(0, 10);
+        nilaiAwal = { 
+          usaha_id: profile?.usaha_id || '', 
+          karyawan_id: '', 
+          tanggal: today, 
+          jam_mulai: '', 
+          jam_selesai: '', 
+          keterangan: '', 
+          status: 'ditunjuk', 
+          catatan_penolakan: '' 
+        };
       }
     }
 
@@ -3395,6 +3418,8 @@ const Dashboard = () => {
       return ['No.', 'Karyawan', 'Jumlah Poin', 'Sumber', 'Atasan Penilai', 'Keterangan', 'Tanggal', 'Cabang', 'Aksi'];
     } else if (tabel === 'perizinan') {
       return ['No.', 'Karyawan', 'Karyawan Pengganti', 'Jenis Izin', 'Tanggal', 'Alasan', 'Status', 'Catatan / Penyetuju', 'Cabang', 'Aksi'];
+    } else if (tabel === 'lembur') {
+      return ['No.', 'Karyawan', 'Tanggal', 'Jam Mulai', 'Jam Selesai', 'Keterangan', 'Status', 'Cabang', 'Aksi'];
     } else if (tabel === 'kebersihan') {
       return ['No.', 'Nama Area', 'Jam Mulai', 'Jam Selesai', 'Cabang', 'Aksi'];
     } else if (tabel === 'kebersihan_tugas') {
@@ -3860,6 +3885,35 @@ const Dashboard = () => {
             ) : <span className="text-muted small">-</span>}
           </td>
           <td><span className="badge bg-secondary">{baris.nama_usaha || '-'}</span></td>
+        </>
+      );
+    } else if (tabel === 'lembur') {
+      const formatTgl = (t) => {
+        if (!t) return '-';
+        const d = new Date(t);
+        return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+      };
+
+      const karyawanObj = opsiUsers.find(u => u.id == baris.karyawan_id);
+      const namaKaryawan = karyawanObj ? karyawanObj.nama : (baris.nama_karyawan || `Karyawan #${baris.karyawan_id}`);
+      const namaUsaha = opsiUsaha.find(u => u.id == baris.usaha_id)?.nama_usaha || baris.usaha_id;
+
+      const badgeStatus = {
+        ditunjuk: <span className="badge bg-info">Ditunjuk</span>,
+        diterima: <span className="badge bg-success">Diterima</span>,
+        ditolak: <span className="badge bg-danger">Ditolak</span>
+      }[baris.status] || <span className="badge bg-secondary">{baris.status}</span>;
+
+      return (
+        <>
+          <td>{noUrut}</td>
+          <td className="fw-bold text-main">{namaKaryawan}</td>
+          <td><code>{formatTgl(baris.tanggal)}</code></td>
+          <td><code>{baris.jam_mulai ? baris.jam_mulai.substring(0, 5) : '-'}</code></td>
+          <td><code>{baris.jam_selesai ? baris.jam_selesai.substring(0, 5) : '-'}</code></td>
+          <td className="small text-muted">{baris.keterangan || '-'}</td>
+          <td>{badgeStatus}</td>
+          <td><span className="badge bg-secondary">{namaUsaha}</span></td>
         </>
       );
     } else if (tabel === 'kebersihan') {
