@@ -71,6 +71,21 @@ $routes->group('api/kebersihan', ['filter' => 'jwt'], function($routes) {
     $routes->post('tugas/tunjuk/(:num)', '\App\Modules\Manajemen\Controllers\KebersihanController::tunjukTugas/$1');
 });
 
+// Rute Transaksi & Kasir POS
+$routes->group('api/transaksi', ['filter' => 'jwt'], function($routes) {
+    $routes->post('checkout', '\App\Modules\Manajemen\Controllers\Transaksi::checkout');
+    $routes->get('riwayat', '\App\Modules\Manajemen\Controllers\Transaksi::riwayat');
+    $routes->get('members', '\App\Modules\Manajemen\Controllers\Transaksi::members');
+    $routes->post('tambah-member', '\App\Modules\Manajemen\Controllers\Transaksi::tambahMember');
+    $routes->put('update-hutang/(:num)', '\App\Modules\Manajemen\Controllers\Transaksi::updateHutang/$1');
+    $routes->put('lunasi-hutang/(:num)', '\App\Modules\Manajemen\Controllers\Transaksi::lunasiHutang/$1');
+});
+
+// Rute Transaksi Publik (tanpa JWT filter untuk Nota digital Opsi B)
+$routes->group('api/transaksi-publik', function($routes) {
+    $routes->get('detail/(:num)', '\App\Modules\Manajemen\Controllers\Transaksi::publikDetail/$1');
+});
+
 // Menangani request preflight OPTIONS secara global untuk CORS
 $routes->options('(:any)', function() {
     return response()->setStatusCode(200);

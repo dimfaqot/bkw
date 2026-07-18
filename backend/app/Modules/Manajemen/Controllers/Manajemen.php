@@ -11,7 +11,7 @@ class Manajemen extends ResourceController
 
     protected $format = 'json';
 
-    private $daftarTabel = ['users', 'usaha', 'unit', 'roles', 'user_role', 'menus', 'role_permissions', 'iot', 'iot_alokasi', 'shift', 'jadwal_karyawan', 'absensi', 'kriteria_poin', 'points', 'perizinan', 'lembur', 'kebersihan', 'kebersihan_tugas'];
+    private $daftarTabel = ['users', 'usaha', 'unit', 'roles', 'user_role', 'menus', 'role_permissions', 'iot', 'iot_alokasi', 'shift', 'jadwal_karyawan', 'absensi', 'kriteria_poin', 'points', 'perizinan', 'lembur', 'kebersihan', 'kebersihan_tugas', 'produk_jasa', 'transaksi', 'transaksi_detail', 'produk_komposisi'];
 
     // Validasi input untuk masing-masing tabel
     private function dapatkanValidasi($tabel, $id = null)
@@ -58,6 +58,7 @@ class Manajemen extends ResourceController
             $aturan = [
                 'usaha_id'  => 'required|numeric',
                 'nama_unit' => 'required|min_length[3]',
+                'kategori'  => 'required|in_list[kantin,billiard,rental_mobil,salon,multimedia]',
             ];
         } else if ($tabel === 'roles') {
             $aturan = [
@@ -225,6 +226,49 @@ class Manajemen extends ResourceController
                 'waktu_dibersihkan'    => 'permit_empty',
                 'waktu_diverifikasi'   => 'permit_empty'
             ];
+        } else if ($tabel === 'produk_jasa') {
+            $aturan = [
+                'usaha_id'         => 'required|numeric',
+                'unit_id'          => 'permit_empty|numeric',
+                'nama_produk'      => 'required|min_length[3]',
+                'tipe'             => 'required|in_list[barang,jasa,sewa]',
+                'harga_beli'       => 'permit_empty|numeric',
+                'harga_jual'       => 'required|numeric',
+                'stok'             => 'permit_empty|numeric',
+                'stok_minimum'     => 'permit_empty|numeric',
+                'is_stok_dikelola' => 'permit_empty|in_list[0,1]',
+                'satuan'           => 'permit_empty'
+            ];
+        } else if ($tabel === 'transaksi') {
+            $aturan = [
+                'usaha_id'          => 'required|numeric',
+                'nomor_invoice'     => 'required',
+                'kasir_id'          => 'required|numeric',
+                'total_harga'       => 'required|numeric',
+                'uang_jaminan'      => 'permit_empty|numeric',
+                'status_pembayaran' => 'required|in_list[belum_bayar,lunas]'
+            ];
+        } else if ($tabel === 'transaksi_detail') {
+            $aturan = [
+                'transaksi_id'   => 'required|numeric',
+                'produk_id'      => 'required|numeric',
+                'qty'            => 'required|numeric',
+                'harga_satuan'   => 'required|numeric',
+                'subtotal'       => 'required|numeric',
+                'tipe_sewa'      => 'permit_empty|in_list[open,reguler]',
+                'waktu_mulai'    => 'permit_empty',
+                'waktu_selesai'  => 'permit_empty',
+                'durasi_menit'   => 'permit_empty|numeric',
+                'status_sewa'    => 'permit_empty|in_list[aktif,selesai]',
+                'petugas_id'     => 'permit_empty|numeric',
+                'komisi_petugas' => 'permit_empty|numeric'
+            ];
+        } else if ($tabel === 'produk_komposisi') {
+            $aturan = [
+                'produk_induk_id' => 'required|numeric',
+                'produk_bahan_id' => 'required|numeric',
+                'jumlah'          => 'required|numeric'
+            ];
         }
         return $aturan;
     }
@@ -340,6 +384,14 @@ class Manajemen extends ResourceController
                 $builder->join('kebersihan k_filter', 'k_filter.id = kebersihan_tugas.kebersihan_id')
                         ->where('k_filter.usaha_id', $usahaId)
                         ->select('kebersihan_tugas.*');
+            } else if ($tabel === 'transaksi_detail') {
+                $builder->join('transaksi', 'transaksi.id = transaksi_detail.transaksi_id')
+                        ->where('transaksi.usaha_id', $usahaId)
+                        ->select('transaksi_detail.*');
+            } else if ($tabel === 'produk_komposisi') {
+                $builder->join('produk_jasa p1', 'p1.id = produk_komposisi.produk_induk_id')
+                        ->where('p1.usaha_id', $usahaId)
+                        ->select('produk_komposisi.*');
             }
         }
         // JOIN relasi untuk iot_alokasi agar response mengandung nama perangkat & unit
@@ -369,6 +421,13 @@ class Manajemen extends ResourceController
             $builder->select('lembur.*, karyawan.nama as nama_karyawan, usaha.nama_usaha')
                     ->join('users as karyawan', 'karyawan.id = lembur.karyawan_id', 'left')
                     ->join('usaha', 'usaha.id = lembur.usaha_id', 'left');
+        }
+
+        // JOIN relasi untuk produk_komposisi
+        if ($tabel === 'produk_komposisi') {
+            $builder->select('produk_komposisi.*, p_induk.nama_produk as nama_produk_induk, p_bahan.nama_produk as nama_produk_bahan')
+                    ->join('produk_jasa p_induk', 'p_induk.id = produk_komposisi.produk_induk_id', 'left')
+                    ->join('produk_jasa p_bahan', 'p_bahan.id = produk_komposisi.produk_bahan_id', 'left');
         }
 
         // JOIN relasi untuk users jika login sebagai Root (usahaId == null) agar respons mengandung usaha_id
@@ -437,6 +496,27 @@ class Manajemen extends ResourceController
                     ->join('points p', "p.referensi_id = kebersihan_tugas.id AND p.sumber = 'kebersihan'", 'left')
                     ->join('users as penyetuju', 'penyetuju.id = p.pemberi_poin_id', 'left')
                     ->groupBy('kebersihan_tugas.id');
+        }
+
+        // JOIN relasi untuk produk_jasa
+        if ($tabel === 'produk_jasa') {
+            $builder->select('produk_jasa.*, usaha.nama_usaha, unit.nama_unit')
+                    ->join('usaha', 'usaha.id = produk_jasa.usaha_id', 'left')
+                    ->join('unit', 'unit.id = produk_jasa.unit_id', 'left');
+        }
+
+        // JOIN relasi untuk transaksi
+        if ($tabel === 'transaksi') {
+            $builder->select('transaksi.*, usaha.nama_usaha, kasir.nama as nama_kasir')
+                    ->join('usaha', 'usaha.id = transaksi.usaha_id', 'left')
+                    ->join('users as kasir', 'kasir.id = transaksi.kasir_id', 'left');
+        }
+
+        // JOIN relasi untuk transaksi_detail
+        if ($tabel === 'transaksi_detail') {
+            $builder->select('transaksi_detail.*, produk_jasa.nama_produk, users.nama as nama_petugas')
+                    ->join('produk_jasa', 'produk_jasa.id = transaksi_detail.produk_id', 'left')
+                    ->join('users', 'users.id = transaksi_detail.petugas_id', 'left');
         }
 
         $data = $builder->get()->getResultArray();
@@ -598,6 +678,35 @@ class Manajemen extends ResourceController
                         'pesan'  => "Penambahan alokasi dibatalkan! Perangkat IoT '{$device->nama_perangkat}' sudah dialokasikan ke cabang/usaha lain."
                     ], 400);
                 }
+            }
+        }
+
+        // Validasi ekstra khusus produk_komposisi (memastikan produk induk & bahan berada di bawah usaha_id yang sama)
+        if ($tabel === 'produk_komposisi') {
+            $induk = $db->table('produk_jasa')->where('id', $input['produk_induk_id'])->get()->getRow();
+            $bahan = $db->table('produk_jasa')->where('id', $input['produk_bahan_id'])->get()->getRow();
+            
+            if (!$induk || !$bahan) {
+                return $this->fail('Produk induk atau bahan tidak ditemukan.');
+            }
+            
+            if ($usahaId !== null) {
+                if ($induk->usaha_id != $usahaId || $bahan->usaha_id != $usahaId) {
+                    return $this->fail('Kedua produk harus milik cabang usaha Anda.');
+                }
+            }
+            
+            if ($input['produk_induk_id'] == $input['produk_bahan_id']) {
+                return $this->fail('Produk induk tidak boleh sama dengan produk bahan baku.');
+            }
+            
+            // Cek duplikasi komposisi
+            $existing = $db->table('produk_komposisi')
+                           ->where('produk_induk_id', $input['produk_induk_id'])
+                           ->where('produk_bahan_id', $input['produk_bahan_id'])
+                           ->get()->getRow();
+            if ($existing) {
+                return $this->fail('Komposisi bahan untuk produk ini sudah terdaftar.');
             }
         }
 
@@ -875,6 +984,41 @@ class Manajemen extends ResourceController
             log_message('error', 'Input received: ' . json_encode($input));
             log_message('error', 'Validation errors: ' . json_encode($this->validator->getErrors()));
             return $this->fail($this->validator->getErrors());
+        }
+
+        // Validasi ekstra khusus produk_komposisi (saat update)
+        if ($tabel === 'produk_komposisi') {
+            $indukId = $input['produk_induk_id'] ?? null;
+            $bahanId = $input['produk_bahan_id'] ?? null;
+            
+            if ($indukId && $bahanId) {
+                $induk = $db->table('produk_jasa')->where('id', $indukId)->get()->getRow();
+                $bahan = $db->table('produk_jasa')->where('id', $bahanId)->get()->getRow();
+                
+                if (!$induk || !$bahan) {
+                    return $this->fail('Produk induk atau bahan tidak ditemukan.');
+                }
+                
+                if ($usahaId !== null) {
+                    if ($induk->usaha_id != $usahaId || $bahan->usaha_id != $usahaId) {
+                        return $this->fail('Kedua produk harus milik cabang usaha Anda.');
+                    }
+                }
+                
+                if ($indukId == $bahanId) {
+                    return $this->fail('Produk induk tidak boleh sama dengan produk bahan baku.');
+                }
+                
+                // Cek duplikasi komposisi (kecuali id ini sendiri)
+                $existing = $db->table('produk_komposisi')
+                               ->where('produk_induk_id', $indukId)
+                               ->where('produk_bahan_id', $bahanId)
+                               ->where('id !=', $id)
+                               ->get()->getRow();
+                if ($existing) {
+                    return $this->fail('Komposisi bahan untuk produk ini sudah terdaftar.');
+                }
+            }
         }
 
         // Enkripsi password jika di tabel users dan di-set

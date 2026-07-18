@@ -5,6 +5,7 @@ import Login from './pages/Login.jsx';
 import BuatPassword from './pages/BuatPassword.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import PilihUsaha from './pages/PilihUsaha.jsx';
+import NotaPublik from './pages/NotaPublik.jsx';
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
         <Route path="/buat-password" element={<BuatPassword />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/pilih-usaha" element={<PilihUsaha />} />
+        <Route path="/nota/:id" element={<NotaPublik />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </Router>

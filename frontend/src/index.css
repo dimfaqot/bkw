@@ -250,6 +250,45 @@ body {
   font-size: 0.9rem;
 }
 
+/* Table premium: override Bootstrap default white bg agar cocok dengan dark mode */
+.tabel-premium {
+  --bs-table-bg: transparent;
+  --bs-table-striped-bg: transparent;
+  --bs-table-hover-bg: rgba(255, 255, 255, 0.04);
+  --bs-table-border-color: rgba(255, 255, 255, 0.08);
+  color: var(--teks-utama, #e2e8f0);
+  font-size: 0.82rem;
+}
+.tabel-premium thead tr {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+.tabel-premium thead th {
+  background: transparent !important;
+  color: var(--teks-redup, #94a3b8);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.75rem 1rem;
+  border: none !important;
+}
+.tabel-premium tbody tr {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  transition: background 0.15s;
+}
+.tabel-premium tbody tr:hover {
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+.tabel-premium tbody td {
+  background: transparent !important;
+  border: none !important;
+  padding: 0.7rem 1rem;
+  vertical-align: middle;
+}
+
+
 /* Spacing & Font Sizing Rules for Mobile View (Wajib 0.5rem - 1rem) */
 @media (max-width: 575.98px) {
   :root {

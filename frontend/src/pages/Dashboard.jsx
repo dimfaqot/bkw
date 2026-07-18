@@ -74,6 +74,10 @@ const formatTanggal = (dateString, tipe = 'sedang') => {
   return `${tanggal} ${namaBulanSingkat} ${tahun}`;
 };
 
+const formatRupiah = (val) => {
+  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(val || 0));
+};
+
 const urlBase64ToUint8Array = (base64String) => {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding)
@@ -346,7 +350,7 @@ const PilihRelasi = ({ options, value, onChange, name, placeholder, dropUp = fal
   );
 };
 
-const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUsaha, opsiUsers, opsiUnit, opsiRoles, opsiMenus, opsiIot = [], opsiAlokasi = [], opsiShift = [], opsiKriteriaPoin = [], opsiJadwal = [], profile }) => {
+const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUsaha, opsiUsers, opsiUnit, opsiRoles, opsiMenus, opsiIot = [], opsiAlokasi = [], opsiShift = [], opsiKriteriaPoin = [], opsiJadwal = [], opsiProduk = [], profile }) => {
   const [formState, setFormState] = useState(dataAwal);
   const [shiftTersedia, setShiftTersedia] = useState([]);
   const [loadingShift, setLoadingShift] = useState(false);
@@ -468,6 +472,21 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
     } else if (tabel === 'lembur') {
       dataAkhir.karyawan_id = ekstrakId(dataAkhir.karyawan_id, opsiUsers.map(u => ({ value: u.id, label: u.nama })));
       dataAkhir.usaha_id = ekstrakId(dataAkhir.usaha_id, opsiUsaha.map(u => ({ value: u.id, label: u.nama_usaha })));
+    } else if (tabel === 'produk_jasa') {
+      dataAkhir.usaha_id = ekstrakId(dataAkhir.usaha_id, opsiUsaha.map(u => ({ value: u.id, label: u.nama_usaha })));
+      dataAkhir.unit_id = ekstrakId(dataAkhir.unit_id, opsiUnit.map(u => ({ value: u.id, label: u.nama_unit })));
+    } else if (tabel === 'produk_komposisi') {
+      dataAkhir.produk_induk_id = ekstrakId(dataAkhir.produk_induk_id, opsiProduk.map(p => ({ value: p.id, label: `${p.nama_produk} [${p.tipe}]` })));
+      
+      if (isEdit) {
+        dataAkhir.produk_bahan_id = ekstrakId(dataAkhir.produk_bahan_id, opsiProduk.map(p => ({ value: p.id, label: `${p.nama_produk} (${p.stok || 0} ${p.satuan})` })));
+      } else {
+        // Ekstrak ID untuk setiap baris bahan baku
+        dataAkhir.bahan = (dataAkhir.bahan || []).map(item => ({
+          produk_bahan_id: ekstrakId(item.produk_bahan_id, opsiProduk.map(p => ({ value: p.id, label: `${p.nama_produk} (${p.stok || 0} ${p.satuan})` }))),
+          jumlah: item.jumlah
+        }));
+      }
     }
 
 
@@ -481,6 +500,24 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
     } else if (tabel === 'unit') {
       if (!dataAkhir.usaha_id) { onError('Silakan pilih Usaha.'); return; }
       if (!dataAkhir.nama_unit?.trim()) { onError('Nama unit wajib diisi.'); return; }
+      if (!dataAkhir.kategori) { onError('Kategori unit wajib dipilih.'); return; }
+    } else if (tabel === 'produk_jasa') {
+      if (!dataAkhir.nama_produk?.trim()) { onError('Nama produk/jasa wajib diisi.'); return; }
+      if (!dataAkhir.harga_jual) { onError('Harga jual wajib diisi.'); return; }
+    } else if (tabel === 'produk_komposisi') {
+      if (!dataAkhir.produk_induk_id) { onError('Silakan pilih produk menu utama.'); return; }
+      
+      if (isEdit) {
+        if (!dataAkhir.produk_bahan_id) { onError('Silakan pilih produk bahan baku.'); return; }
+        if (!dataAkhir.jumlah || Number(dataAkhir.jumlah) <= 0) { onError('Jumlah takaran wajib diisi dan bernilai positif.'); return; }
+      } else {
+        if (!dataAkhir.bahan || dataAkhir.bahan.length === 0) { onError('Silakan tambah minimal 1 bahan baku.'); return; }
+        for (let i = 0; i < dataAkhir.bahan.length; i++) {
+          const item = dataAkhir.bahan[i];
+          if (!item.produk_bahan_id) { onError(`Silakan pilih bahan baku pada baris ke-${i+1}.`); return; }
+          if (!item.jumlah || Number(item.jumlah) <= 0) { onError(`Jumlah takaran pada baris ke-${i+1} wajib diisi dan bernilai positif.`); return; }
+        }
+      }
     } else if (tabel === 'roles') {
       if (!dataAkhir.nama_role?.trim()) { onError('Nama role wajib diisi.'); return; }
     } else if (tabel === 'user_role') {
@@ -760,6 +797,201 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
             <div>
               <label className="form-label small fw-semibold">Nama Unit Cabang</label>
               <input type="text" name="nama_unit" className="form-control input-premium" value={formState.nama_unit || ''} onChange={handleChange} placeholder="cth: Cabang Pusat" />
+            </div>
+            <div>
+              <label className="form-label small fw-semibold">Kategori Unit (Fitur)</label>
+              <PilihRelasi
+                name="kategori"
+                placeholder="Pilih kategori unit..."
+                value={formState.kategori || ''}
+                onChange={handleChange}
+                dropUp={true}
+                options={[
+                  { value: 'kantin', label: '💼 Kantin (F&B / Kelola Stok)' },
+                  { value: 'billiard', label: '🎱 Billiard (IoT & Sewa Jam-Jaman)' },
+                  { value: 'rental_mobil', label: '🚗 Rental Mobil (Sewa Aset & Opsi Tambahan)' },
+                  { value: 'salon', label: '💅 Salon (Jasa Treatment & Stylist)' },
+                  { value: 'multimedia', label: '📸 Multimedia (Studio & Hybrid POS)' }
+                ]}
+              />
+            </div>
+          </>
+        )}
+        {tabel === 'produk_jasa' && (
+          <>
+            {profile?.usaha_id ? (
+              <input type="hidden" name="usaha_id" value={formState.usaha_id || profile.usaha_id} />
+            ) : (
+              <div>
+                <label className="form-label small fw-semibold">Pilih Usaha Induk</label>
+                <PilihRelasi
+                  name="usaha_id"
+                  placeholder="Ketik atau pilih usaha..."
+                  value={formState.usaha_id || ''}
+                  onChange={handleChange}
+                  options={opsiUsaha.map(u => ({ value: u.id, label: u.nama_usaha }))}
+                />
+              </div>
+            )}
+            <div>
+              <label className="form-label small fw-semibold">Pilih Unit Cabang</label>
+              <PilihRelasi
+                name="unit_id"
+                placeholder="Pilih unit cabang..."
+                value={formState.unit_id || ''}
+                onChange={handleChange}
+                options={opsiUnit.filter(u => u.usaha_id == (formState.usaha_id || profile?.usaha_id)).map(u => ({ value: u.id, label: u.nama_unit }))}
+              />
+            </div>
+            <div>
+              <label className="form-label small fw-semibold">Nama Produk / Jasa / Sewa</label>
+              <input type="text" name="nama_produk" className="form-control input-premium" value={formState.nama_produk || ''} onChange={handleChange} placeholder="cth: Kopi Susu, Sewa Meja, Potong Rambut" />
+            </div>
+            <div>
+              <label className="form-label small fw-semibold">Tipe Produk</label>
+              <select name="tipe" className="form-select input-premium" value={formState.tipe || 'barang'} onChange={handleChange}>
+                <option value="barang">📦 Barang Fisik</option>
+                <option value="jasa">💅 Layanan Jasa</option>
+                <option value="sewa">🚗 Sewa Alat/Aset</option>
+              </select>
+            </div>
+            <div>
+              <label className="form-label small fw-semibold">Harga Beli (HPP)</label>
+              <input type="number" name="harga_beli" className="form-control input-premium" value={formState.harga_beli || '0'} onChange={handleChange} />
+            </div>
+            <div>
+              <label className="form-label small fw-semibold">Harga Jual</label>
+              <input type="number" name="harga_jual" className="form-control input-premium" value={formState.harga_jual || '0'} onChange={handleChange} />
+            </div>
+            <div>
+              <label className="form-label small fw-semibold">Kelola Stok?</label>
+              <select name="is_stok_dikelola" className="form-select input-premium" value={formState.is_stok_dikelola || '0'} onChange={handleChange}>
+                <option value="0">Tidak (Stok Tanpa Batas / Jasa)</option>
+                <option value="1">Ya (Barang Fisik)</option>
+              </select>
+            </div>
+            {formState.is_stok_dikelola == '1' && (
+              <>
+                <div>
+                  <label className="form-label small fw-semibold">Stok Saat Ini</label>
+                  <input type="number" name="stok" className="form-control input-premium" value={formState.stok || '0'} onChange={handleChange} />
+                </div>
+                <div>
+                  <label className="form-label small fw-semibold">Minimum Stok Alert</label>
+                  <input type="number" name="stok_minimum" className="form-control input-premium" value={formState.stok_minimum || '0'} onChange={handleChange} />
+                </div>
+              </>
+            )}
+            <div>
+              <label className="form-label small fw-semibold">Satuan</label>
+              <input type="text" name="satuan" className="form-control input-premium" value={formState.satuan || 'pcs'} onChange={handleChange} placeholder="pcs, porsi, jam, hari" />
+            </div>
+          </>
+        )}
+        {tabel === 'produk_komposisi' && (
+          <>
+            <div>
+              <label className="form-label small fw-semibold">Pilih Menu Produk (Induk)</label>
+              <PilihRelasi
+                name="produk_induk_id"
+                placeholder="Pilih produk utama yang dijual..."
+                value={formState.produk_induk_id || ''}
+                onChange={handleChange}
+                options={opsiProduk.map(p => ({ value: p.id, label: `${p.nama_produk} [${p.tipe}]` }))}
+              />
+            </div>
+
+            <div className="mt-3">
+              <label className="form-label small fw-semibold d-flex justify-content-between align-items-center mb-2">
+                <span>Daftar Bahan Baku / Penunjang</span>
+                {!isEdit && (
+                  <button
+                    type="button"
+                    className="tombol-premium py-1 px-2"
+                    style={{ fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                    onClick={() => {
+                      const newBahan = [...(formState.bahan || [])];
+                      newBahan.push({ produk_bahan_id: '', jumlah: '1.00' });
+                      setFormState(prev => ({ ...prev, bahan: newBahan }));
+                    }}
+                  >
+                    + Tambah Bahan Baku
+                  </button>
+                )}
+              </label>
+
+              {isEdit ? (
+                // Mode Edit: Hanya mengedit satu bahan yang dipilih
+                <div className="p-3 rounded-3 mb-2" style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--warna-border)' }}>
+                  <div>
+                    <label className="form-label small text-muted">Bahan Mentah / Penunjang</label>
+                    <PilihRelasi
+                      name="produk_bahan_id"
+                      placeholder="Pilih bahan baku/wadah..."
+                      value={formState.produk_bahan_id || ''}
+                      onChange={handleChange}
+                      dropUp={true}
+                      options={opsiProduk.map(p => ({ value: p.id, label: `${p.nama_produk} (${p.stok || 0} ${p.satuan})` }))}
+                    />
+                  </div>
+                  <div className="mt-2">
+                    <label className="form-label small text-muted">Jumlah Takaran</label>
+                    <input type="number" step="any" name="jumlah" className="form-control input-premium" value={formState.jumlah || '1.00'} onChange={handleChange} />
+                  </div>
+                </div>
+              ) : (
+                // Mode Tambah Baru: Bisa menambahkan banyak bahan sekaligus secara dinamis
+                (formState.bahan || []).map((row, idx) => (
+                  <div key={idx} className="p-3 rounded-3 mb-2 d-flex flex-column gap-2" style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--warna-border)' }}>
+                    <div className="d-flex justify-content-between align-items-center">
+                      <span className="fw-semibold text-muted" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>BAHAN #{idx + 1}</span>
+                      {formState.bahan.length > 1 && (
+                        <button
+                          type="button"
+                          className="btn-ikon-premium px-2 py-1"
+                          style={{ color: 'var(--warna-bahaya)', border: 'none', background: 'rgba(239,68,68,0.08)', fontSize: '0.65rem' }}
+                          onClick={() => {
+                            const newBahan = formState.bahan.filter((_, bIdx) => bIdx !== idx);
+                            setFormState(prev => ({ ...prev, bahan: newBahan }));
+                          }}
+                        >
+                          ✕ Hapus
+                        </button>
+                      )}
+                    </div>
+                    <div>
+                      <label className="form-label small text-muted mb-1">Pilih Bahan Mentah</label>
+                      <PilihRelasi
+                        name={`produk_bahan_id_${idx}`}
+                        placeholder="Pilih bahan baku/wadah..."
+                        value={row.produk_bahan_id || ''}
+                        onChange={(e) => {
+                          const newBahan = [...formState.bahan];
+                          newBahan[idx].produk_bahan_id = e.target.value;
+                          setFormState(prev => ({ ...prev, bahan: newBahan }));
+                        }}
+                        dropUp={true}
+                        options={opsiProduk.map(p => ({ value: p.id, label: `${p.nama_produk} (${p.stok || 0} ${p.satuan})` }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label small text-muted mb-1">Jumlah Takaran</label>
+                      <input
+                        type="number"
+                        step="any"
+                        placeholder="Jumlah takaran..."
+                        className="form-control input-premium"
+                        value={row.jumlah || ''}
+                        onChange={(e) => {
+                          const newBahan = [...formState.bahan];
+                          newBahan[idx].jumlah = e.target.value;
+                          setFormState(prev => ({ ...prev, bahan: newBahan }));
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </>
         )}
@@ -2418,6 +2650,36 @@ const Dashboard = () => {
   const [opsiShift, setOpsiShift] = useState([]);
   const [opsiKriteriaPoin, setOpsiKriteriaPoin] = useState([]);
   const [opsiJadwal, setOpsiJadwal] = useState([]);
+  const [opsiProduk, setOpsiProduk] = useState([]);
+
+  // State khusus untuk Kasir POS
+  const [posProducts, setPosProducts] = useState([]);
+  const [posLoading, setPosLoading] = useState(false);
+  const [cart, setCart] = useState([]);
+  const [searchProductQuery, setSearchProductQuery] = useState('');
+  const [filterUnitPos, setFilterUnitPos] = useState('');
+  const [uangJaminanPos, setUangJaminanPos] = useState(0);
+  const [riwayatTransaksi, setRiwayatTransaksi] = useState([]);
+  const [transaksiLoading, setTransaksiLoading] = useState(false);
+
+  const [filterTanggalPos, setFilterTanggalPos] = useState(new Date().toISOString().substring(0, 10));
+  const [searchRiwayatQuery, setSearchRiwayatQuery] = useState('');
+  const [pembayaranTipePos, setPembayaranTipePos] = useState('lunas'); // lunas / belum_bayar
+  const [metodePembayaranPos, setMetodePembayaranPos] = useState('cash'); // cash / qris / tap
+  const [pelangganIdPos, setPelangganIdPos] = useState('');
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
+  const [showDropdownMember, setShowDropdownMember] = useState(false);
+  const [showTambahMemberModal, setShowTambahMemberModal] = useState(false);
+  const [namaMemberBaru, setNamaMemberBaru] = useState('');
+  const [waMemberBaru, setWaMemberBaru] = useState('');
+  const [memberBaruTerdaftar, setMemberBaruTerdaftar] = useState(null);
+  const [showDetailNotaModal, setShowDetailNotaModal] = useState(false);
+  const [selectedTransaksi, setSelectedTransaksi] = useState(null);
+  const [waNotaManual, setWaNotaManual] = useState('');
+
+  const [pilihanProdukHutang, setPilihanProdukHutang] = useState('');
+  const [pilihanQtyHutang, setPilihanQtyHutang] = useState(1);
+  const [metodePelunasanHutang, setMetodePelunasanHutang] = useState('cash');
 
   // Dipisah sebagai useCallback agar bisa dipanggil ulang setelah CRUD (tanpa reload)
   const fetchGlobalOptions = useCallback(async () => {
@@ -2436,9 +2698,9 @@ const Dashboard = () => {
       return profile?.menus?.some(m => m.tabel === namaTabel && (m.can_read == 1 || m.permissions?.can_read == 1));
     };
 
-    const butuhUsaha = bolehBaca('usaha') || bolehBaca('unit') || bolehBaca('user_role') || bolehBaca('iot_alokasi') || bolehBaca('shift') || bolehBaca('jadwal_karyawan') || bolehBaca('absensi') || bolehBaca('kriteria_poin') || bolehBaca('points') || bolehBaca('perizinan');
-    const butuhUsers = bolehBaca('users') || bolehBaca('user_role') || bolehBaca('jadwal_karyawan') || bolehBaca('absensi') || bolehBaca('points') || bolehBaca('perizinan');
-    const butuhUnit = bolehBaca('unit') || bolehBaca('user_role') || bolehBaca('iot_alokasi');
+    const butuhUsaha = bolehBaca('usaha') || bolehBaca('unit') || bolehBaca('user_role') || bolehBaca('iot_alokasi') || bolehBaca('shift') || bolehBaca('jadwal_karyawan') || bolehBaca('absensi') || bolehBaca('kriteria_poin') || bolehBaca('points') || bolehBaca('perizinan') || bolehBaca('produk_jasa') || bolehBaca('transaksi') || bolehBaca('produk_komposisi');
+    const butuhUsers = bolehBaca('users') || bolehBaca('user_role') || bolehBaca('jadwal_karyawan') || bolehBaca('absensi') || bolehBaca('points') || bolehBaca('perizinan') || bolehBaca('transaksi') || bolehBaca('transaksi_detail');
+    const butuhUnit = bolehBaca('unit') || bolehBaca('user_role') || bolehBaca('iot_alokasi') || bolehBaca('produk_jasa') || bolehBaca('produk_komposisi');
     const butuhRoles = bolehBaca('roles') || bolehBaca('user_role') || bolehBaca('role_permissions');
     const butuhMenus = bolehBaca('menus') || bolehBaca('role_permissions');
     const butuhIot = bolehBaca('iot') || bolehBaca('iot_alokasi');
@@ -2446,6 +2708,7 @@ const Dashboard = () => {
     const butuhShift = bolehBaca('shift') || bolehBaca('jadwal_karyawan') || bolehBaca('absensi');
     const butuhKriteriaPoin = bolehBaca('kriteria_poin') || bolehBaca('points');
     const butuhJadwal = bolehBaca('jadwal_karyawan') || bolehBaca('absensi');
+    const butuhProduk = bolehBaca('produk_jasa') || bolehBaca('produk_komposisi');
     
     const safeFetch = async (url) => {
       try {
@@ -2457,9 +2720,9 @@ const Dashboard = () => {
     };
 
     // Hanya fetch tabel yang user punya izin baca atau dibutuhkan oleh menu relasional
-    const [dUsaha, dUsers, dUnit, dRoles, dMenus, dIot, dAlokasi, dShift, dKriteria, dJadwal] = await Promise.all([
+    const [dUsaha, dUsers, dUnit, dRoles, dMenus, dIot, dAlokasi, dShift, dKriteria, dJadwal, dProduk] = await Promise.all([
       butuhUsaha ? safeFetch('http://localhost:8080/api/manajemen/ambil/usaha') : Promise.resolve([]),
-      butuhUsers ? safeFetch('http://localhost:8080/api/manajemen/ambil/users') : Promise.resolve([]),
+      butuhUsers ? safeFetch(profile?.role?.toLowerCase() === 'kasir' ? 'http://localhost:8080/api/transaksi/members' : 'http://localhost:8080/api/manajemen/ambil/users') : Promise.resolve([]),
       butuhUnit ? safeFetch('http://localhost:8080/api/manajemen/ambil/unit') : Promise.resolve([]),
       butuhRoles ? safeFetch('http://localhost:8080/api/manajemen/ambil/roles') : Promise.resolve([]),
       butuhMenus ? safeFetch('http://localhost:8080/api/manajemen/ambil/menus') : Promise.resolve([]),
@@ -2467,7 +2730,8 @@ const Dashboard = () => {
       butuhAlokasi ? safeFetch('http://localhost:8080/api/manajemen/ambil/iot_alokasi') : Promise.resolve([]),
       butuhShift ? safeFetch('http://localhost:8080/api/manajemen/ambil/shift') : Promise.resolve([]),
       butuhKriteriaPoin ? safeFetch('http://localhost:8080/api/manajemen/ambil/kriteria_poin') : Promise.resolve([]),
-      butuhJadwal ? safeFetch('http://localhost:8080/api/manajemen/ambil/jadwal_karyawan') : Promise.resolve([])
+      butuhJadwal ? safeFetch('http://localhost:8080/api/manajemen/ambil/jadwal_karyawan') : Promise.resolve([]),
+      butuhProduk ? safeFetch('http://localhost:8080/api/manajemen/ambil/produk_jasa') : Promise.resolve([])
     ]);
 
     setOpsiUsaha(dUsaha);
@@ -2478,6 +2742,7 @@ const Dashboard = () => {
     setOpsiShift(dShift);
     setOpsiKriteriaPoin(dKriteria);
     setOpsiJadwal(dJadwal);
+    setOpsiProduk(dProduk || []);
 
     // Jika non-Root (tidak punya izin ke tabel iot/unit), bangun opsi dari data iot_alokasi yang sudah di-JOIN
     if (dIot.length > 0) {
@@ -2866,13 +3131,21 @@ const Dashboard = () => {
       return;
     }
     
+    if (menuAktif === 'kasir') {
+      setTabelTerpilih(null);
+      lastTabelRef.current = null;
+      fetchPosProducts();
+      fetchRiwayatTransaksi(filterTanggalPos);
+      return;
+    }
+    
     // Temukan menu yang aktif di seluruh grup
     let currentMenu = null;
     menuGroups.forEach(g => {
       const m = g.menus.find(x => x.url === menuAktif);
       if (m) currentMenu = m;
     });
-
+ 
     if (currentMenu) {
       if (currentMenu.grup) {
         setOpenAccordion(currentMenu.grup);
@@ -2901,7 +3174,343 @@ const Dashboard = () => {
       setFilterTahunPoin('');
       setFilterUsahaGlobal('');
     }
-  }, [menuAktif, menuGroups]);
+  }, [menuAktif, menuGroups, filterTanggalPos]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      const parent = document.getElementById('searchable-member-wrapper');
+      if (parent && !parent.contains(e.target)) {
+        setShowDropdownMember(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  const fetchPosProducts = async () => {
+    setPosLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const r = await fetch(`${API_BASE_URL}/manajemen/ambil/produk_jasa`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const json = await r.json();
+      if (r.ok && json.status === 'sukses') {
+        setPosProducts(json.data || []);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    setPosLoading(false);
+  };
+
+  const fetchRiwayatTransaksi = async (tgl = filterTanggalPos) => {
+    try {
+      const token = localStorage.getItem('token');
+      const r = await fetch(`${API_BASE_URL}/transaksi/riwayat?tanggal=${tgl}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const json = await r.json();
+      if (r.ok && json.status === 'sukses') {
+        setRiwayatTransaksi(json.data || []);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const tambahKeKeranjang = (prod) => {
+    setCart(prev => {
+      const existing = prev.find(item => item.id === prod.id);
+      if (existing) {
+        if (prod.tipe === 'barang' && prod.is_stok_dikelola == 1 && existing.qty >= prod.stok) {
+          ui.notif('gagal', `Stok '${prod.nama_produk}' tidak mencukupi untuk ditambah lagi.`);
+          return prev;
+        }
+        return prev.map(item => item.id === prod.id ? { ...item, qty: item.qty + 1 } : item);
+      } else {
+        if (prod.tipe === 'barang' && prod.is_stok_dikelola == 1 && prod.stok <= 0) {
+          ui.notif('gagal', `Stok '${prod.nama_produk}' sedang habis.`);
+          return prev;
+        }
+        return [...prev, { ...prod, qty: 1 }];
+      }
+    });
+  };
+
+  const kurangiDariKeranjang = (prodId) => {
+    setCart(prev => {
+      const existing = prev.find(item => item.id === prodId);
+      if (existing && existing.qty > 1) {
+        return prev.map(item => item.id === prodId ? { ...item, qty: item.qty - 1 } : item);
+      } else {
+        return prev.filter(item => item.id !== prodId);
+      }
+    });
+  };
+
+  const hapusDariKeranjang = (prodId) => {
+    setCart(prev => prev.filter(item => item.id !== prodId));
+  };
+
+  const resetKeranjang = () => {
+    setCart([]);
+    setUangJaminanPos(0);
+  };
+
+  const prosesCheckout = async () => {
+    if (cart.length === 0) {
+      ui.notif('gagal', 'Keranjang belanja kosong.');
+      return;
+    }
+
+    // Deteksi unit secara otomatis dari produk di keranjang jika filterUnitPos kosong (Semua Kategori Unit)
+    let unitTerdeteksi = filterUnitPos;
+    if (!unitTerdeteksi && cart.length > 0) {
+      unitTerdeteksi = cart[0].unit_id || '';
+    }
+
+    if (!unitTerdeteksi) {
+      ui.notif('gagal', 'Pilih unit terlebih dahulu sebelum melakukan transaksi.');
+      return;
+    }
+
+    if (opsiShift.length === 0) {
+      ui.notif('gagal', 'Tidak ada shift kerja terdaftar untuk cabang usaha ini. Transaksi dinonaktifkan.');
+      return;
+    }
+
+    if (pembayaranTipePos === 'belum_bayar' && !pelangganIdPos) {
+      ui.notif('gagal', 'Pilih pelanggan terlebih dahulu untuk transaksi Bayar Nanti (Hutang).');
+      return;
+    }
+
+    const setuju = await ui.notif('konfirmasi', 'Apakah Anda yakin ingin memproses transaksi ini?');
+    if (!setuju) return;
+
+    setTransaksiLoading(true);
+    ui.loading(true, 'fullscreen', 'Memproses pembayaran...');
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/transaksi/checkout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          unit_id: Number(unitTerdeteksi),
+          uang_jaminan: uangJaminanPos,
+          pelanggan_id: pelangganIdPos ? Number(pelangganIdPos) : null,
+          status_pembayaran: pembayaranTipePos,
+          metode_pembayaran: pembayaranTipePos === 'lunas' ? metodePembayaranPos : null,
+          items: cart.map(item => ({
+            produk_id: item.id,
+            qty: item.qty
+          }))
+        })
+      });
+      const resData = await response.json();
+      ui.loading(false);
+      setTransaksiLoading(false);
+      if (response.ok && resData.status === 'sukses') {
+        ui.notif('sukses', resData.pesan || 'Transaksi berhasil!');
+        
+        // Membuka modal detail nota secara otomatis setelah checkout berhasil HANYA jika bayar sekarang (lunas)
+        const txId = resData.data?.transaksi_id;
+        if (pembayaranTipePos === 'lunas' && txId) {
+          try {
+            const detailRes = await fetch(`${API_BASE_URL}/transaksi-publik/detail/${txId}`);
+            const detailJson = await detailRes.json();
+            if (detailRes.ok && detailJson.status === 'sukses') {
+              setSelectedTransaksi(detailJson.data);
+              setShowDetailNotaModal(true);
+            }
+          } catch (err) {
+            console.error('Gagal memuat detail nota baru:', err);
+          }
+        }
+
+        resetKeranjang();
+        setPelangganIdPos('');
+        setMemberSearchQuery('');
+        setPembayaranTipePos('lunas');
+        setMetodePembayaranPos('cash');
+        fetchPosProducts();
+        fetchRiwayatTransaksi(filterTanggalPos);
+      } else {
+        const pesanError =
+          resData.pesan ||
+          resData.messages?.error ||
+          (Array.isArray(resData.messages) ? resData.messages.join(' ') : null) ||
+          'Gagal memproses transaksi. Silakan cek stok bahan baku.';
+        ui.notif('gagal', pesanError);
+      }
+    } catch (err) {
+      ui.loading(false);
+      setTransaksiLoading(false);
+      ui.notif('gagal', 'Terjadi kesalahan koneksi.');
+    }
+  };
+
+  const tambahMemberBaru = async (e) => {
+    if (e) e.preventDefault();
+    if (!namaMemberBaru || !waMemberBaru) {
+      ui.notif('gagal', 'Nama dan WhatsApp wajib diisi.');
+      return;
+    }
+    
+    ui.loading(true, 'fullscreen', 'Mendaftarkan member...');
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/transaksi/tambah-member`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          nama: namaMemberBaru,
+          wa: waMemberBaru
+        })
+      });
+      const res = await response.json();
+      ui.loading(false);
+      if (response.ok && res.status === 'sukses') {
+        ui.notif('sukses', res.pesan || 'Member berhasil didaftarkan!');
+        setMemberBaruTerdaftar(res.data);
+        setNamaMemberBaru('');
+        setWaMemberBaru('');
+        // Refresh options
+        fetchGlobalOptions();
+        // Auto select
+        setPelangganIdPos(String(res.data.id));
+        setMemberSearchQuery(`${res.data.nama} (${res.data.wa})`);
+      } else {
+        ui.notif('gagal', res.pesan || 'Gagal mendaftarkan member.');
+      }
+    } catch {
+      ui.loading(false);
+      ui.notif('gagal', 'Kesalahan koneksi saat mendaftarkan member.');
+    }
+  };
+
+  const simpanTambahanPesananHutang = async () => {
+    if (!selectedTransaksi) return;
+    ui.loading(true, 'fullscreen', 'Menyimpan tambahan pesanan...');
+    try {
+      const gabungItems = () => {
+        const map = {};
+        selectedTransaksi.detail.forEach(d => {
+          map[d.produk_id] = (map[d.produk_id] || 0) + Number(d.qty);
+        });
+        if (pilihanProdukHutang) {
+          const pid = Number(pilihanProdukHutang);
+          map[pid] = (map[pid] || 0) + Number(pilihanQtyHutang);
+        }
+        return Object.keys(map).map(pid => ({
+          produk_id: Number(pid),
+          qty: map[pid]
+        }));
+      };
+
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/transaksi/update-hutang/${selectedTransaksi.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          items: gabungItems()
+        })
+      });
+      const res = await response.json();
+      ui.loading(false);
+      if (response.ok && res.status === 'sukses') {
+        ui.notif('sukses', res.pesan || 'Tambahan pesanan berhasil disimpan!');
+        setShowDetailNotaModal(false);
+        setSelectedTransaksi(null);
+        setPilihanProdukHutang('');
+        setPilihanQtyHutang(1);
+        fetchPosProducts();
+        fetchRiwayatTransaksi(filterTanggalPos);
+      } else {
+        ui.notif('gagal', res.pesan || 'Gagal menyimpan tambahan pesanan.');
+      }
+    } catch {
+      ui.loading(false);
+      ui.notif('gagal', 'Kesalahan koneksi saat menyimpan tambahan.');
+    }
+  };
+
+  const bayarLunasHutang = async () => {
+    if (!selectedTransaksi) return;
+    const konf = await ui.notif('konfirmasi', `Apakah Anda yakin ingin melunasi tagihan ini dengan metode ${metodePelunasanHutang.toUpperCase()}?`);
+    if (!konf) return;
+
+    ui.loading(true, 'fullscreen', 'Memproses pelunasan...');
+    try {
+      const gabungItems = () => {
+        const map = {};
+        selectedTransaksi.detail.forEach(d => {
+          map[d.produk_id] = (map[d.produk_id] || 0) + Number(d.qty);
+        });
+        if (pilihanProdukHutang) {
+          const pid = Number(pilihanProdukHutang);
+          map[pid] = (map[pid] || 0) + Number(pilihanQtyHutang);
+        }
+        return Object.keys(map).map(pid => ({
+          produk_id: Number(pid),
+          qty: map[pid]
+        }));
+      };
+
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/transaksi/lunasi-hutang/${selectedTransaksi.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          metode_pembayaran: metodePelunasanHutang,
+          items: pilihanProdukHutang ? gabungItems() : []
+        })
+      });
+      const res = await response.json();
+      ui.loading(false);
+      if (response.ok && res.status === 'sukses') {
+        ui.notif('sukses', res.pesan || 'Tagihan berhasil dilunasi!');
+        
+        // Memuat ulang detail nota untuk menampilkan status lunas dan tombol cetak/kirim
+        try {
+          const detailRes = await fetch(`${API_BASE_URL}/transaksi-publik/detail/${selectedTransaksi.id}`);
+          const detailJson = await detailRes.json();
+          if (detailRes.ok && detailJson.status === 'sukses') {
+            setSelectedTransaksi(detailJson.data);
+          } else {
+            setShowDetailNotaModal(false);
+            setSelectedTransaksi(null);
+          }
+        } catch (err) {
+          console.error('Gagal memperbarui detail nota:', err);
+          setShowDetailNotaModal(false);
+          setSelectedTransaksi(null);
+        }
+
+        setPilihanProdukHutang('');
+        setPilihanQtyHutang(1);
+        fetchPosProducts();
+        fetchRiwayatTransaksi(filterTanggalPos);
+      } else {
+        ui.notif('gagal', res.pesan || 'Gagal melunasi tagihan.');
+      }
+    } catch {
+      ui.loading(false);
+      ui.notif('gagal', 'Kesalahan koneksi saat pelunasan.');
+    }
+  };
 
   const handleLogout = async () => {
     const setuju = await ui.notif('konfirmasi', 'Apakah Anda yakin ingin keluar dari aplikasi BKW Console?');
@@ -3316,6 +3925,77 @@ const Dashboard = () => {
 
   const tanganiSimpan = async (dataForm) => {
     const isEdit = dataForm.id !== undefined;
+    
+    // Batch insert khusus untuk produk_komposisi saat tambah data baru
+    if (tabelTerpilih === 'produk_komposisi' && !isEdit) {
+      ui.loading(true, 'fullscreen', 'Menyimpan seluruh bahan resep...');
+      const token = localStorage.getItem('token');
+      const headers = { 
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+      
+      try {
+        // Kirim request ke backend satu per satu untuk setiap bahan secara paralel
+        const promises = (dataForm.bahan || []).map(item => {
+          const payload = {
+            produk_induk_id: dataForm.produk_induk_id,
+            produk_bahan_id: item.produk_bahan_id,
+            jumlah: item.jumlah
+          };
+          return fetch(`http://localhost:8080/api/manajemen/tambah/produk_komposisi`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(payload)
+          });
+        });
+        
+        const responses = await Promise.all(promises);
+        
+        // Periksa apakah ada request yang gagal
+        let adaGagal = false;
+        let pesanGagal = '';
+        
+        for (let i = 0; i < responses.length; i++) {
+          const r = responses[i];
+          if (!r.ok) {
+            adaGagal = true;
+            const res = await r.json();
+            
+            // Ekstrak pesan kesalahan dari backend
+            if (res.errors && typeof res.errors === 'object') {
+              pesanGagal = Object.values(res.errors).join(', ');
+            } else if (res.messages) {
+              if (typeof res.messages === 'object') {
+                pesanGagal = Object.values(res.messages).join(', ');
+              } else {
+                pesanGagal = String(res.messages);
+              }
+            } else if (res.pesan) {
+              pesanGagal = res.pesan;
+            } else {
+              pesanGagal = 'Gagal menyimpan salah satu bahan.';
+            }
+            break;
+          }
+        }
+        
+        if (adaGagal) {
+          ui.notif('gagal', `Gagal menyimpan: ${pesanGagal}`);
+        } else {
+          ui.notif('sukses', 'Seluruh bahan resep berhasil disimpan!');
+          tutupModalForm();
+          await ambilDataTabel(tabelTerpilih, true);
+          await fetchGlobalOptions();
+        }
+      } catch (err) {
+        ui.notif('gagal', 'Koneksi gagal saat menyimpan bahan resep.');
+      } finally {
+        ui.tutupLoading();
+      }
+      return;
+    }
+
     let url = isEdit 
       ? `http://localhost:8080/api/manajemen/ubah/${tabelTerpilih}/${dataForm.id}` 
       : `http://localhost:8080/api/manajemen/tambah/${tabelTerpilih}`;
@@ -3440,7 +4120,9 @@ const Dashboard = () => {
       } else if (targetTabel === 'usaha') {
         nilaiAwal = { nama_usaha: '', alamat: '', tanggal_berdiri: '', no_izin: '', latitude: '', longitude: '', radius_absen: '100' };
       } else if (targetTabel === 'unit') {
-        nilaiAwal = { usaha_id: profile?.usaha_id || '', nama_unit: '' };
+        nilaiAwal = { usaha_id: profile?.usaha_id || '', nama_unit: '', kategori: 'kantin' };
+      } else if (targetTabel === 'produk_jasa') {
+        nilaiAwal = { usaha_id: profile?.usaha_id || '', unit_id: '', nama_produk: '', tipe: 'barang', harga_beli: '0', harga_jual: '0', stok: '0', stok_minimum: '0', is_stok_dikelola: '1', satuan: 'pcs' };
       } else if (targetTabel === 'roles') {
         nilaiAwal = { nama_role: '', deskripsi: '' };
       } else if (targetTabel === 'user_role') {
@@ -3489,6 +4171,8 @@ const Dashboard = () => {
           status: 'ditunjuk', 
           catatan_penolakan: '' 
         };
+      } else if (targetTabel === 'produk_komposisi') {
+        nilaiAwal = { produk_induk_id: '', produk_bahan_id: '', jumlah: '1.00', bahan: [{ produk_bahan_id: '', jumlah: '1.00' }] };
       }
     }
 
@@ -3572,7 +4256,11 @@ const Dashboard = () => {
     } else if (tabel === 'usaha') {
       return ['No.', 'Nama Usaha', 'Alamat', 'Tgl Berdiri', 'No Izin', 'Lokasi', 'Radius', 'Aksi'];
     } else if (tabel === 'unit') {
-      return ['No.', 'Usaha Induk', 'Nama Unit', 'Aksi'];
+      return ['No.', 'Usaha Induk', 'Nama Unit', 'Kategori', 'Aksi'];
+    } else if (tabel === 'produk_jasa') {
+      return ['No.', 'Usaha', 'Unit', 'Nama Produk', 'Tipe', 'HPP (Harga Beli)', 'Harga Jual', 'Stok', 'Min. Stok', 'Satuan', 'Aksi'];
+    } else if (tabel === 'produk_komposisi') {
+      return ['No.', 'Produk Menu (Induk)', 'Bahan Mentah / Penunjang', 'Jumlah Takaran', 'Aksi'];
     } else if (tabel === 'roles') {
       return ['No.', 'Nama Role', 'Keterangan', 'Aksi'];
     } else if (tabel === 'user_role') {
@@ -3737,11 +4425,57 @@ const Dashboard = () => {
       );
     } else if (tabel === 'unit') {
       const namaUsaha = opsiUsaha.find(u => u.id == baris.usaha_id)?.nama_usaha || baris.usaha_id;
+      const kategoriLabels = {
+        kantin: '💼 Kantin',
+        billiard: '🎱 Billiard',
+        rental_mobil: '🚗 Rental Mobil',
+        salon: '💅 Salon',
+        multimedia: '📸 Multimedia'
+      };
       return (
         <>
           <td>{noUrut}</td>
           <td><span className="badge bg-secondary">{namaUsaha}</span></td>
           <td className="fw-bold">{baris.nama_unit}</td>
+          <td><span className="badge bg-info">{kategoriLabels[baris.kategori] || baris.kategori || '-'}</span></td>
+        </>
+      );
+    } else if (tabel === 'produk_jasa') {
+      const namaUsaha = opsiUsaha.find(u => u.id == baris.usaha_id)?.nama_usaha || baris.usaha_id;
+      const namaUnit = baris.unit_id ? (opsiUnit.find(u => u.id == baris.unit_id)?.nama_unit || baris.unit_id) : <span className="text-muted italic">Global</span>;
+      const formatRupiah = (val) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
+      const tipeLabels = { barang: '📦 Barang', jasa: '💅 Jasa', sewa: '🚗 Sewa' };
+      return (
+        <>
+          <td>{noUrut}</td>
+          <td><span className="badge bg-secondary">{namaUsaha}</span></td>
+          <td><span className="badge bg-light text-dark">{namaUnit}</span></td>
+          <td className="fw-bold text-main">{baris.nama_produk}</td>
+          <td><span className="badge bg-info">{tipeLabels[baris.tipe] || baris.tipe}</span></td>
+          <td><code className="text-main">{formatRupiah(baris.harga_beli)}</code></td>
+          <td><strong className="text-main">{formatRupiah(baris.harga_jual)}</strong></td>
+          <td>
+            {baris.is_stok_dikelola == 1 ? (
+              <span className={Number(baris.stok) <= Number(baris.stok_minimum) ? 'text-danger fw-bold' : 'text-main'}>
+                {baris.stok} {baris.satuan} {Number(baris.stok) <= Number(baris.stok_minimum) && '⚠️'}
+              </span>
+            ) : (
+              <span className="text-muted">-</span>
+            )}
+          </td>
+          <td><span className="text-muted small">{baris.is_stok_dikelola == 1 ? `${baris.stok_minimum} ${baris.satuan}` : '-'}</span></td>
+          <td><span className="text-main">{baris.satuan}</span></td>
+        </>
+      );
+    } else if (tabel === 'produk_komposisi') {
+      const namaInduk = baris.nama_produk_induk || `Produk #${baris.produk_induk_id}`;
+      const namaBahan = baris.nama_produk_bahan || `Bahan #${baris.produk_bahan_id}`;
+      return (
+        <>
+          <td>{noUrut}</td>
+          <td className="fw-bold text-main">🍜 {namaInduk}</td>
+          <td className="text-main">📦 {namaBahan}</td>
+          <td><strong className="text-primary">{baris.jumlah}</strong></td>
         </>
       );
     } else if (tabel === 'roles') {
@@ -5063,6 +5797,590 @@ const Dashboard = () => {
                   </div>
                 </div>
               )}
+              
+              {menuAktif === 'kasir' && (() => {
+                const formatRupiah = (val) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
+                
+                // Saring produk berdasarkan pencarian & filter unit
+                // Hanya tampilkan produk yang memiliki harga jual > 0 (bukan bahan baku internal)
+                const produkTersaring = posProducts.filter(p => {
+                  const matchSearch = p.nama_produk.toLowerCase().includes(searchProductQuery.toLowerCase());
+                  const matchUnit = filterUnitPos ? String(p.unit_id) === String(filterUnitPos) : true;
+                  const matchHarga = Number(p.harga_jual) > 0; // Sembunyikan bahan baku (harga 0)
+                  return matchSearch && matchUnit && matchHarga;
+                });
+
+                // Hitung total belanjaan di keranjang
+                const totalBelanja = cart.reduce((total, item) => total + (item.harga_jual * item.qty), 0);
+
+                return (
+                  <div className="row g-4 fade-in">
+                    {/* Sisi Kiri: Katalog Produk */}
+                    <div className="col-12 col-lg-8">
+                      <div className="kartu-premium p-3 p-sm-4">
+                        <div className="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3 mb-4 pb-3" style={{ borderBottom: '1px solid var(--warna-border)' }}>
+                          <div>
+                            <h4 className="fw-bold mb-1 d-flex align-items-center gap-2">
+                              <ShoppingCart size={20} className="text-primary" style={{ color: 'var(--warna-utama)' }} />
+                              <span>Katalog Kasir POS</span>
+                            </h4>
+                            <div className="text-muted small">Pilih menu produk kantin atau jasa layanan untuk ditransaksikan.</div>
+                          </div>
+                        </div>
+
+                        {/* Peringatan jika tidak ada shift terdaftar */}
+                        {opsiShift.length === 0 && (
+                          <div className="alert alert-danger py-2.5 px-3 small mb-4 d-flex align-items-center gap-2 border-0" style={{ borderRadius: '8px', color: '#f87171', backgroundColor: 'rgba(239, 68, 68, 0.08)' }}>
+                            <span>⚠️</span>
+                            <div><strong>Peringatan:</strong> Tidak ada shift kerja yang terdaftar untuk cabang usaha ini. Transaksi kasir dinonaktifkan. Silakan hubungi admin/supervisor untuk mendaftarkan shift.</div>
+                          </div>
+                        )}
+
+                        {/* Search & Filter Unit */}
+                        <div className="row g-2 mb-4">
+                          <div className="col-12 col-sm-7 position-relative">
+                            <div className="position-absolute d-flex align-items-center justify-content-center" style={{ top: 0, bottom: 0, left: '15px', color: 'var(--text-secondary)', opacity: 0.7, pointerEvents: 'none' }}>
+                              <Search size={16} />
+                            </div>
+                            <input 
+                              type="text" 
+                              className="form-control input-premium w-100" 
+                              style={{ paddingLeft: '40px', fontSize: '0.85rem' }} 
+                              placeholder="Cari nama produk/jasa..." 
+                              value={searchProductQuery}
+                              onChange={(e) => setSearchProductQuery(e.target.value)}
+                            />
+                          </div>
+                          <div className="col-12 col-sm-5">
+                            <select
+                              className="form-select input-premium w-100"
+                              style={{ fontSize: '0.85rem' }}
+                              value={filterUnitPos}
+                              onChange={e => setFilterUnitPos(e.target.value)}
+                            >
+                              <option value="">Semua Kategori Unit</option>
+                              {opsiUnit.filter(u => !profile?.usaha_id || u.usaha_id == profile.usaha_id).map(u => (
+                                <option key={u.id} value={u.id}>Unit: {u.nama_unit} ({u.kategori})</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Product Grid */}
+                        {posLoading ? (
+                          <div className="text-center py-5">
+                            <span className="spinner-border spinner-border-sm text-primary me-2" />
+                            Memuat daftar produk...
+                          </div>
+                        ) : produkTersaring.length === 0 ? (
+                          <div className="text-center py-5 text-muted small" style={{ border: '1px dashed var(--warna-border)', borderRadius: '10px' }}>
+                            Tidak ada produk/jasa yang ditemukan.
+                          </div>
+                        ) : (
+                          <div className="row g-3" style={{ maxHeight: '550px', overflowY: 'auto', paddingRight: '5px' }}>
+                            {produkTersaring.map(prod => {
+                              const cartItem = cart.find(item => item.id === prod.id);
+                              const isStokMenipis = prod.is_stok_dikelola == 1 && Number(prod.stok) <= Number(prod.stok_minimum);
+                              return (
+                                <div key={prod.id} className="col-12 col-sm-6">
+                                  <div 
+                                    className="p-3 rounded-3 d-flex flex-column justify-content-between h-100"
+                                    style={{ 
+                                      backgroundColor: 'var(--bg-kartu)', 
+                                      border: cartItem ? '1.5px solid var(--warna-utama)' : '1px solid var(--warna-border)',
+                                      boxShadow: cartItem ? '0 4px 12px rgba(99, 102, 241, 0.08)' : 'none',
+                                      transition: 'all 0.2s'
+                                    }}
+                                  >
+                                    <div>
+                                      <div className="d-flex justify-content-between align-items-start gap-2 mb-1">
+                                        <span className="fw-bold text-main" style={{ fontSize: '0.82rem' }}>{prod.nama_produk}</span>
+                                        <span className="badge bg-light text-dark" style={{ fontSize: '0.6rem' }}>{prod.nama_unit || 'Global'}</span>
+                                      </div>
+                                      
+                                      <div className="d-flex align-items-center justify-content-between mt-1 mb-2">
+                                        <span className="text-primary fw-bold" style={{ fontSize: '0.8rem', color: 'var(--warna-utama)' }}>{formatRupiah(prod.harga_jual)}</span>
+                                        
+                                        {prod.is_stok_dikelola == 1 ? (
+                                          <span className={`badge ${isStokMenipis ? 'bg-danger' : 'bg-secondary'}`} style={{ fontSize: '0.62rem' }}>
+                                            Stok: {prod.stok} {prod.satuan} {isStokMenipis && '⚠️'}
+                                          </span>
+                                        ) : (
+                                          <span className="text-muted small" style={{ fontSize: '0.65rem' }}>Non-Stok</span>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Action Counter */}
+                                    <div className="mt-2">
+                                      {cartItem ? (
+                                        <div className="d-flex align-items-center justify-content-between gap-2">
+                                          <button 
+                                            onClick={() => kurangiDariKeranjang(prod.id)}
+                                            className="btn btn-sm btn-outline-danger py-1 px-2.5 d-flex align-items-center justify-content-center"
+                                            style={{ borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold' }}
+                                          >-</button>
+                                          <span className="fw-bold text-main" style={{ fontSize: '0.85rem' }}>{cartItem.qty} {prod.satuan}</span>
+                                          <button 
+                                            onClick={() => tambahKeKeranjang(prod)}
+                                            className="btn btn-sm btn-outline-primary py-1 px-2.5 d-flex align-items-center justify-content-center"
+                                            style={{ borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold' }}
+                                            disabled={prod.is_stok_dikelola == 1 && cartItem.qty >= prod.stok}
+                                          >+</button>
+                                        </div>
+                                      ) : (
+                                        <button
+                                          onClick={() => tambahKeKeranjang(prod)}
+                                          className="tombol-premium border-0 w-100 py-1 px-3 d-flex align-items-center justify-content-center gap-1"
+                                          style={{ fontSize: '0.72rem', borderRadius: '8px' }}
+                                          disabled={prod.is_stok_dikelola == 1 && prod.stok <= 0}
+                                        >
+                                          <Plus size={12} />
+                                          <span>Pilih</span>
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Sisi Kanan: Keranjang Belanja & Pembayaran */}
+                    <div className="col-12 col-lg-4">
+                      <div className="kartu-premium p-3 p-sm-4 h-100 d-flex flex-column justify-content-between" style={{ minHeight: '400px' }}>
+                        <div>
+                          <h4 className="fw-bold mb-3 pb-2 d-flex align-items-center gap-2" style={{ borderBottom: '1px solid var(--warna-border)' }}>
+                            <ShoppingCart size={18} className="text-primary" />
+                            <span style={{ fontSize: '0.85rem' }}>Keranjang Transaksi</span>
+                          </h4>
+
+                          {cart.length === 0 ? (
+                            <div className="text-center py-5 text-muted small italic">Keranjang belanja kosong. Silakan pilih produk dari katalog.</div>
+                          ) : (
+                            <div className="d-flex flex-column gap-3" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                              {cart.map(item => (
+                                <div key={item.id} className="d-flex align-items-center justify-content-between pb-2" style={{ borderBottom: '1px dashed var(--warna-border)' }}>
+                                  <div style={{ maxWidth: '60%' }}>
+                                    <div className="fw-bold text-main" style={{ fontSize: '0.78rem' }}>{item.nama_produk}</div>
+                                    <div className="text-muted small" style={{ fontSize: '0.68rem' }}>
+                                      {item.qty} x {formatRupiah(item.harga_jual)}
+                                    </div>
+                                  </div>
+                                  <div className="d-flex align-items-center gap-2">
+                                    <span className="fw-bold text-main" style={{ fontSize: '0.78rem' }}>{formatRupiah(item.harga_jual * item.qty)}</span>
+                                    <button 
+                                      onClick={() => hapusDariKeranjang(item.id)}
+                                      className="btn btn-link text-danger p-0 ms-1"
+                                      title="Hapus"
+                                      style={{ border: 'none', background: 'none' }}
+                                    >🗑️</button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {cart.length > 0 && (
+                          <div className="mt-4 pt-3" style={{ borderTop: '1.5px solid var(--warna-border)' }}>
+                            {/* Summary */}
+                            <div className="d-flex justify-content-between align-items-center mb-3">
+                              <span className="text-muted small">Total Pembayaran:</span>
+                              <span className="fs-5 fw-bold text-main" style={{ color: 'var(--warna-utama)' }}>{formatRupiah(totalBelanja)}</span>
+                            </div>
+
+                            {/* Tipe Pembayaran (Lunas vs Hutang) */}
+                            <div className="mb-3">
+                              <label className="text-muted small d-block mb-1">Tipe Transaksi:</label>
+                              <div className="d-flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setPembayaranTipePos('lunas')}
+                                  className={`border-0 flex-fill py-1.5 px-3 small d-flex align-items-center justify-content-center gap-1`}
+                                  style={{
+                                    fontSize: '0.72rem',
+                                    borderRadius: '8px',
+                                    backgroundColor: pembayaranTipePos === 'lunas' ? 'var(--warna-utama, #6366f1)' : 'rgba(255,255,255,0.03)',
+                                    color: pembayaranTipePos === 'lunas' ? '#fff' : 'var(--teks-redup, #94a3b8)',
+                                    fontWeight: 600,
+                                    transition: 'all 0.15s'
+                                  }}
+                                >
+                                  💳 Bayar Sekarang
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setPembayaranTipePos('belum_bayar')}
+                                  className={`border-0 flex-fill py-1.5 px-3 small d-flex align-items-center justify-content-center gap-1`}
+                                  style={{
+                                    fontSize: '0.72rem',
+                                    borderRadius: '8px',
+                                    backgroundColor: pembayaranTipePos === 'belum_bayar' ? 'var(--warna-utama, #6366f1)' : 'rgba(255,255,255,0.03)',
+                                    color: pembayaranTipePos === 'belum_bayar' ? '#fff' : 'var(--teks-redup, #94a3b8)',
+                                    fontWeight: 600,
+                                    transition: 'all 0.15s'
+                                  }}
+                                >
+                                  ⚠️ Bayar Nanti
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Pilihan Pelanggan (Selalu Muncul) */}
+                            <div className="mb-3 fade-in" id="searchable-member-wrapper" style={{ position: 'relative' }}>
+                              <div className="d-flex align-items-center justify-content-between mb-1">
+                                <label className="text-muted small mb-0">
+                                  Pilih Member {pembayaranTipePos === 'belum_bayar' ? '(Wajib)' : '(Opsional)'}:
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setMemberBaruTerdaftar(null);
+                                    setShowTambahMemberModal(true);
+                                  }}
+                                  className="btn btn-link text-primary p-0 d-flex align-items-center gap-0.5 border-0"
+                                  style={{ fontSize: '0.68rem', textDecoration: 'none', color: 'var(--warna-utama)' }}
+                                >
+                                  ➕ Tambah Baru
+                                </button>
+                              </div>
+
+                              <div className="position-relative">
+                                <input
+                                  type="text"
+                                  className="form-control input-premium text-main py-1.5 px-3"
+                                  style={{ fontSize: '0.78rem', borderRadius: '8px' }}
+                                  placeholder="Ketik nama atau wa member..."
+                                  value={memberSearchQuery}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setMemberSearchQuery(val);
+                                    if (!val) {
+                                      setPelangganIdPos('');
+                                    }
+                                    setShowDropdownMember(true);
+                                  }}
+                                  onFocus={() => setShowDropdownMember(true)}
+                                />
+                                {pelangganIdPos && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setPelangganIdPos('');
+                                      setMemberSearchQuery('');
+                                    }}
+                                    className="position-absolute end-0 top-50 translate-middle-y btn btn-link text-danger p-0 border-0 me-2"
+                                    style={{ fontSize: '0.75rem', textDecoration: 'none', lineHeight: 1 }}
+                                    title="Hapus pilihan"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Dropdown menu pencarian */}
+                              {showDropdownMember && (() => {
+                                const query = memberSearchQuery.toLowerCase();
+                                const filteredMembers = opsiUsers.filter(u => {
+                                  if (!query) return true;
+                                  return u.nama.toLowerCase().includes(query) || u.wa.toLowerCase().includes(query);
+                                });
+
+                                return (
+                                  <div
+                                    className="position-absolute w-100 rounded-3 shadow-lg p-1"
+                                    style={{
+                                      zIndex: 1050,
+                                      maxHeight: '200px',
+                                      overflowY: 'auto',
+                                      top: '100%',
+                                      left: 0,
+                                      backgroundColor: '#1e293b',
+                                      border: '1px solid var(--warna-border)',
+                                      marginTop: '4px'
+                                    }}
+                                  >
+                                    {filteredMembers.length === 0 ? (
+                                      <div className="text-muted small py-2 px-3 italic text-white">Tidak ada member cocok.</div>
+                                    ) : (
+                                      filteredMembers.map(u => (
+                                        <div
+                                          key={u.id}
+                                          onClick={() => {
+                                            setPelangganIdPos(String(u.id));
+                                            setMemberSearchQuery(`${u.nama} (${u.wa})`);
+                                            setShowDropdownMember(false);
+                                          }}
+                                          className="py-1.5 px-3 rounded-2 text-white small"
+                                          style={{
+                                            cursor: 'pointer',
+                                            fontSize: '0.76rem',
+                                            transition: 'background 0.15s'
+                                          }}
+                                          onMouseEnter={e => e.target.style.backgroundColor = 'rgba(255,255,255,0.06)'}
+                                          onMouseLeave={e => e.target.style.backgroundColor = 'transparent'}
+                                        >
+                                          👤 {u.nama} ({u.wa})
+                                        </div>
+                                      ))
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                            </div>
+
+                            {/* Pilihan Metode Pembayaran (Jika Bayar Sekarang) */}
+                            {pembayaranTipePos === 'lunas' && (
+                              <div className="mb-3 fade-in">
+                                <label className="text-muted small d-block mb-1.5">Metode Pembayaran:</label>
+                                <div className="d-flex gap-1.5 p-1 rounded-3" style={{ backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid var(--warna-border)' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setMetodePembayaranPos('cash')}
+                                    className="border-0 flex-fill py-1.5 px-2 small text-center"
+                                    style={{
+                                      fontSize: '0.74rem',
+                                      borderRadius: '6px',
+                                      backgroundColor: metodePembayaranPos === 'cash' ? 'var(--warna-utama, #6366f1)' : 'transparent',
+                                      color: metodePembayaranPos === 'cash' ? '#fff' : 'var(--teks-redup, #94a3b8)',
+                                      fontWeight: 600,
+                                      transition: 'all 0.2s'
+                                    }}
+                                  >
+                                    💵 Cash
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setMetodePembayaranPos('qris')}
+                                    className="border-0 flex-fill py-1.5 px-2 small text-center"
+                                    style={{
+                                      fontSize: '0.74rem',
+                                      borderRadius: '6px',
+                                      backgroundColor: metodePembayaranPos === 'qris' ? 'var(--warna-utama, #6366f1)' : 'transparent',
+                                      color: metodePembayaranPos === 'qris' ? '#fff' : 'var(--teks-redup, #94a3b8)',
+                                      fontWeight: 600,
+                                      transition: 'all 0.2s'
+                                    }}
+                                  >
+                                    📱 QRIS
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setMetodePembayaranPos('tap')}
+                                    className="border-0 flex-fill py-1.5 px-2 small text-center"
+                                    style={{
+                                      fontSize: '0.74rem',
+                                      borderRadius: '6px',
+                                      backgroundColor: metodePembayaranPos === 'tap' ? 'var(--warna-utama, #6366f1)' : 'transparent',
+                                      color: metodePembayaranPos === 'tap' ? '#fff' : 'var(--teks-redup, #94a3b8)',
+                                      fontWeight: 600,
+                                      transition: 'all 0.2s'
+                                    }}
+                                  >
+                                    🔲 Tap
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Buttons */}
+                            <div className="d-flex gap-2">
+                              <button
+                                onClick={resetKeranjang}
+                                className="tombol-sekunder-premium border-0 flex-fill text-center py-2 text-danger"
+                                style={{ fontSize: '0.78rem', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.05)' }}
+                              >
+                                Reset
+                              </button>
+                              <button
+                                onClick={prosesCheckout}
+                                className="tombol-premium border-0 flex-fill text-center py-2"
+                                style={{ fontSize: '0.78rem', borderRadius: '10px' }}
+                                disabled={transaksiLoading}
+                              >
+                                {transaksiLoading ? 'Proses...' : 'Proses / Simpan'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Baris Bawah: Riwayat Transaksi Penjualan */}
+                    <div className="col-12">
+                      <div className="kartu-premium p-3 p-sm-4 mt-2">
+                        <h4 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ fontSize: '0.85rem' }}>
+                          <span>📝 Riwayat Transaksi Penjualan</span>
+                        </h4>
+
+                        {/* Filter Tanggal & Pencarian Realtime */}
+                        <div className="row g-2 mb-3">
+                          <div className="col-12 col-sm-4">
+                            <label className="text-muted small mb-1 d-block" style={{ fontSize: '0.72rem' }}>Filter Tanggal Siklus:</label>
+                            <input
+                              type="date"
+                              className="form-control input-premium w-100 py-1.5 px-2 text-main"
+                              style={{ fontSize: '0.78rem' }}
+                              value={filterTanggalPos}
+                              onChange={e => setFilterTanggalPos(e.target.value)}
+                            />
+                          </div>
+                          <div className="col-12 col-sm-8">
+                            <label className="text-muted small mb-1 d-block" style={{ fontSize: '0.72rem' }}>Pencarian Realtime:</label>
+                            <input
+                              type="text"
+                              className="form-control input-premium w-100 py-1.5 px-3 text-main"
+                              style={{ fontSize: '0.78rem' }}
+                              placeholder="Cari nomor invoice, nama kasir, nama member, no WA, barang..."
+                              value={searchRiwayatQuery}
+                              onChange={e => setSearchRiwayatQuery(e.target.value)}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Summary Bar */}
+                        {(() => {
+                          const query = searchRiwayatQuery.toLowerCase();
+                          const filtered = riwayatTransaksi.filter(tx => {
+                            if (!query) return true;
+                            const matchInvoice = tx.nomor_invoice.toLowerCase().includes(query);
+                            const matchKasir = (tx.nama_kasir || '').toLowerCase().includes(query);
+                            const matchPelanggan = (tx.nama_pelanggan || '').toLowerCase().includes(query);
+                            const matchWa = (tx.wa_pelanggan || '').toLowerCase().includes(query);
+                            const matchItems = tx.detail?.some(d => d.nama_produk.toLowerCase().includes(query));
+                            return matchInvoice || matchKasir || matchPelanggan || matchWa || matchItems;
+                          });
+
+                          const totalCash = filtered.filter(t => t.status_pembayaran === 'lunas' && t.metode_pembayaran === 'cash').reduce((sum, t) => sum + Number(t.total_harga), 0);
+                          const totalQris = filtered.filter(t => t.status_pembayaran === 'lunas' && t.metode_pembayaran === 'qris').reduce((sum, t) => sum + Number(t.total_harga), 0);
+                          const totalTap = filtered.filter(t => t.status_pembayaran === 'lunas' && t.metode_pembayaran === 'tap').reduce((sum, t) => sum + Number(t.total_harga), 0);
+                          const totalHutang = filtered.filter(t => t.status_pembayaran === 'belum_bayar').reduce((sum, t) => sum + Number(t.total_harga), 0);
+                          const totalSemua = totalCash + totalQris + totalTap + totalHutang;
+
+                          return (
+                            <div className="row g-2 mb-4">
+                              <div className="col-6 col-md-2.4" style={{ width: '20%' }}>
+                                <div className="p-2 rounded-3 text-center" style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                  <div className="text-muted small" style={{ fontSize: '0.65rem' }}>💵 Cash</div>
+                                  <div className="fw-bold text-success" style={{ fontSize: '0.8rem' }}>{formatRupiah(totalCash)}</div>
+                                </div>
+                              </div>
+                              <div className="col-6 col-md-2.4" style={{ width: '20%' }}>
+                                <div className="p-2 rounded-3 text-center" style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                  <div className="text-muted small" style={{ fontSize: '0.65rem' }}>📱 QRIS</div>
+                                  <div className="fw-bold text-info" style={{ fontSize: '0.8rem' }}>{formatRupiah(totalQris)}</div>
+                                </div>
+                              </div>
+                              <div className="col-6 col-md-2.4" style={{ width: '20%' }}>
+                                <div className="p-2 rounded-3 text-center" style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                  <div className="text-muted small" style={{ fontSize: '0.65rem' }}>🔲 Tap</div>
+                                  <div className="fw-bold text-warning" style={{ fontSize: '0.8rem' }}>{formatRupiah(totalTap)}</div>
+                                </div>
+                              </div>
+                              <div className="col-6 col-md-2.4" style={{ width: '20%' }}>
+                                <div className="p-2 rounded-3 text-center" style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                  <div className="text-muted small" style={{ fontSize: '0.65rem' }}>⚠️ Hutang</div>
+                                  <div className="fw-bold text-danger" style={{ fontSize: '0.8rem' }}>{formatRupiah(totalHutang)}</div>
+                                </div>
+                              </div>
+                              <div className="col-12 col-md-2.4" style={{ width: '20%' }}>
+                                <div className="p-2 rounded-3 text-center" style={{ backgroundColor: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                                  <div className="text-muted small" style={{ fontSize: '0.65rem', fontWeight: 600 }}>✅ Total Semua</div>
+                                  <div className="fw-bold" style={{ fontSize: '0.8rem', color: 'var(--warna-utama, #6366f1)' }}>{formatRupiah(totalSemua)}</div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                        
+                        {riwayatTransaksi.length === 0 ? (
+                          <div className="text-muted small py-3 italic text-center">Belum ada riwayat transaksi penjualan untuk cabang usaha ini.</div>
+                        ) : (
+                          (() => {
+                            const query = searchRiwayatQuery.toLowerCase();
+                            const filtered = riwayatTransaksi.filter(tx => {
+                              if (!query) return true;
+                              const matchInvoice = tx.nomor_invoice.toLowerCase().includes(query);
+                              const matchKasir = (tx.nama_kasir || '').toLowerCase().includes(query);
+                              const matchPelanggan = (tx.nama_pelanggan || '').toLowerCase().includes(query);
+                              const matchWa = (tx.wa_pelanggan || '').toLowerCase().includes(query);
+                              const matchItems = tx.detail?.some(d => d.nama_produk.toLowerCase().includes(query));
+                              return matchInvoice || matchKasir || matchPelanggan || matchWa || matchItems;
+                            });
+
+                            if (filtered.length === 0) {
+                              return <div className="text-muted small py-3 italic text-center">Tidak ada transaksi yang cocok dengan pencarian.</div>;
+                            }
+
+                            return (
+                              <div className="table-responsive">
+                                <table className="table tabel-premium align-middle mb-0">
+                                  <thead>
+                                    <tr>
+                                      <th>No. Invoice</th>
+                                      <th>Tanggal</th>
+                                      <th>Kasir</th>
+                                      <th>Pelanggan</th>
+                                      <th>Total Belanja</th>
+                                      <th>Detail Item</th>
+                                      <th>Status</th>
+                                      <th>Aksi</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {filtered.map(tx => (
+                                      <tr key={tx.id}>
+                                        <td className="fw-bold text-main" style={{ fontSize: '0.78rem' }}><code>{tx.nomor_invoice}</code></td>
+                                        <td className="text-main" style={{ fontSize: '0.78rem' }}>{new Date(tx.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                                        <td className="text-main" style={{ fontSize: '0.78rem' }}>{tx.nama_kasir || `User #${tx.kasir_id}`}</td>
+                                        <td className="text-main" style={{ fontSize: '0.78rem' }}>{tx.nama_pelanggan ? `${tx.nama_pelanggan} (${tx.wa_pelanggan})` : <span className="text-muted">-</span>}</td>
+                                        <td className="fw-bold text-main" style={{ fontSize: '0.78rem' }}>{formatRupiah(tx.total_harga)}</td>
+                                        <td>
+                                          <div className="d-flex flex-column gap-1">
+                                            {tx.detail?.map(d => (
+                                              <span key={d.id} className="small text-muted" style={{ fontSize: '0.68rem' }}>
+                                                • {d.nama_produk} ({d.qty} x {formatRupiah(d.harga_satuan)})
+                                              </span>
+                                            ))}
+                                          </div>
+                                        </td>
+                                        <td>
+                                          {tx.status_pembayaran === 'lunas' ? (
+                                            <span className="badge py-1 px-2" style={{ backgroundColor: 'rgba(34, 197, 94, 0.1)', color: '#4ade80', fontSize: '0.68rem', borderRadius: '6px' }}>Lunas ({tx.metode_pembayaran?.toUpperCase()})</span>
+                                          ) : (
+                                            <span className="badge py-1 px-2" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#f87171', fontSize: '0.68rem', borderRadius: '6px' }}>Hutang</span>
+                                          )}
+                                        </td>
+                                        <td>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setSelectedTransaksi(tx);
+                                              setShowDetailNotaModal(true);
+                                            }}
+                                            className="tombol-premium border-0 py-1 px-2.5 d-inline-flex align-items-center justify-content-center"
+                                            style={{ fontSize: '0.68rem', borderRadius: '6px' }}
+                                          >
+                                            Detail
+                                          </button>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            );
+                          })()
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* DYNAMIC CRUD PANEL */}
               {(() => {
@@ -5072,7 +6390,7 @@ const Dashboard = () => {
                   if (m) currentMenu = m;
                 });
                 
-                if (!currentMenu || !currentMenu.tabel) return null;
+                if (!currentMenu || !currentMenu.tabel || currentMenu.url === 'kasir') return null;
                 
                 const canCreate = currentMenu.can_create == 1 || currentMenu.permissions?.can_create == 1;
                 const canUpdate = currentMenu.can_update == 1 || currentMenu.permissions?.can_update == 1;
@@ -6396,8 +7714,440 @@ const Dashboard = () => {
               opsiShift={opsiShift}
               opsiKriteriaPoin={opsiKriteriaPoin}
               opsiJadwal={opsiJadwal}
+              opsiProduk={opsiProduk}
               profile={profile}
             />
+          </div>
+        </div>
+      )}
+      {/* ===== MODAL TAMBAH MEMBER CEPAT ===== */}
+      {showTambahMemberModal && (
+        <div
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center p-3"
+          style={{
+            zIndex: 9995,
+            backgroundColor: 'rgba(11, 15, 25, 0.65)',
+            backdropFilter: 'blur(6px)',
+            animation: 'fadeIn 0.2s ease forwards'
+          }}
+        >
+          <div className="kartu-premium fade-in w-100" style={{ maxWidth: '420px', padding: '1.5rem' }}>
+            <div className="d-flex align-items-center justify-content-between pb-2 mb-3" style={{ borderBottom: '1px solid var(--warna-border)' }}>
+              <h4 className="fw-bold mb-0 text-main" style={{ fontSize: '0.85rem' }}>➕ Tambah Member Baru</h4>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowTambahMemberModal(false);
+                  setMemberBaruTerdaftar(null);
+                }}
+                className="btn btn-link text-main p-0 border-0"
+                style={{ fontSize: '0.9rem', textDecoration: 'none' }}
+              >✕</button>
+            </div>
+
+            {memberBaruTerdaftar ? (
+              <div className="text-center py-2">
+                <div className="text-success fw-bold mb-2" style={{ fontSize: '0.85rem' }}>✅ Member Berhasil Didaftarkan!</div>
+                <p className="text-muted mb-4" style={{ fontSize: '0.75rem' }}>
+                  Member <strong>{memberBaruTerdaftar.nama}</strong> telah berhasil dibuat.<br/>
+                  Password login sementara adalah 4 digit terakhir nomor WA yaitu: <strong>{memberBaruTerdaftar.wa.substring(memberBaruTerdaftar.wa.length - 4)}</strong>.
+                </p>
+                <div className="d-flex flex-column gap-2">
+                  <a
+                    href={`https://wa.me/${memberBaruTerdaftar.wa.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                      `Halo ${memberBaruTerdaftar.nama},\nPendaftaran Member Anda di BKW berhasil!\n\nDetail Akun Anda:\nUsername/WA: ${memberBaruTerdaftar.wa}\nPassword Sementara: ${memberBaruTerdaftar.wa.substring(memberBaruTerdaftar.wa.length - 4)}\n\nTautan Login: http://localhost:5173/login`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="tombol-premium border-0 text-center py-2 small d-flex align-items-center justify-content-center gap-2"
+                    style={{ fontSize: '0.78rem', borderRadius: '8px', textDecoration: 'none' }}
+                  >
+                    💬 Kirim Info Akses via WA
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowTambahMemberModal(false);
+                      setMemberBaruTerdaftar(null);
+                    }}
+                    className="tombol-sekunder-premium border-0 py-2 small"
+                    style={{ fontSize: '0.78rem', borderRadius: '8px' }}
+                  >
+                    Selesai
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={tambahMemberBaru}>
+                <div className="mb-3">
+                  <label className="text-muted small mb-1 d-block" style={{ fontSize: '0.7rem' }}>Nama Lengkap:</label>
+                  <input
+                    type="text"
+                    required
+                    className="form-control input-premium text-main"
+                    style={{ fontSize: '0.8rem' }}
+                    placeholder="Nama pelanggan..."
+                    value={namaMemberBaru}
+                    onChange={e => setNamaMemberBaru(e.target.value)}
+                  />
+                </div>
+                <div className="mb-3">
+                  <label className="text-muted small mb-1 d-block" style={{ fontSize: '0.7rem' }}>Nomor WhatsApp:</label>
+                  <input
+                    type="text"
+                    required
+                    className="form-control input-premium text-main"
+                    style={{ fontSize: '0.8rem' }}
+                    placeholder="Contoh: 0858xxxxxxxx..."
+                    value={waMemberBaru}
+                    onChange={e => setWaMemberBaru(e.target.value)}
+                  />
+                </div>
+                <div className="d-flex gap-2 mt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowTambahMemberModal(false)}
+                    className="tombol-sekunder-premium border-0 flex-fill py-2 small"
+                    style={{ fontSize: '0.78rem', borderRadius: '8px' }}
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="tombol-premium border-0 flex-fill py-2 small"
+                    style={{ fontSize: '0.78rem', borderRadius: '8px' }}
+                  >
+                    Daftarkan
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ===== MODAL DETAIL NOTA & EDIT HUTANG ===== */}
+      {showDetailNotaModal && selectedTransaksi && (
+        <div
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center p-3"
+          style={{
+            zIndex: 9993,
+            backgroundColor: 'rgba(11, 15, 25, 0.65)',
+            backdropFilter: 'blur(6px)',
+            animation: 'fadeIn 0.2s ease forwards'
+          }}
+        >
+          <div className="kartu-premium fade-in w-100" style={{ maxWidth: '580px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div className="d-flex align-items-center justify-content-between pb-2 mb-3" style={{ borderBottom: '1px solid var(--warna-border)' }}>
+              <h4 className="fw-bold mb-0 text-main" style={{ fontSize: '0.85rem' }}>
+                📄 Detail Transaksi: {selectedTransaksi.nomor_invoice}
+              </h4>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDetailNotaModal(false);
+                  setSelectedTransaksi(null);
+                  setPilihanProdukHutang('');
+                  setPilihanQtyHutang(1);
+                  setWaNotaManual('');
+                }}
+                className="btn btn-link text-main p-0 border-0"
+                style={{ fontSize: '0.9rem', textDecoration: 'none' }}
+              >✕</button>
+            </div>
+
+            {/* Receipt Content */}
+            <div className="p-3 mb-3 rounded-3" style={{ backgroundColor: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.03)', fontSize: '0.75rem' }}>
+              <div className="row g-2 mb-3 text-muted">
+                <div className="col-6">Kasir: <strong className="text-main">{selectedTransaksi.nama_kasir || `User #${selectedTransaksi.kasir_id}`}</strong></div>
+                <div className="col-6 text-end">Waktu: <strong className="text-main">{new Date(selectedTransaksi.created_at).toLocaleString('id-ID')}</strong></div>
+                <div className="col-12">
+                  Pelanggan: <strong className="text-main">{selectedTransaksi.nama_pelanggan ? `${selectedTransaksi.nama_pelanggan} (${selectedTransaksi.wa_pelanggan})` : 'Umum/Tamu'}</strong>
+                </div>
+                <div className="col-6">
+                  Status: {selectedTransaksi.status_pembayaran === 'lunas' ? (
+                    <span className="badge bg-success" style={{ fontSize: '0.62rem' }}>Lunas ({selectedTransaksi.metode_pembayaran?.toUpperCase()})</span>
+                  ) : (
+                    <span className="badge bg-danger" style={{ fontSize: '0.62rem' }}>Hutang (Belum Lunas)</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Items List */}
+              <div className="mt-3">
+                <div className="fw-bold text-main mb-2" style={{ borderBottom: '1px dashed var(--warna-border)', paddingBottom: '4px' }}>Daftar Belanja:</div>
+                <div className="d-flex flex-column gap-2">
+                  {selectedTransaksi.detail?.map(d => (
+                    <div key={d.id} className="d-flex justify-content-between align-items-center">
+                      <div className="text-main">• {d.nama_produk} (x{d.qty})</div>
+                      <div className="fw-bold text-main">{formatRupiah(d.harga_satuan * d.qty)}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="d-flex justify-content-between align-items-center mt-3 pt-2 fw-bold text-main" style={{ borderTop: '1px solid var(--warna-border)' }}>
+                  <span>Total Tagihan:</span>
+                  <span className="fs-6" style={{ color: 'var(--warna-utama)' }}>{formatRupiah(selectedTransaksi.total_harga)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* ACTION PANEL BERDASARKAN STATUS */}
+            {selectedTransaksi.status_pembayaran === 'belum_bayar' ? (
+              (() => {
+                // Periksa apakah transaksi dalam siklus yang sama
+                const shiftPertama = opsiShift[0];
+                let isBisaEdit = false;
+
+                const parseSafeDate = (dateStr) => {
+                  if (!dateStr) return new Date();
+                  const cleaned = String(dateStr).replace(' ', 'T');
+                  const d = new Date(cleaned);
+                  if (isNaN(d.getTime())) {
+                    const parts = String(dateStr).split(/[- :]/);
+                    if (parts.length >= 5) {
+                      return new Date(parts[0], parts[1] - 1, parts[2], parts[3], parts[4], parts[5] || 0);
+                    }
+                    return new Date();
+                  }
+                  return d;
+                };
+
+                const getLocalDateString = (dt) => {
+                  const year = dt.getFullYear();
+                  const month = String(dt.getMonth() + 1).padStart(2, '0');
+                  const day = String(dt.getDate()).padStart(2, '0');
+                  return `${year}-${month}-${day}`;
+                };
+
+                const txDate = parseSafeDate(selectedTransaksi.created_at);
+                const nowDate = new Date();
+
+                if (shiftPertama) {
+                  const dapatkanSiklus = (dt) => {
+                    const jamMulai = shiftPertama.jam_mulai;
+                    const toleransi = Number(shiftPertama.toleransi_sebelum);
+                    const dateStr = getLocalDateString(dt);
+                    
+                    const [h, m, s] = jamMulai.split(':');
+                    const cycleStart = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), Number(h), Number(m), Number(s) || 0).getTime() - (toleransi * 60 * 1000) + (15 * 60 * 1000);
+                    
+                    if (dt.getTime() >= cycleStart) {
+                      return dateStr;
+                    } else {
+                      const prevDate = new Date(dt.getTime() - 24 * 60 * 60 * 1000);
+                      return getLocalDateString(prevDate);
+                    }
+                  };
+
+                  isBisaEdit = dapatkanSiklus(nowDate) === dapatkanSiklus(txDate);
+                } else {
+                  isBisaEdit = getLocalDateString(nowDate) === getLocalDateString(txDate);
+                }
+
+                return (
+                  <div>
+                    {isBisaEdit ? (
+                      <div className="p-3 mb-4 rounded-3" style={{ border: '1px solid rgba(99,102,241,0.15)', backgroundColor: 'rgba(99,102,241,0.02)' }}>
+                        <div className="fw-bold mb-2 text-main" style={{ fontSize: '0.78rem' }}>➕ Tambah Item Pesanan (Siklus Aktif):</div>
+                        <div className="row g-2">
+                          <div className="col-12 col-sm-8">
+                            <select
+                              value={pilihanProdukHutang}
+                              onChange={e => setPilihanProdukHutang(e.target.value)}
+                              className="form-select input-premium text-main py-1 px-2"
+                              style={{ fontSize: '0.75rem', borderRadius: '6px' }}
+                            >
+                              <option value="">-- Pilih Tambah Produk --</option>
+                              {posProducts.filter(p => Number(p.harga_jual) > 0).map(p => (
+                                <option key={p.id} value={p.id}>{p.nama_produk} ({formatRupiah(p.harga_jual)})</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="col-12 col-sm-4">
+                            <input
+                              type="number"
+                              min="1"
+                              value={pilihanQtyHutang}
+                              onChange={e => setPilihanQtyHutang(Number(e.target.value))}
+                              className="form-control input-premium text-main py-1 text-center"
+                              style={{ fontSize: '0.75rem', borderRadius: '6px' }}
+                              placeholder="Qty..."
+                            />
+                          </div>
+                        </div>
+
+                        <div className="d-flex gap-2 mt-3">
+                          <button
+                            type="button"
+                            onClick={simpanTambahanPesananHutang}
+                            className="tombol-sekunder-premium border-0 flex-fill py-1.5 px-3 small"
+                            style={{ fontSize: '0.75rem', borderRadius: '8px' }}
+                          >
+                            💾 Simpan Tambahan Pesanan
+                          </button>
+                        </div>
+
+                        {/* Pelunasan Panel */}
+                        <div className="mt-4 pt-3" style={{ borderTop: '1px dashed var(--warna-border)' }}>
+                          <label className="text-muted small mb-1.5 d-block">Metode Pelunasan:</label>
+                          <div className="d-flex flex-column gap-2">
+                            <div className="d-flex gap-1.5 p-1 rounded-3" style={{ backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid var(--warna-border)' }}>
+                              <button
+                                type="button"
+                                onClick={() => setMetodePelunasanHutang('cash')}
+                                className="border-0 flex-fill py-1.5 px-2 small text-center"
+                                style={{
+                                  fontSize: '0.74rem',
+                                  borderRadius: '6px',
+                                  backgroundColor: metodePelunasanHutang === 'cash' ? 'var(--warna-utama, #6366f1)' : 'transparent',
+                                  color: metodePelunasanHutang === 'cash' ? '#fff' : 'var(--teks-redup, #94a3b8)',
+                                  fontWeight: 600,
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                💵 Cash
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setMetodePelunasanHutang('qris')}
+                                className="border-0 flex-fill py-1.5 px-2 small text-center"
+                                style={{
+                                  fontSize: '0.74rem',
+                                  borderRadius: '6px',
+                                  backgroundColor: metodePelunasanHutang === 'qris' ? 'var(--warna-utama, #6366f1)' : 'transparent',
+                                  color: metodePelunasanHutang === 'qris' ? '#fff' : 'var(--teks-redup, #94a3b8)',
+                                  fontWeight: 600,
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                📱 QRIS
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setMetodePelunasanHutang('tap')}
+                                className="border-0 flex-fill py-1.5 px-2 small text-center"
+                                style={{
+                                  fontSize: '0.74rem',
+                                  borderRadius: '6px',
+                                  backgroundColor: metodePelunasanHutang === 'tap' ? 'var(--warna-utama, #6366f1)' : 'transparent',
+                                  color: metodePelunasanHutang === 'tap' ? '#fff' : 'var(--teks-redup, #94a3b8)',
+                                  fontWeight: 600,
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                🔲 Tap
+                              </button>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={bayarLunasHutang}
+                              className="tombol-premium border-0 w-100 py-2 small text-center mt-1"
+                              style={{ fontSize: '0.78rem', borderRadius: '8px' }}
+                            >
+                              💰 Bayar Lunas Sekarang
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="alert alert-warning py-2 px-3 small mb-4 border-0" style={{ borderRadius: '8px', color: '#fbbf24', backgroundColor: 'rgba(251,191,36,0.06)' }}>
+                        ⚠️ Transaksi ini berada di luar siklus berjalan dan telah bersifat <strong>FINAL</strong> sebagai hutang. Item pesanan tidak dapat diubah kembali.
+                      </div>
+                    )}
+
+                    {/* WA Penagihan link */}
+                    {selectedTransaksi.wa_pelanggan && (
+                      <a
+                        href={`https://wa.me/${selectedTransaksi.wa_pelanggan.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                          `Halo ${selectedTransaksi.nama_pelanggan},\nKami dari BKW ingin mengingatkan mengenai tagihan belanja Anda sebesar ${formatRupiah(selectedTransaksi.total_harga)} (Nomor Invoice: ${selectedTransaksi.nomor_invoice}) yang saat ini berstatus belum lunas.\n\nAnda dapat melihat detail nota digital Anda melalui tautan berikut:\nhttp://localhost:5173/nota/${selectedTransaksi.id}\n\nTerima kasih atas kerja samanya.`
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="tombol-sekunder-premium border-0 w-100 text-center py-2.5 small d-flex align-items-center justify-content-center gap-2 mb-2 text-danger"
+                        style={{ fontSize: '0.78rem', borderRadius: '10px', textDecoration: 'none', background: 'rgba(239, 68, 68, 0.05)' }}
+                      >
+                        ⚠️ Kirim WA Penagihan Hutang
+                      </a>
+                    )}
+                  </div>
+                );
+              })()
+            ) : (
+              <div className="d-flex flex-column gap-2 mb-2">
+                {/* Cetak Struk */}
+                <button
+                  type="button"
+                  onClick={() => window.open(`http://localhost:5173/nota/${selectedTransaksi.id}`, '_blank')}
+                  className="tombol-premium border-0 w-100 text-center py-2.5 small d-flex align-items-center justify-content-center gap-2"
+                  style={{ fontSize: '0.78rem', borderRadius: '10px' }}
+                >
+                  🖨️ Cetak Struk / Buka Digital Receipt
+                </button>
+
+                {/* WA Struk link */}
+                {selectedTransaksi.wa_pelanggan ? (
+                  <a
+                    href={`https://wa.me/${selectedTransaksi.wa_pelanggan.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                      `Halo ${selectedTransaksi.nama_pelanggan},\nTerima kasih telah berbelanja di BKW!\n\nBerikut adalah tautan nota digital resmi untuk transaksi belanja Anda (Nomor Invoice: ${selectedTransaksi.nomor_invoice}) sebesar ${formatRupiah(selectedTransaksi.total_harga)}:\nhttp://localhost:5173/nota/${selectedTransaksi.id}\n\nSemoga hari Anda menyenangkan!`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="tombol-sekunder-premium border-0 w-100 text-center py-2.5 small d-flex align-items-center justify-content-center gap-2 text-main"
+                    style={{ fontSize: '0.78rem', borderRadius: '10px', textDecoration: 'none' }}
+                  >
+                    💬 Kirim Nota via WhatsApp
+                  </a>
+                ) : (
+                  <div className="p-2.5 rounded-3 mb-1" style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--warna-border)' }}>
+                    <label className="text-muted small mb-1.5 d-block" style={{ fontSize: '0.7rem' }}>Kirim Nota ke WhatsApp Lain:</label>
+                    <div className="d-flex gap-2">
+                      <input
+                        type="text"
+                        className="form-control input-premium text-main py-1 px-2.5"
+                        style={{ fontSize: '0.78rem', borderRadius: '8px' }}
+                        placeholder="Contoh: 08xxxxxxxx..."
+                        value={waNotaManual}
+                        onChange={e => setWaNotaManual(e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        disabled={!waNotaManual}
+                        onClick={() => {
+                          const cleanWa = waNotaManual.replace(/[^0-9]/g, '');
+                          if (!cleanWa) {
+                            ui.notif('gagal', 'Nomor WA tidak valid.');
+                            return;
+                          }
+                          window.open(`https://wa.me/${cleanWa}?text=${encodeURIComponent(
+                            `Halo,\nTerima kasih telah berbelanja di BKW!\n\nBerikut adalah tautan nota digital resmi untuk transaksi belanja Anda (Nomor Invoice: ${selectedTransaksi.nomor_invoice}) sebesar ${formatRupiah(selectedTransaksi.total_harga)}:\nhttp://localhost:5173/nota/${selectedTransaksi.id}\n\nSemoga hari Anda menyenangkan!`
+                          )}`, '_blank');
+                        }}
+                        className="tombol-sekunder-premium border-0 py-1.5 px-3 small d-flex align-items-center justify-content-center gap-1.5"
+                        style={{ fontSize: '0.78rem', borderRadius: '8px' }}
+                      >
+                        💬 Kirim
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={() => {
+                setShowDetailNotaModal(false);
+                setSelectedTransaksi(null);
+                setPilihanProdukHutang('');
+                setPilihanQtyHutang(1);
+                setWaNotaManual('');
+              }}
+              className="tombol-sekunder-premium border-0 w-100 py-2 small"
+              style={{ fontSize: '0.78rem', borderRadius: '10px' }}
+            >
+              Tutup
+            </button>
           </div>
         </div>
       )}
