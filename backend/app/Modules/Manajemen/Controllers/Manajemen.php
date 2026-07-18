@@ -52,13 +52,15 @@ class Manajemen extends ResourceController
                         'min_length' => 'Nama usaha minimal 3 karakter.',
                         'is_unique'  => 'Nama usaha ini sudah terdaftar. Gunakan nama lain.'
                     ]
-                ]
+                ],
+                'pendiri' => 'permit_empty|min_length[3]',
+                'butuh_absen' => 'permit_empty|in_list[0,1]'
             ];
         } else if ($tabel === 'unit') {
             $aturan = [
                 'usaha_id'  => 'required|numeric',
                 'nama_unit' => 'required|min_length[3]',
-                'kategori'  => 'required|in_list[kantin,billiard,rental_mobil,salon,multimedia]',
+                'kategori'  => 'required|in_list[kantin,billiard,rental_mobil,salon,multimedia,cuci_kendaraan]',
             ];
         } else if ($tabel === 'roles') {
             $aturan = [
@@ -237,6 +239,7 @@ class Manajemen extends ResourceController
                 'stok'             => 'permit_empty|numeric',
                 'stok_minimum'     => 'permit_empty|numeric',
                 'is_stok_dikelola' => 'permit_empty|in_list[0,1]',
+                'butuh_persiapan'  => 'permit_empty|in_list[0,1]',
                 'satuan'           => 'permit_empty'
             ];
         } else if ($tabel === 'transaksi') {
@@ -250,18 +253,19 @@ class Manajemen extends ResourceController
             ];
         } else if ($tabel === 'transaksi_detail') {
             $aturan = [
-                'transaksi_id'   => 'required|numeric',
-                'produk_id'      => 'required|numeric',
-                'qty'            => 'required|numeric',
-                'harga_satuan'   => 'required|numeric',
-                'subtotal'       => 'required|numeric',
-                'tipe_sewa'      => 'permit_empty|in_list[open,reguler]',
-                'waktu_mulai'    => 'permit_empty',
-                'waktu_selesai'  => 'permit_empty',
-                'durasi_menit'   => 'permit_empty|numeric',
-                'status_sewa'    => 'permit_empty|in_list[aktif,selesai]',
-                'petugas_id'     => 'permit_empty|numeric',
-                'komisi_petugas' => 'permit_empty|numeric'
+                'transaksi_id'      => 'required|numeric',
+                'produk_id'         => 'required|numeric',
+                'qty'               => 'required|numeric',
+                'harga_satuan'      => 'required|numeric',
+                'subtotal'          => 'required|numeric',
+                'tipe_sewa'         => 'permit_empty|in_list[open,reguler]',
+                'waktu_mulai'       => 'permit_empty',
+                'waktu_selesai'     => 'permit_empty',
+                'durasi_menit'      => 'permit_empty|numeric',
+                'status_sewa'       => 'permit_empty|in_list[aktif,selesai]',
+                'status_pengerjaan' => 'permit_empty|in_list[Menunggu,Dikerjakan,Selesai]',
+                'petugas_id'        => 'permit_empty|numeric',
+                'komisi_petugas'    => 'permit_empty|numeric'
             ];
         } else if ($tabel === 'produk_komposisi') {
             $aturan = [
@@ -299,6 +303,7 @@ class Manajemen extends ResourceController
             if (isset($input['nama_unit'])) $input['nama_unit'] = ucwords(strtolower($input['nama_unit']));
         } else if ($tabel === 'usaha') {
             if (isset($input['nama_usaha'])) $input['nama_usaha'] = ucwords(strtolower($input['nama_usaha']));
+            if (isset($input['pendiri'])) $input['pendiri'] = ucwords(strtolower($input['pendiri']));
             if (isset($input['alamat'])) $input['alamat'] = ucwords(strtolower($input['alamat']));
             if (isset($input['no_izin'])) $input['no_izin'] = strtoupper($input['no_izin']);
         } else if ($tabel === 'shift') {

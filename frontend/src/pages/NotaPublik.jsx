@@ -99,15 +99,30 @@ const NotaPublik = () => {
             <span>Total</span>
           </div>
           <div className="d-flex flex-column gap-2.5">
-            {transaksi.detail?.map(d => (
-              <div key={d.id} className="small d-flex justify-content-between align-items-start" style={{ fontSize: '0.8rem' }}>
-                <div style={{ maxWidth: '70%' }}>
-                  <div>{d.nama_produk}</div>
-                  <div className="text-muted text-xs" style={{ fontSize: '0.72rem' }}>{d.qty} x {formatRupiah(d.harga_satuan)}</div>
+            {transaksi.detail?.map(d => {
+              const statusLabels = {
+                Menunggu: '⏳ Antrean',
+                Dikerjakan: '🍳 Proses',
+                Selesai: '✓ Selesai'
+              };
+              const showStatus = d.status_pengerjaan && d.status_pengerjaan !== 'Selesai';
+              return (
+                <div key={d.id} className="small d-flex justify-content-between align-items-start" style={{ fontSize: '0.8rem' }}>
+                  <div style={{ maxWidth: '70%' }}>
+                    <div className="d-flex align-items-center gap-1.5 flex-wrap">
+                      <span className="fw-semibold">{d.nama_produk}</span>
+                      {showStatus && (
+                        <span className={`badge ${d.status_pengerjaan === 'Menunggu' ? 'bg-warning text-dark' : 'bg-info'} border-0 ms-1`} style={{ fontSize: '0.58rem', padding: '0.1rem 0.3rem' }}>
+                          {statusLabels[d.status_pengerjaan]}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-muted text-xs" style={{ fontSize: '0.72rem' }}>{d.qty} x {formatRupiah(d.harga_satuan)}</div>
+                  </div>
+                  <div className="fw-bold">{formatRupiah(d.harga_satuan * d.qty)}</div>
                 </div>
-                <div className="fw-bold">{formatRupiah(d.harga_satuan * d.qty)}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <div className="mt-3" style={{ borderBottom: '2px dashed #cbd5e1' }} />
         </div>

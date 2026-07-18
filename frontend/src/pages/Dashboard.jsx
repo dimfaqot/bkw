@@ -2276,6 +2276,75 @@ const Dashboard = () => {
   const [openAccordion, setOpenAccordion] = useState(null); // Track opened accordion group
   const [mobileSubmenuGroup, setMobileSubmenuGroup] = useState(null); // Track opened mobile submenu
   
+  // Job Board States & Handlers
+  const [jobBoardList, setJobBoardList] = useState([]);
+  
+  const ambilJobBoard = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const response = await fetch('http://localhost:8080/api/transaksi/job-board', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (response.ok && data.status === 'sukses') {
+        setJobBoardList(data.data || []);
+      }
+    } catch (err) {
+      console.error('Error fetching job board:', err);
+    }
+  }, []);
+
+  const handleKlaimJob = async (detailId) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    ui.loading(true, 'claiming', 'Mengambil pekerjaan...');
+    try {
+      const response = await fetch(`http://localhost:8080/api/transaksi/job-board/klaim/${detailId}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      ui.loading(false);
+      if (response.ok && data.status === 'sukses') {
+        ui.notif('sukses', data.pesan);
+        ambilJobBoard();
+        fetchTotalPoin();
+      } else {
+        ui.notif('gagal', data.pesan || 'Gagal mengklaim pekerjaan.');
+      }
+    } catch (err) {
+      ui.loading(false);
+      ui.notif('gagal', 'Terjadi kesalahan koneksi.');
+    }
+  };
+
+  const handleSelesaiJob = async (detailId) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    const yakin = await ui.notif('konfirmasi', 'Apakah Anda yakin pekerjaan ini telah selesai dikerjakan?');
+    if (!yakin) return;
+    ui.loading(true, 'completing', 'Menyelesaikan pekerjaan...');
+    try {
+      const response = await fetch(`http://localhost:8080/api/transaksi/job-board/selesai/${detailId}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      ui.loading(false);
+      if (response.ok && data.status === 'sukses') {
+        ui.notif('sukses', data.pesan);
+        ambilJobBoard();
+        fetchTotalPoin();
+      } else {
+        ui.notif('gagal', data.pesan || 'Gagal menyelesaikan pekerjaan.');
+      }
+    } catch (err) {
+      ui.loading(false);
+      ui.notif('gagal', 'Terjadi kesalahan koneksi.');
+    }
+  };
+  
   // Notification settings states
   const [pengaturanNotif, setPengaturanNotif] = useState([]);
   const [loadingPengaturanNotif, setLoadingPengaturanNotif] = useState(false);
@@ -3059,6 +3128,7 @@ const Dashboard = () => {
         if (event.data.type === 'PUSH_RECEIVED') {
           ambilNotifikasi();
           ambilRiwayatPerizinan();
+          ambilJobBoard();
         }
 
         // B. Jika notifikasi diklik, arahkan ke sub-menu yang ditargetkan secara instan
@@ -3076,7 +3146,21 @@ const Dashboard = () => {
         navigator.serviceWorker.removeEventListener('message', handleSWMessage);
       };
     }
-  }, [ambilNotifikasi, ambilRiwayatPerizinan]);
+  }, [ambilNotifikasi, ambilRiwayatPerizinan, ambilJobBoard]);
+
+  // Polling Job Board setiap 10 detik
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token || ['member'].includes(profile?.role?.toLowerCase())) return;
+
+    ambilJobBoard();
+
+    const interval = setInterval(() => {
+      ambilJobBoard();
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [profile, ambilJobBoard]);
 
   // Polling fallback: Ambil notifikasi & data perizinan setiap 20 detik (berguna jika PWA/Push diblokir oleh browser)
   useEffect(() => {
@@ -5795,7 +5879,95 @@ const Dashboard = () => {
                       )}
                     </div>
                   </div>
-                </div>
+                  {/* WIDGET JOB BOARD (ANTREAN PEKERJAAN TERBUKA) */}
+                  {!['member'].includes(profile?.role?.toLowerCase()) && (
+                    <div className="col-12 mt-4">
+                      <div className="kartu-premium fade-in">
+                        <div className="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
+                          <h4 className="fw-bold mb-0 text-main d-flex align-items-center gap-2" style={{ fontSize: '0.85rem' }}>
+                            <span>🛎️ Job Board - Antrean Pekerjaan Terbuka</span>
+                          </h4>
+                          <span className="badge bg-primary" style={{ backgroundColor: 'var(--warna-utama)' }}>
+                            {jobBoardList.length} Pekerjaan Aktif
+                          </span>
+                        </div>
+
+                        {jobBoardList.length === 0 ? (
+                          <div className="p-4 rounded-3 text-center text-muted small" style={{ backgroundColor: 'var(--bg-halaman)', border: '1px dashed var(--warna-border)' }}>
+                            Tidak ada antrean pekerjaan aktif saat ini.
+                          </div>
+                        ) : (
+                          <div className="row g-3">
+                            {jobBoardList.map(job => {
+                              const isMyJob = String(job.petugas_id) === String(profile?.user_id);
+                              const isDikerjakan = job.status_pengerjaan === 'Dikerjakan';
+                              const statusColor = job.status_pengerjaan === 'Menunggu' ? 'warning text-dark' : 'info';
+                              
+                              return (
+                                <div key={job.id} className="col-12 col-md-6 col-lg-4">
+                                  <div className="p-3 rounded-3 h-100 d-flex flex-column justify-content-between" style={{ backgroundColor: 'var(--bg-halaman)', border: '1px solid var(--warna-border)' }}>
+                                    <div>
+                                      <div className="d-flex justify-content-between align-items-start mb-2">
+                                        <span className={`badge bg-${statusColor}`} style={{ fontSize: '0.65rem' }}>
+                                          {job.status_pengerjaan === 'Menunggu' ? '⏳ Menunggu' : `⚙️ Proses`}
+                                        </span>
+                                        <span className="text-muted" style={{ fontSize: '0.65rem' }}>
+                                          {new Date(job.waktu_nota).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                      </div>
+                                      <h5 className="fw-bold text-main mb-1" style={{ fontSize: '0.8rem' }}>{job.nama_produk}</h5>
+                                      <div className="text-muted small mb-2">
+                                        Jumlah: <strong className="text-main">{job.qty} {job.satuan}</strong>
+                                      </div>
+                                      <div className="text-muted" style={{ fontSize: '0.7rem' }}>
+                                        Nota: <strong className="text-main">{job.nomor_invoice}</strong>
+                                      </div>
+                                      <div className="text-muted" style={{ fontSize: '0.7rem' }}>
+                                        Pelanggan: <strong className="text-main">{job.nama_pelanggan || 'Pelanggan Umum'}</strong>
+                                      </div>
+                                      {isDikerjakan && (
+                                        <div className="text-muted mt-2" style={{ fontSize: '0.7rem' }}>
+                                          Petugas: <span className="badge bg-light text-dark text-capitalize">{job.nama_petugas || 'Karyawan'}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="mt-3 pt-2 border-top" style={{ borderColor: 'var(--warna-border)' }}>
+                                      {job.status_pengerjaan === 'Menunggu' ? (
+                                        <button
+                                          onClick={() => handleKlaimJob(job.id)}
+                                          className="w-100 tombol-premium py-1.5 d-flex align-items-center justify-content-center gap-1"
+                                          style={{ fontSize: '0.75rem' }}
+                                        >
+                                          👨‍🍳 Ambil Tugas
+                                        </button>
+                                      ) : isMyJob ? (
+                                        <button
+                                          onClick={() => handleSelesaiJob(job.id)}
+                                          className="w-100 tombol-premium py-1.5 d-flex align-items-center justify-content-center gap-1"
+                                          style={{ fontSize: '0.75rem', background: 'linear-gradient(135deg, #10b981, #059669)' }}
+                                        >
+                                          ✅ Selesai Dikerjakan
+                                        </button>
+                                      ) : (
+                                        <button
+                                          disabled
+                                          className="w-100 tombol-sekunder-premium py-1.5 text-muted border-0"
+                                          style={{ fontSize: '0.75rem', cursor: 'not-allowed' }}
+                                        >
+                                          🔒 Sedang Dikerjakan Koki Lain
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  </div>
               )}
               
               {menuAktif === 'kasir' && (() => {

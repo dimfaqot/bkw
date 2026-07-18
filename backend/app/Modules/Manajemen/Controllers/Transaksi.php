@@ -65,11 +65,10 @@ class Transaksi extends ResourceController
             return $this->respond(['status' => 'gagal', 'pesan' => 'Usaha tidak ditemukan.'], 400);
         }
 
-        // Generate nomor invoice: KODE_USAHA/KODE_UNIT/YYYYMMDD/NO_URUT
+        // Generate nomor invoice: KODE_USAHA/YYYYMMDD/NO_URUT (tanpa unit karena lintas unit)
         $kodeUsaha = $this->dapatkanShortCode($usaha['nama_usaha']);
-        $kodeUnit = $this->dapatkanShortCode($unit['nama_unit']);
         $today = date('Ymd');
-        $prefix = "$kodeUsaha/$kodeUnit/$today/";
+        $prefix = "$kodeUsaha/$today/";
 
         $db->transStart();
 
@@ -130,14 +129,17 @@ class Transaksi extends ResourceController
             $subtotal = $hargaSatuan * $qty;
             $totalHarga += $subtotal;
 
+            $statusPengerjaan = ($produk->butuh_persiapan == 1) ? 'Menunggu' : 'Selesai';
+
             $detailData = [
-                'transaksi_id'   => $transaksiId,
-                'produk_id'      => $produkId,
-                'qty'            => $qty,
-                'harga_satuan'   => $hargaSatuan,
-                'subtotal'       => $subtotal,
-                'created_at'     => $now,
-                'updated_at'     => $now
+                'transaksi_id'      => $transaksiId,
+                'produk_id'         => $produkId,
+                'qty'               => $qty,
+                'harga_satuan'      => $hargaSatuan,
+                'subtotal'          => $subtotal,
+                'status_pengerjaan' => $statusPengerjaan,
+                'created_at'        => $now,
+                'updated_at'        => $now
             ];
 
             $db->table('transaksi_detail')->insert($detailData);
@@ -155,6 +157,27 @@ class Transaksi extends ResourceController
 
         if ($db->transStatus() === false) {
             return $this->respond(['status' => 'gagal', 'pesan' => 'Gagal menyimpan transaksi ke database. Silakan coba lagi.'], 500);
+        }
+
+        // Kirim Notifikasi jika ada item yang butuh pengerjaan dapur/kru
+        $adaPekerjaan = false;
+        foreach ($items as $item) {
+            $prod = $db->table('produk_jasa')->where('id', $item['produk_id'])->get()->getRow();
+            if ($prod && $prod->butuh_persiapan == 1) {
+                $adaPekerjaan = true;
+                break;
+            }
+        }
+
+        if ($adaPekerjaan) {
+            $recipientIds = $this->dapatkanKaryawanAktifDanCustomer($db, $usahaId, $pelangganId);
+            $this->kirimNotifPekerjaan(
+                $usahaId,
+                $recipientIds,
+                "Pesanan Baru Masuk 🛎️",
+                "Ada pesanan baru yang membutuhkan pengerjaan. Nomor Nota: $nomorInvoice",
+                "/dashboard"
+            );
         }
 
         return $this->respond([
@@ -422,13 +445,15 @@ class Transaksi extends ResourceController
                         return $this->respond(['status' => 'gagal', 'pesan' => $err], 400);
                     }
 
+                    $statusPengerjaan = ($produk->butuh_persiapan == 1) ? 'Menunggu' : 'Selesai';
                     $subtotalBaru = $hargaSatuan * $qtyBaru;
                     $db->table('transaksi_detail')
                        ->where('id', $detailLama['id'])
                        ->update([
-                           'qty'        => $qtyBaru,
-                           'subtotal'   => $subtotalBaru,
-                           'updated_at' => $dateTimeNow
+                           'qty'               => $qtyBaru,
+                           'subtotal'          => $subtotalBaru,
+                           'status_pengerjaan' => $statusPengerjaan,
+                           'updated_at'        => $dateTimeNow
                        ]);
                 }
             } else {
@@ -438,15 +463,17 @@ class Transaksi extends ResourceController
                     return $this->respond(['status' => 'gagal', 'pesan' => $err], 400);
                 }
 
+                $statusPengerjaan = ($produk->butuh_persiapan == 1) ? 'Menunggu' : 'Selesai';
                 $subtotal = $hargaSatuan * $qtyBaru;
                 $db->table('transaksi_detail')->insert([
-                    'transaksi_id' => $id,
-                    'produk_id'    => $produkId,
-                    'qty'          => $qtyBaru,
-                    'harga_satuan' => $hargaSatuan,
-                    'subtotal'     => $subtotal,
-                    'created_at'   => $dateTimeNow,
-                    'updated_at'   => $dateTimeNow
+                    'transaksi_id'      => $id,
+                    'produk_id'         => $produkId,
+                    'qty'               => $qtyBaru,
+                    'harga_satuan'      => $hargaSatuan,
+                    'subtotal'          => $subtotal,
+                    'status_pengerjaan' => $statusPengerjaan,
+                    'created_at'        => $dateTimeNow,
+                    'updated_at'        => $dateTimeNow
                 ]);
             }
         }
@@ -574,13 +601,15 @@ class Transaksi extends ResourceController
                             return $this->respond(['status' => 'gagal', 'pesan' => $err], 400);
                         }
 
+                        $statusPengerjaan = ($produk->butuh_persiapan == 1) ? 'Menunggu' : 'Selesai';
                         $subtotalBaru = $hargaSatuan * $qtyBaru;
                         $db->table('transaksi_detail')
                            ->where('id', $detailLama['id'])
                            ->update([
-                               'qty'        => $qtyBaru,
-                               'subtotal'   => $subtotalBaru,
-                               'updated_at' => $dateTimeNow
+                               'qty'               => $qtyBaru,
+                               'subtotal'          => $subtotalBaru,
+                               'status_pengerjaan' => $statusPengerjaan,
+                               'updated_at'        => $dateTimeNow
                            ]);
                     }
                 } else {
@@ -590,15 +619,17 @@ class Transaksi extends ResourceController
                         return $this->respond(['status' => 'gagal', 'pesan' => $err], 400);
                     }
 
+                    $statusPengerjaan = ($produk->butuh_persiapan == 1) ? 'Menunggu' : 'Selesai';
                     $subtotal = $hargaSatuan * $qtyBaru;
                     $db->table('transaksi_detail')->insert([
-                        'transaksi_id' => $id,
-                        'produk_id'    => $produkId,
-                        'qty'          => $qtyBaru,
-                        'harga_satuan' => $hargaSatuan,
-                        'subtotal'     => $subtotal,
-                        'created_at'   => $dateTimeNow,
-                        'updated_at'   => $dateTimeNow
+                        'transaksi_id'      => $id,
+                        'produk_id'         => $produkId,
+                        'qty'               => $qtyBaru,
+                        'harga_satuan'      => $hargaSatuan,
+                        'subtotal'          => $subtotal,
+                        'status_pengerjaan' => $statusPengerjaan,
+                        'created_at'        => $dateTimeNow,
+                        'updated_at'        => $dateTimeNow
                     ]);
                 }
             }
@@ -722,5 +753,272 @@ class Transaksi extends ResourceController
         }
 
         return null;
+    }
+
+    // GET /api/transaksi/job-board
+    public function jobBoard()
+    {
+        $penggunaAktif = \App\Modules\Auth\Filters\JWTFilter::getPenggunaAktif();
+        $usahaId = $penggunaAktif['usaha_id'];
+
+        $db = \Config\Database::connect();
+        $jobs = $db->table('transaksi_detail td')
+                   ->select('td.*, t.nomor_invoice, t.pelanggan_id, pj.nama_produk, pj.satuan, u.nama as nama_petugas, cust.nama as nama_pelanggan, t.created_at as waktu_nota')
+                   ->join('transaksi t', 't.id = td.transaksi_id')
+                   ->join('produk_jasa pj', 'pj.id = td.produk_id')
+                   ->join('users u', 'u.id = td.petugas_id', 'left')
+                   ->join('users cust', 'cust.id = t.pelanggan_id', 'left')
+                   ->where('t.usaha_id', $usahaId)
+                   ->whereIn('td.status_pengerjaan', ['Menunggu', 'Dikerjakan'])
+                   ->orderBy('td.id', 'ASC')
+                   ->get()->getResultArray();
+
+        return $this->respond(['status' => 'sukses', 'data' => $jobs]);
+    }
+
+    // POST /api/transaksi/job-board/klaim/(:num)
+    public function klaimJob($detailId)
+    {
+        $penggunaAktif = \App\Modules\Auth\Filters\JWTFilter::getPenggunaAktif();
+        $userId = $penggunaAktif['user_id'];
+        $usahaId = $penggunaAktif['usaha_id'];
+
+        $db = \Config\Database::connect();
+
+        // Cek absensi jika butuh_absen == 1
+        $usaha = $db->table('usaha')->where('id', $usahaId)->get()->getRow();
+        $butuhAbsen = $usaha ? (int)$usaha->butuh_absen : 1;
+
+        if ($butuhAbsen === 1) {
+            $today = date('Y-m-d');
+            $absen = $db->table('absensi')
+                        ->where('karyawan_id', $userId)
+                        ->where('DATE(jam_masuk)', $today)
+                        ->where('jam_pulang', null)
+                        ->get()->getRow();
+            if (!$absen) {
+                return $this->respond([
+                    'status' => 'gagal',
+                    'pesan'  => 'Anda harus melakukan absen masuk (clock-in) terlebih dahulu sebelum dapat mengambil pekerjaan.'
+                ], 400);
+            }
+        }
+
+        $db->transStart();
+        $detail = $db->table('transaksi_detail')->where('id', $detailId)->get()->getRow();
+        if (!$detail) {
+            $db->transRollback();
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Pekerjaan tidak ditemukan.'], 404);
+        }
+        if ($detail->status_pengerjaan !== 'Menunggu') {
+            $db->transRollback();
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Pekerjaan sudah diambil oleh petugas lain.'], 400);
+        }
+
+        $db->table('transaksi_detail')->where('id', $detailId)->update([
+            'status_pengerjaan' => 'Dikerjakan',
+            'petugas_id'        => $userId,
+            'updated_at'        => date('Y-m-d H:i:s')
+        ]);
+
+        $transaksi = $db->table('transaksi')->where('id', $detail->transaksi_id)->get()->getRow();
+        $produk = $db->table('produk_jasa')->where('id', $detail->produk_id)->get()->getRow();
+
+        $db->transComplete();
+
+        if ($db->transStatus() === false) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Gagal mengklaim pekerjaan.'], 500);
+        }
+
+        $namaProduk = $produk ? $produk->nama_produk : 'Produk';
+        $invoice = $transaksi ? $transaksi->nomor_invoice : '-';
+        $pelangganId = $transaksi ? $transaksi->pelanggan_id : null;
+
+        $recipients = $this->dapatkanKaryawanAktifDanCustomer($db, $usahaId, $pelangganId);
+        $this->kirimNotifPekerjaan(
+            $usahaId,
+            $recipients,
+            "Pekerjaan Diambil ⚙️",
+            "Pekerjaan '$namaProduk' (Nota: $invoice) sedang dikerjakan oleh " . $penggunaAktif['nama'],
+            "/dashboard"
+        );
+
+        return $this->respond(['status' => 'sukses', 'pesan' => 'Pekerjaan berhasil diklaim.']);
+    }
+
+    // POST /api/transaksi/job-board/selesai/(:num)
+    public function selesaiJob($detailId)
+    {
+        $penggunaAktif = \App\Modules\Auth\Filters\JWTFilter::getPenggunaAktif();
+        $userId = $penggunaAktif['user_id'];
+        $usahaId = $penggunaAktif['usaha_id'];
+
+        $db = \Config\Database::connect();
+
+        $detail = $db->table('transaksi_detail')->where('id', $detailId)->get()->getRow();
+        if (!$detail) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Pekerjaan tidak ditemukan.'], 404);
+        }
+        if ($detail->petugas_id != $userId) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Anda bukan petugas yang ditunjuk untuk pekerjaan ini.'], 403);
+        }
+        if ($detail->status_pengerjaan !== 'Dikerjakan') {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Status pengerjaan tidak valid untuk diselesaikan.'], 400);
+        }
+
+        $db->transStart();
+
+        $db->table('transaksi_detail')->where('id', $detailId)->update([
+            'status_pengerjaan' => 'Selesai',
+            'updated_at'        => date('Y-m-d H:i:s')
+        ]);
+
+        $transaksi = $db->table('transaksi')->where('id', $detail->transaksi_id)->get()->getRow();
+        $produk = $db->table('produk_jasa')->where('id', $detail->produk_id)->get()->getRow();
+        $namaProduk = $produk ? $produk->nama_produk : 'Produk';
+        $invoice = $transaksi ? $transaksi->nomor_invoice : '-';
+
+        // Berikan Poin Otomatis (5 Poin)
+        $db->table('points')->insert([
+            'karyawan_id'     => $userId,
+            'jumlah_poin'     => 5,
+            'sumber'          => 'pengerjaan_pesanan',
+            'referensi_id'    => $detailId,
+            'pemberi_poin_id' => null,
+            'keterangan'      => "Menyelesaikan pengerjaan $namaProduk (Nota: $invoice)",
+            'tanggal'         => date('Y-m-d'),
+            'created_at'      => date('Y-m-d H:i:s'),
+            'updated_at'      => date('Y-m-d H:i:s')
+        ]);
+
+        $db->transComplete();
+
+        if ($db->transStatus() === false) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Gagal menyelesaikan pekerjaan.'], 500);
+        }
+
+        $pelangganId = $transaksi ? $transaksi->pelanggan_id : null;
+        $recipients = $this->dapatkanKaryawanAktifDanCustomer($db, $usahaId, $pelangganId);
+        $this->kirimNotifPekerjaan(
+            $usahaId,
+            $recipients,
+            "Pekerjaan Selesai! 🎉",
+            "Pekerjaan '$namaProduk' (Nota: $invoice) telah selesai dikerjakan.",
+            "/dashboard"
+        );
+
+        return $this->respond(['status' => 'sukses', 'pesan' => 'Pekerjaan selesai, 5 poin berhasil didapatkan!']);
+    }
+
+    private function kirimNotifPekerjaan($usahaId, $karyawanIds, $judul, $pesan, $tautan = null)
+    {
+        $db = \Config\Database::connect();
+        $now = date('Y-m-d H:i:s');
+
+        $dataNotif = [
+            'usaha_id'    => $usahaId,
+            'judul'       => $judul,
+            'pesan'       => $pesan,
+            'tautan'      => $tautan,
+            'created_at'  => $now,
+            'updated_at'  => $now
+        ];
+        $db->table('notifikasi')->insert($dataNotif);
+
+        if (empty($karyawanIds)) {
+            return;
+        }
+
+        $subs = $db->table('push_subscriptions')
+                   ->whereIn('karyawan_id', $karyawanIds)
+                   ->get()->getResult();
+
+        if (empty($subs)) {
+            return;
+        }
+
+        try {
+            $config = new \Config\Vapid();
+
+            if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+                $opensslCnf = 'C:/xampp/apache/conf/openssl.cnf';
+                if (file_exists($opensslCnf)) {
+                    putenv("OPENSSL_CONF=" . $opensslCnf);
+                }
+            }
+
+            $auth = [
+                'VAPID' => [
+                    'subject'    => $config->subject,
+                    'publicKey'  => $config->publicKey,
+                    'privateKey' => $config->privateKey,
+                ]
+            ];
+
+            $defaultOptions = [];
+            $timeout = 2;
+            $clientOptions = [
+                'connect_timeout' => 2
+            ];
+            $webPush = new \Minishlink\WebPush\WebPush($auth, $defaultOptions, $timeout, $clientOptions);
+            $payload = json_encode([
+                'title' => $judul,
+                'body'  => $pesan,
+                'link'  => $tautan
+            ]);
+
+            foreach ($subs as $sub) {
+                $subscription = \Minishlink\WebPush\Subscription::create([
+                    'endpoint' => $sub->endpoint,
+                    'keys' => [
+                        'p256dh' => $sub->p256dh,
+                        'auth'   => $sub->auth
+                    ]
+                ]);
+
+                $webPush->queueNotification($subscription, $payload);
+            }
+
+            foreach ($webPush->flush() as $report) {
+                if (!$report->isSuccess()) {
+                    if ($report->getStatusCode() === 410 || $report->getStatusCode() === 404) {
+                        $db->table('push_subscriptions')
+                           ->where('endpoint', $report->getEndpoint())
+                           ->delete();
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            log_message('error', 'Push Job Notification error: ' . $e->getMessage());
+        }
+    }
+
+    private function dapatkanKaryawanAktifDanCustomer($db, $usahaId, $pelangganId = null)
+    {
+        $usaha = $db->table('usaha')->where('id', $usahaId)->get()->getRow();
+        $butuhAbsen = $usaha ? (int)$usaha->butuh_absen : 1;
+
+        $karyawanIds = [];
+        if ($butuhAbsen === 1) {
+            $today = date('Y-m-d');
+            $activeEmployees = $db->table('absensi')
+                                  ->select('karyawan_id')
+                                  ->where('DATE(jam_masuk)', $today)
+                                  ->where('jam_pulang', null)
+                                  ->get()->getResultArray();
+            $karyawanIds = array_column($activeEmployees, 'karyawan_id');
+        } else {
+            $allEmployees = $db->table('user_role')
+                               ->select('user_id')
+                               ->where('usaha_id', $usahaId)
+                               ->get()->getResultArray();
+            $karyawanIds = array_column($allEmployees, 'user_id');
+        }
+
+        if ($pelangganId) {
+            $karyawanIds[] = (int)$pelangganId;
+        }
+
+        return array_unique(array_map('intval', $karyawanIds));
     }
 }
