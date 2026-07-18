@@ -9,7 +9,7 @@ $config  = ['hostname' => 'localhost', 'database' => 'bkw', 'username' => 'root'
 if (file_exists($envFile)) {
     $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {
-        if (str_starts_with(trim($line), '#')) continue;
+        if (strpos(trim($line), '#') === 0) continue;
         if (preg_match('/^database\.default\.(\w+)\s*=\s*(.*)$/', trim($line), $m)) {
             $key = $m[1];
             $val = trim($m[2]);
