@@ -1271,17 +1271,30 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
                     />
                   </div>
                 ) : (
-                  <div>
-                    <label className="form-label small fw-semibold">Nama Barang / Aset Inventaris</label>
-                    <input
-                      type="text"
-                      name="deskripsi_keperluan"
-                      className="form-control input-premium"
-                      value={formState.deskripsi_keperluan || ''}
-                      onChange={handleChange}
-                      placeholder="cth: Kulkas Showcase Polytron, Laptop Admin"
-                    />
-                  </div>
+                  <>
+                    <div>
+                      <label className="form-label small fw-semibold">Nama Barang / Aset Inventaris</label>
+                      <input
+                        type="text"
+                        name="deskripsi_keperluan"
+                        className="form-control input-premium"
+                        value={formState.deskripsi_keperluan || ''}
+                        onChange={handleChange}
+                        placeholder="cth: Kulkas Showcase Polytron, Laptop Admin"
+                      />
+                    </div>
+                    <div className="mt-2">
+                      <label className="form-label small fw-semibold">Nomor Inventaris (Aset)</label>
+                      <input
+                        type="text"
+                        name="nomor_inventaris"
+                        className="form-control input-premium"
+                        value={formState.nomor_inventaris || ''}
+                        onChange={handleChange}
+                        placeholder="cth: INV-KNT-2026-0001"
+                      />
+                    </div>
+                  </>
                 )}
                 <div className="row g-2 mt-2">
                   <div className="col-4">
@@ -4859,9 +4872,9 @@ const Dashboard = () => {
     if (tabel === 'users') {
       return ['No.', 'Nama', 'WA', 'Email', 'Aksi'];
     } else if (tabel === 'usaha') {
-      return ['No.', 'Nama Usaha', 'Alamat', 'Tgl Berdiri', 'No Izin', 'Lokasi', 'Radius', 'Aksi'];
+      return ['No.', 'Nama Usaha', 'Kode Usaha', 'Alamat', 'Tgl Berdiri', 'No Izin', 'Lokasi', 'Radius', 'Aksi'];
     } else if (tabel === 'unit') {
-      return ['No.', 'Usaha Induk', 'Nama Unit', 'Kategori', 'Aksi'];
+      return ['No.', 'Usaha Induk', 'Nama Unit', 'Kode Unit', 'Kategori', 'Aksi'];
     } else if (tabel === 'produk_jasa') {
       return ['No.', 'Usaha', 'Unit', 'Nama Produk', 'Tipe', 'HPP (Harga Beli)', 'Harga Jual', 'Stok', 'Min. Stok', 'Satuan', 'Aksi'];
     } else if (tabel === 'produk_komposisi') {
@@ -5019,6 +5032,7 @@ const Dashboard = () => {
         <>
           <td>{noUrut}</td>
           <td className="fw-bold">{baris.nama_usaha}</td>
+          <td><code className="text-main small">{baris.kode_usaha || <span className="text-muted">-</span>}</code></td>
           <td style={{ maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{baris.alamat || <span className="text-muted">-</span>}</td>
           <td>{baris.tanggal_berdiri || <span className="text-muted">-</span>}</td>
           <td>{baris.no_izin || <span className="text-muted">-</span>}</td>
@@ -5045,6 +5059,7 @@ const Dashboard = () => {
           <td>{noUrut}</td>
           <td><span className="badge bg-secondary">{namaUsaha}</span></td>
           <td className="fw-bold">{baris.nama_unit}</td>
+          <td><code className="text-main small">{baris.kode_unit || <span className="text-muted">-</span>}</code></td>
           <td><span className="badge bg-info">{kategoriLabels[baris.kategori] || baris.kategori || '-'}</span></td>
         </>
       );
