@@ -15,17 +15,37 @@ Please change the parent <Route path="${e}"> to <Route path="${e===`/`?`*`:`${e}
                           background: white !important;
                           color: black !important;
                         }
-                        .sidebar-wrapper, .konten-utama-wrapper > header, .noprint, nav, aside {
+                        .topbar-premium,
+                        .leftbar-premium,
+                        .bottombar-premium,
+                        footer,
+                        .noprint {
+                          display: none !important;
+                        }
+                        .konten-utama-wrapper main > *:not(.laporan-page) {
+                          display: none !important;
+                        }
+                        .laporan-page > *:not(.print-container) {
                           display: none !important;
                         }
                         .konten-utama-wrapper {
-                          margin-left: 0 !important;
+                          margin: 0 !important;
                           padding: 0 !important;
+                          width: 100% !important;
+                          position: absolute !important;
+                          left: 0 !important;
+                          top: 0 !important;
+                        }
+                        main {
+                          padding: 0 !important;
+                          margin: 0 !important;
                         }
                         .print-container {
                           display: block !important;
                           width: 100% !important;
-                          padding: 10px !important;
+                          background: white !important;
+                          color: black !important;
+                          padding: 20px !important;
                         }
                       }
                       
