@@ -8419,28 +8419,12 @@ const Dashboard = () => {
                         {(() => {
                           const namaBulanId = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
                           const dStart = new Date(laporanFilter.start_date);
-                          const dEnd   = new Date(laporanFilter.end_date);
-                          const bulanStart = namaBulanId[dStart.getMonth()];
-                          const bulanEnd   = namaBulanId[dEnd.getMonth()];
+                          const bulanStart = namaBulanId[dStart.getMonth()].toUpperCase();
                           const tahunStart = dStart.getFullYear();
-                          const tahunEnd   = dEnd.getFullYear();
-
-                          let labelBulanTahun;
-                          if (tahunStart === tahunEnd && dStart.getMonth() === dEnd.getMonth()) {
-                            // Rentang 1 bulan: "BULAN MEI TAHUN 2026"
-                            labelBulanTahun = `BULAN ${bulanStart.toUpperCase()} TAHUN ${tahunStart}`;
-                          } else if (tahunStart === tahunEnd) {
-                            // Beda bulan, tahun sama: "MEI S/D JULI 2026"
-                            labelBulanTahun = `${bulanStart.toUpperCase()} S/D ${bulanEnd.toUpperCase()} TAHUN ${tahunStart}`;
-                          } else {
-                            // Beda tahun: "MEI 2025 S/D JULI 2026"
-                            labelBulanTahun = `${bulanStart.toUpperCase()} ${tahunStart} S/D ${bulanEnd.toUpperCase()} ${tahunEnd}`;
-                          }
-
                           const jenis = isCetakMode === 'singkat' ? 'SINGKAT (REKAP HARIAN)' : 'DETAIL TRANSAKSI';
                           return (
                             <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#111', borderBottom: '1px solid #999', paddingBottom: '4px', marginBottom: '16px', textAlign: 'center' }}>
-                              LAPORAN KEUANGAN {jenis} {labelBulanTahun}
+                              LAPORAN KEUANGAN {jenis} BULAN {bulanStart} TAHUN {tahunStart}
                             </div>
                           );
                         })()}
