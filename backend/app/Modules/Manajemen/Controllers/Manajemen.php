@@ -916,12 +916,13 @@ class Manajemen extends ResourceController
         if ($builder->insert($input)) {
             $idBaru = $db->insertID();
 
-            // Hook khusus: Jika pengeluaran baru bertipe Restok/Belanja, tambah stok barang otomatis
+            // Hook khusus: Jika pengeluaran baru bertipe Restok/Belanja, tambah stok barang otomatis & update HPP produk
             if ($tabel === 'pengeluaran') {
                 $kategori = $input['kategori'] ?? 'Operasional';
                 if (($kategori === 'Bahan Baku' || $kategori === 'Inv') && !empty($input['produk_id']) && !empty($input['qty'])) {
-                    $db->query("UPDATE produk_jasa SET stok = COALESCE(stok, 0) + ? WHERE id = ?", [
+                    $db->query("UPDATE produk_jasa SET stok = COALESCE(stok, 0) + ?, harga_beli = ? WHERE id = ?", [
                         (int)$input['qty'],
+                        (float)($input['harga_satuan'] ?? 0),
                         (int)$input['produk_id']
                     ]);
                 }
@@ -1422,6 +1423,16 @@ class Manajemen extends ResourceController
         }
 
         if ($builder->where('id', $id)->update($input)) {
+            // Hook khusus: Jika pengeluaran diupdate, dan kategori adalah restock, kita update harga_beli produk
+            if ($tabel === 'pengeluaran') {
+                $kategori = $input['kategori'] ?? 'Operasional';
+                if (($kategori === 'Bahan Baku' || $kategori === 'Inv') && !empty($input['produk_id'])) {
+                    $db->query("UPDATE produk_jasa SET harga_beli = ? WHERE id = ?", [
+                        (float)($input['harga_satuan'] ?? 0),
+                        (int)$input['produk_id']
+                    ]);
+                }
+            }
             // Hook Notifikasi PWA & Riwayat untuk Perubahan Izin
             if ($tabel === 'perizinan' && isset($input['status']) && $input['status'] !== $existing->status) {
                 $statusBaru = $input['status'];
