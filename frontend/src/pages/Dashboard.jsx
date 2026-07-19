@@ -875,17 +875,17 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
               <>
                 <div>
                   <label className="form-label small fw-semibold">Stok Saat Ini</label>
-                  <input type="number" name="stok" className="form-control input-premium" value={formState.stok || '0'} onChange={handleChange} />
+                  <input type="number" name="stok" className="form-control input-premium" value={formState.stok ?? '0'} onChange={handleChange} />
                 </div>
                 <div>
                   <label className="form-label small fw-semibold">Minimum Stok Alert</label>
-                  <input type="number" name="stok_minimum" className="form-control input-premium" value={formState.stok_minimum || '0'} onChange={handleChange} />
+                  <input type="number" name="stok_minimum" className="form-control input-premium" value={formState.stok_minimum ?? '0'} onChange={handleChange} />
                 </div>
               </>
             )}
             <div>
               <label className="form-label small fw-semibold">Satuan</label>
-              <input type="text" name="satuan" className="form-control input-premium" value={formState.satuan || 'pcs'} onChange={handleChange} placeholder="pcs, porsi, jam, hari" />
+              <input type="text" name="satuan" className="form-control input-premium" value={formState.satuan ?? 'pcs'} onChange={handleChange} placeholder="pcs, porsi, jam, hari" />
             </div>
             <div className="d-flex align-items-center justify-content-between p-2 rounded" style={{background:'var(--bg-card)', border:'1px solid var(--border-color)'}}>
               <div>
