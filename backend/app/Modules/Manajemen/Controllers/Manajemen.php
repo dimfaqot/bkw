@@ -11,7 +11,7 @@ class Manajemen extends ResourceController
 
     protected $format = 'json';
 
-    private $daftarTabel = ['users', 'usaha', 'unit', 'roles', 'user_role', 'menus', 'role_permissions', 'iot', 'iot_alokasi', 'shift', 'jadwal_karyawan', 'absensi', 'kriteria_poin', 'points', 'perizinan', 'lembur', 'kebersihan', 'kebersihan_tugas', 'produk_jasa', 'transaksi', 'transaksi_detail', 'produk_komposisi'];
+    private $daftarTabel = ['users', 'usaha', 'unit', 'roles', 'user_role', 'menus', 'role_permissions', 'iot', 'iot_alokasi', 'shift', 'jadwal_karyawan', 'absensi', 'kriteria_poin', 'points', 'perizinan', 'lembur', 'kebersihan', 'kebersihan_tugas', 'produk_jasa', 'transaksi', 'transaksi_detail', 'produk_komposisi', 'pengeluaran'];
 
     // Validasi input untuk masing-masing tabel
     private function dapatkanValidasi($tabel, $id = null)
@@ -274,6 +274,23 @@ class Manajemen extends ResourceController
                 'produk_bahan_id' => 'required|numeric',
                 'jumlah'          => 'required|numeric'
             ];
+        } else if ($tabel === 'pengeluaran') {
+            $aturan = [
+                'usaha_id'            => 'required|numeric',
+                'unit_id'             => 'permit_empty|numeric',
+                'kategori'            => 'required|in_list[Gaji,Bahan Baku,Inv,Operasional,Lain-lain]',
+                'deskripsi_keperluan' => 'permit_empty',
+                'keterangan'          => 'permit_empty',
+                'karyawan_gaji_id'    => 'permit_empty|numeric',
+                'produk_id'           => 'permit_empty|numeric',
+                'qty'                 => 'permit_empty|numeric',
+                'harga_satuan'        => 'permit_empty|numeric',
+                'diskon'              => 'permit_empty|numeric',
+                'nominal_total'       => 'permit_empty|numeric',
+                'pencatat_id'         => 'permit_empty|numeric',
+                'penanggung_jawab_id' => 'permit_empty|numeric',
+                'tanggal'             => 'required|valid_date[Y-m-d]'
+            ];
         }
         return $aturan;
     }
@@ -523,6 +540,15 @@ class Manajemen extends ResourceController
             $builder->select('transaksi_detail.*, produk_jasa.nama_produk, users.nama as nama_petugas')
                     ->join('produk_jasa', 'produk_jasa.id = transaksi_detail.produk_id', 'left')
                     ->join('users', 'users.id = transaksi_detail.petugas_id', 'left');
+        }
+
+        if ($tabel === 'pengeluaran') {
+            $builder->select('pengeluaran.*, unit.nama_unit, produk_jasa.nama_produk, karyawan_gaji.nama as nama_karyawan_gaji, pencatat.nama as nama_pencatat, penanggung_jawab.nama as nama_penanggung_jawab')
+                    ->join('unit', 'unit.id = pengeluaran.unit_id', 'left')
+                    ->join('produk_jasa', 'produk_jasa.id = pengeluaran.produk_id', 'left')
+                    ->join('users as karyawan_gaji', 'karyawan_gaji.id = pengeluaran.karyawan_gaji_id', 'left')
+                    ->join('users as pencatat', 'pencatat.id = pengeluaran.pencatat_id', 'left')
+                    ->join('users as penanggung_jawab', 'penanggung_jawab.id = pengeluaran.penanggung_jawab_id', 'left');
         }
 
         $data = $builder->get()->getResultArray();
@@ -850,6 +876,24 @@ class Manajemen extends ResourceController
                 $input['status'] = 'menunggu_persetujuan';
             }
         }
+        if ($tabel === 'pengeluaran') {
+            $input['pencatat_id'] = $penggunaAktif['uid'] ?? null;
+            $kategori = $input['kategori'] ?? 'Operasional';
+            if ($kategori === 'Bahan Baku' || $kategori === 'Inv') {
+                $qty = (int)($input['qty'] ?? 0);
+                $hargaSatuan = (float)($input['harga_satuan'] ?? 0);
+                $diskon = (float)($input['diskon'] ?? 0);
+                $input['nominal_total'] = ($hargaSatuan * $qty) - $diskon;
+                if ($input['nominal_total'] < 0) {
+                    $input['nominal_total'] = 0.00;
+                }
+            } else {
+                $input['qty'] = 1;
+                $input['harga_satuan'] = $input['nominal_total'] ?? 0;
+                $input['diskon'] = 0.00;
+                $input['produk_id'] = null;
+            }
+        }
 
         // Set timestamps jika ada kolomnya
         $db = \Config\Database::connect();
@@ -871,6 +915,17 @@ class Manajemen extends ResourceController
         $builder = $db->table($tabel);
         if ($builder->insert($input)) {
             $idBaru = $db->insertID();
+
+            // Hook khusus: Jika pengeluaran baru bertipe Restok/Belanja, tambah stok barang otomatis
+            if ($tabel === 'pengeluaran') {
+                $kategori = $input['kategori'] ?? 'Operasional';
+                if (($kategori === 'Bahan Baku' || $kategori === 'Inv') && !empty($input['produk_id']) && !empty($input['qty'])) {
+                    $db->query("UPDATE produk_jasa SET stok = COALESCE(stok, 0) + ? WHERE id = ?", [
+                        (int)$input['qty'],
+                        (int)$input['produk_id']
+                    ]);
+                }
+            }
 
             // Hook khusus: Jika user baru berhasil dibuat oleh non-Root (Supervisor/Owner/Unit),
             // kaitkan langsung user tersebut ke usaha_id pembuat agar bisa diakses/dikelola
@@ -1329,6 +1384,28 @@ class Manajemen extends ResourceController
                     }
                 }
 
+            }
+        }
+        if ($tabel === 'pengeluaran') {
+            $fieldJoin = ['nama_unit', 'nama_produk', 'nama_karyawan_gaji', 'nama_pencatat', 'nama_penanggung_jawab'];
+            foreach ($fieldJoin as $f) {
+                unset($input[$f]);
+            }
+            
+            $kategori = $input['kategori'] ?? 'Operasional';
+            if ($kategori === 'Bahan Baku' || $kategori === 'Inv') {
+                $qty = (int)($input['qty'] ?? 0);
+                $hargaSatuan = (float)($input['harga_satuan'] ?? 0);
+                $diskon = (float)($input['diskon'] ?? 0);
+                $input['nominal_total'] = ($hargaSatuan * $qty) - $diskon;
+                if ($input['nominal_total'] < 0) {
+                    $input['nominal_total'] = 0.00;
+                }
+            } else {
+                $input['qty'] = 1;
+                $input['harga_satuan'] = $input['nominal_total'] ?? 0;
+                $input['diskon'] = 0.00;
+                $input['produk_id'] = null;
             }
         }
 

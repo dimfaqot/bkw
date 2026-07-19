@@ -845,65 +845,105 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
               />
             </div>
             <div>
-              <label className="form-label small fw-semibold">Nama Produk / Jasa / Sewa</label>
-              <input type="text" name="nama_produk" className="form-control input-premium" value={formState.nama_produk || ''} onChange={handleChange} placeholder="cth: Kopi Susu, Sewa Meja, Potong Rambut" />
-            </div>
-            <div>
-              <label className="form-label small fw-semibold">Tipe Produk</label>
-              <select name="tipe" className="form-select input-premium" value={formState.tipe || 'barang'} onChange={handleChange}>
+              <label className="form-label small fw-semibold">Tipe Produk / Layanan</label>
+              <select
+                name="tipe"
+                className="form-select input-premium"
+                value={formState.tipe || ''}
+                onChange={e => {
+                  const val = e.target.value;
+                  setFormState(prev => ({
+                    ...prev,
+                    tipe: val,
+                    is_stok_dikelola: val === 'barang' ? '' : '0',
+                    butuh_persiapan: '0'
+                  }));
+                }}
+              >
+                <option value="">-- Pilih Tipe --</option>
                 <option value="barang">📦 Barang Fisik</option>
                 <option value="jasa">💅 Layanan Jasa</option>
                 <option value="sewa">🚗 Sewa Alat/Aset</option>
               </select>
             </div>
-            <div>
-              <label className="form-label small fw-semibold">Harga Beli (HPP)</label>
-              <input type="number" name="harga_beli" className="form-control input-premium" value={formState.harga_beli || '0'} onChange={handleChange} />
-            </div>
-            <div>
-              <label className="form-label small fw-semibold">Harga Jual</label>
-              <input type="number" name="harga_jual" className="form-control input-premium" value={formState.harga_jual || '0'} onChange={handleChange} />
-            </div>
-            <div>
-              <label className="form-label small fw-semibold">Kelola Stok?</label>
-              <select name="is_stok_dikelola" className="form-select input-premium" value={formState.is_stok_dikelola || '0'} onChange={handleChange}>
-                <option value="0">Tidak (Stok Tanpa Batas / Jasa)</option>
-                <option value="1">Ya (Barang Fisik)</option>
-              </select>
-            </div>
-            {formState.is_stok_dikelola == '1' && (
-              <>
-                <div>
-                  <label className="form-label small fw-semibold">Stok Saat Ini</label>
-                  <input type="number" name="stok" className="form-control input-premium" value={formState.stok ?? '0'} onChange={handleChange} />
-                </div>
-                <div>
-                  <label className="form-label small fw-semibold">Minimum Stok Alert</label>
-                  <input type="number" name="stok_minimum" className="form-control input-premium" value={formState.stok_minimum ?? '0'} onChange={handleChange} />
-                </div>
-              </>
+
+            {formState.tipe === 'barang' && (
+              <div className="fade-in mt-3">
+                <label className="form-label small fw-semibold">Kelola Stok?</label>
+                <select
+                  name="is_stok_dikelola"
+                  className="form-select input-premium"
+                  value={formState.is_stok_dikelola ?? ''}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setFormState(prev => ({ ...prev, is_stok_dikelola: val }));
+                  }}
+                >
+                  <option value="">-- Kelola Stok? --</option>
+                  <option value="0">Tidak (Stok Tanpa Batas / Jasa)</option>
+                  <option value="1">Ya (Barang Fisik)</option>
+                </select>
+              </div>
             )}
-            <div>
-              <label className="form-label small fw-semibold">Satuan</label>
-              <input type="text" name="satuan" className="form-control input-premium" value={formState.satuan ?? 'pcs'} onChange={handleChange} placeholder="pcs, porsi, jam, hari" />
-            </div>
-            <div className="d-flex align-items-center justify-content-between p-2 rounded" style={{background:'var(--bg-card)', border:'1px solid var(--border-color)'}}>
-              <div>
-                <div className="small fw-semibold">🍳 Butuh Persiapan / Dapur</div>
-                <div className="text-muted" style={{fontSize:'0.72rem'}}>Aktifkan jika produk perlu diolah dulu (masuk antrean Job Board)</div>
+
+            {formState.tipe === 'barang' && formState.is_stok_dikelola !== '' && (
+              <div className="d-flex align-items-center justify-content-between p-2 rounded mt-3 fade-in" style={{background:'var(--bg-card)', border:'1px solid var(--border-color)'}}>
+                <div>
+                  <div className="small fw-semibold">🍳 Butuh Persiapan / Dapur</div>
+                  <div className="text-muted" style={{fontSize:'0.72rem'}}>Aktifkan jika produk perlu diolah dulu (masuk antrean Job Board)</div>
+                </div>
+                <div className="form-check form-switch mb-0 ms-3">
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    id="switchButuhPersiapan"
+                    checked={formState.butuh_persiapan == '1'}
+                    onChange={e => {
+                      const val = e.target.checked ? '1' : '0';
+                      setFormState(prev => ({ ...prev, butuh_persiapan: val }));
+                    }}
+                    style={{width:'2.5em', height:'1.3em', cursor:'pointer'}}
+                  />
+                </div>
               </div>
-              <div className="form-check form-switch mb-0 ms-3">
-                <input
-                  className="form-check-input"
-                  type="checkbox"
-                  role="switch"
-                  id="switchButuhPersiapan"
-                  checked={formState.butuh_persiapan == '1'}
-                  onChange={e => handleChange({ target: { name: 'butuh_persiapan', value: e.target.checked ? '1' : '0' } })}
-                  style={{width:'2.5em', height:'1.3em', cursor:'pointer'}}
-                />
+            )}
+
+            {((formState.tipe && formState.tipe !== 'barang') ||
+              (formState.tipe === 'barang' && formState.is_stok_dikelola !== '')) && (
+              <div className="fade-in mt-3 pt-3 border-top" style={{ borderColor: 'var(--warna-border)' }}>
+                <div>
+                  <label className="form-label small fw-semibold">Nama Produk / Jasa / Sewa</label>
+                  <input type="text" name="nama_produk" className="form-control input-premium" value={formState.nama_produk || ''} onChange={handleChange} placeholder="cth: Kopi Susu, Sewa Meja, Potong Rambut" />
+                </div>
+                {formState.tipe === 'barang' && (
+                  <div>
+                    <label className="form-label small fw-semibold">Harga Beli (HPP)</label>
+                    <input type="number" name="harga_beli" className="form-control input-premium" value={formState.harga_beli || '0'} onChange={handleChange} />
+                  </div>
+                )}
+                <div>
+                  <label className="form-label small fw-semibold">Harga Jual</label>
+                  <input type="number" name="harga_jual" className="form-control input-premium" value={formState.harga_jual || '0'} onChange={handleChange} />
+                </div>
+                {formState.tipe === 'barang' && formState.is_stok_dikelola == '1' && (
+                  <>
+                    <div>
+                      <label className="form-label small fw-semibold">Stok Saat Ini</label>
+                      <input type="number" name="stok" className="form-control input-premium" value={formState.stok ?? '0'} onChange={handleChange} />
+                    </div>
+                    <div>
+                      <label className="form-label small fw-semibold">Minimum Stok Alert</label>
+                      <input type="number" name="stok_minimum" className="form-control input-premium" value={formState.stok_minimum ?? '0'} onChange={handleChange} />
+                    </div>
+                  </>
+                )}
+                <div>
+                  <label className="form-label small fw-semibold">Satuan</label>
+                  <input type="text" name="satuan" className="form-control input-premium" value={formState.satuan ?? 'pcs'} onChange={handleChange} placeholder="pcs, porsi, jam, hari" />
+                </div>
               </div>
-            </div>
+            )}
           </>
         )}
         {tabel === 'produk_komposisi' && (
@@ -1084,6 +1124,217 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
                 placeholder="cth: 2500000"
               />
             </div>
+          </>
+        )}
+        {tabel === 'pengeluaran' && (
+          <>
+            {profile?.usaha_id ? (
+              <input type="hidden" name="usaha_id" value={formState.usaha_id || profile.usaha_id} />
+            ) : (
+              <div>
+                <label className="form-label small fw-semibold">Pilih Usaha</label>
+                <PilihRelasi
+                  name="usaha_id"
+                  placeholder="Ketik atau pilih usaha..."
+                  value={formState.usaha_id || ''}
+                  onChange={handleChange}
+                  options={opsiUsaha.map(u => ({ value: u.id, label: u.nama_usaha }))}
+                />
+              </div>
+            )}
+            
+            <div>
+              <label className="form-label small fw-semibold">Pilih Unit (Opsional)</label>
+              <PilihRelasi
+                name="unit_id"
+                placeholder="Pengeluaran Global Cabang"
+                value={formState.unit_id || ''}
+                onChange={handleChange}
+                options={opsiUnit.filter(u => u.usaha_id == (formState.usaha_id || profile?.usaha_id)).map(u => ({ value: u.id, label: u.nama_unit }))}
+              />
+            </div>
+
+            <div>
+              <label className="form-label small fw-semibold">Pilih Kategori Pengeluaran</label>
+              <select
+                name="kategori"
+                className="form-select input-premium"
+                value={formState.kategori || ''}
+                onChange={e => {
+                  const val = e.target.value;
+                  setFormState(prev => ({
+                    ...prev,
+                    kategori: val,
+                    karyawan_gaji_id: '',
+                    produk_id: '',
+                    qty: '1',
+                    harga_satuan: '0',
+                    diskon: '0',
+                    nominal_total: '0',
+                    deskripsi_keperluan: ''
+                  }));
+                }}
+              >
+                <option value="">-- Pilih Kategori --</option>
+                <option value="Gaji">💵 Gaji Karyawan</option>
+                <option value="Bahan Baku">📦 Bahan Baku / Restok</option>
+                <option value="Inv">🏢 Inventaris (Aset)</option>
+                <option value="Operasional">⚡ Operasional</option>
+                <option value="Lain-lain">⚙️ Lain-lain</option>
+              </select>
+            </div>
+
+            {formState.kategori === 'Gaji' && (
+              <div className="fade-in mt-3">
+                <div>
+                  <label className="form-label small fw-semibold">Pilih Penerima Gaji</label>
+                  <PilihRelasi
+                    name="karyawan_gaji_id"
+                    placeholder="Pilih karyawan..."
+                    value={formState.karyawan_gaji_id || ''}
+                    onChange={e => {
+                      const empId = e.target.value;
+                      // Cari gaji pokok dari user_role milik user tersebut (jika ada)
+                      // Kita bisa melacak dari opsiUsers atau relasi opsional lainnya
+                      setFormState(prev => ({
+                        ...prev,
+                        karyawan_gaji_id: empId
+                      }));
+                    }}
+                    options={opsiUsers.map(u => ({ value: u.id, label: `${u.nama} (${u.wa})` }))}
+                  />
+                </div>
+                <div className="mt-2">
+                  <label className="form-label small fw-semibold">Nominal Gaji</label>
+                  <input
+                    type="number"
+                    name="nominal_total"
+                    className="form-control input-premium"
+                    value={formState.nominal_total || '0'}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+            )}
+
+            {(formState.kategori === 'Bahan Baku' || formState.kategori === 'Inv') && (
+              <div className="fade-in mt-3">
+                <div>
+                  <label className="form-label small fw-semibold">Pilih Produk / Barang</label>
+                  <PilihRelasi
+                    name="produk_id"
+                    placeholder="Pilih produk untuk restok..."
+                    value={formState.produk_id || ''}
+                    onChange={handleChange}
+                    options={posProducts.map(p => ({ value: p.id, label: `${p.nama_produk} (Stok: ${p.stok || 0} ${p.satuan})` }))}
+                  />
+                </div>
+                <div className="row g-2 mt-2">
+                  <div className="col-4">
+                    <label className="form-label small fw-semibold">Jumlah (Qty)</label>
+                    <input
+                      type="number"
+                      name="qty"
+                      className="form-control input-premium"
+                      value={formState.qty ?? '1'}
+                      onChange={handleChange}
+                    />
+                  </div>
+                  <div className="col-8">
+                    <label className="form-label small fw-semibold">Harga Satuan</label>
+                    <input
+                      type="number"
+                      name="harga_satuan"
+                      className="form-control input-premium"
+                      value={formState.harga_satuan || '0'}
+                      onChange={handleChange}
+                    />
+                  </div>
+                </div>
+                <div className="mt-2">
+                  <label className="form-label small fw-semibold">Diskon / Potongan</label>
+                  <input
+                    type="number"
+                    name="diskon"
+                    className="form-control input-premium"
+                    value={formState.diskon || '0'}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div className="mt-2">
+                  <label className="form-label small fw-semibold text-muted">Nominal Total (Otomatis)</label>
+                  <input
+                    type="text"
+                    disabled
+                    className="form-control input-premium bg-dark text-success fw-bold"
+                    value={formatRupiah((Number(formState.harga_satuan || 0) * Number(formState.qty || 1)) - Number(formState.diskon || 0))}
+                  />
+                </div>
+              </div>
+            )}
+
+            {(formState.kategori === 'Operasional' || formState.kategori === 'Lain-lain') && (
+              <div className="fade-in mt-3">
+                <div>
+                  <label className="form-label small fw-semibold">Keperluan / Item</label>
+                  <input
+                    type="text"
+                    name="deskripsi_keperluan"
+                    className="form-control input-premium"
+                    value={formState.deskripsi_keperluan || ''}
+                    onChange={handleChange}
+                    placeholder="cth: Beli bensin motor operasional, Bayar PDAM"
+                  />
+                </div>
+                <div className="mt-2">
+                  <label className="form-label small fw-semibold">Nominal Pengeluaran</label>
+                  <input
+                    type="number"
+                    name="nominal_total"
+                    className="form-control input-premium"
+                    value={formState.nominal_total || '0'}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+            )}
+
+            {formState.kategori !== '' && (
+              <div className="fade-in mt-3 pt-3 border-top" style={{ borderColor: 'var(--warna-border)' }}>
+                <div>
+                  <label className="form-label small fw-semibold">Penanggung Jawab (PIC)</label>
+                  <PilihRelasi
+                    name="penanggung_jawab_id"
+                    placeholder="Pilih penanggung jawab..."
+                    value={formState.penanggung_jawab_id || ''}
+                    onChange={handleChange}
+                    options={opsiUsers.map(u => ({ value: u.id, label: u.nama }))}
+                    dropUp={true}
+                  />
+                </div>
+                <div className="mt-2">
+                  <label className="form-label small fw-semibold">Catatan / Keterangan Tambahan</label>
+                  <textarea
+                    name="keterangan"
+                    className="form-control input-premium"
+                    value={formState.keterangan || ''}
+                    onChange={handleChange}
+                    rows="2"
+                    placeholder="cth: Nota hilang, dibeli di toko makmur..."
+                  />
+                </div>
+                <div className="mt-2">
+                  <label className="form-label small fw-semibold">Tanggal Pengeluaran</label>
+                  <input
+                    type="date"
+                    name="tanggal"
+                    className="form-control input-premium"
+                    value={formState.tanggal || ''}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+            )}
           </>
         )}
         {tabel === 'menus' && (
@@ -4295,7 +4546,7 @@ const Dashboard = () => {
       } else if (targetTabel === 'unit') {
         nilaiAwal = { usaha_id: profile?.usaha_id || '', nama_unit: '', kategori: 'kantin' };
       } else if (targetTabel === 'produk_jasa') {
-        nilaiAwal = { usaha_id: profile?.usaha_id || '', unit_id: '', nama_produk: '', tipe: 'barang', harga_beli: '0', harga_jual: '0', stok: '0', stok_minimum: '0', is_stok_dikelola: '1', butuh_persiapan: '0', satuan: 'pcs' };
+        nilaiAwal = { usaha_id: profile?.usaha_id || '', unit_id: '', nama_produk: '', tipe: '', harga_beli: '0', harga_jual: '0', stok: '0', stok_minimum: '0', is_stok_dikelola: '', butuh_persiapan: '0', satuan: 'pcs' };
       } else if (targetTabel === 'roles') {
         nilaiAwal = { nama_role: '', deskripsi: '' };
       } else if (targetTabel === 'user_role') {
@@ -4317,6 +4568,22 @@ const Dashboard = () => {
         nilaiAwal = { jadwal_karyawan_id: '', karyawan_id: '', jam_masuk: nowLocalStr, jam_pulang: '', status_kehadiran: 'tepat_waktu' };
       } else if (targetTabel === 'kriteria_poin') {
         nilaiAwal = { usaha_id: profile?.usaha_id || '', nama_kriteria: '', nilai_poin: 0, is_otomatis: 0, kode_sistem: '' };
+      } else if (targetTabel === 'pengeluaran') {
+        nilaiAwal = { 
+          usaha_id: profile?.usaha_id || '', 
+          unit_id: '', 
+          kategori: '', 
+          deskripsi_keperluan: '', 
+          keterangan: '', 
+          karyawan_gaji_id: '', 
+          produk_id: '', 
+          qty: '1', 
+          harga_satuan: '0', 
+          diskon: '0', 
+          nominal_total: '0', 
+          penanggung_jawab_id: '', 
+          tanggal: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().substring(0, 10) 
+        };
       } else if (targetTabel === 'points') {
         const today = new Date().toISOString().substring(0, 10);
         nilaiAwal = { karyawan_id: '', jumlah_poin: 0, sumber: 'penilaian_supervisor', referensi_id: '', pemberi_poin_id: profile?.id || '', keterangan: '', tanggal: today };
@@ -4454,6 +4721,8 @@ const Dashboard = () => {
       return ['No.', 'Karyawan', 'Shift', 'Batas Kerja', 'Masuk Aktual', 'Pulang Aktual', 'Status Kehadiran', 'Cabang', 'Aksi'];
     } else if (tabel === 'kriteria_poin') {
       return ['No.', 'Nama Kriteria', 'Nilai Poin', 'Sifat', 'Kode Sistem', 'Usaha', 'Aksi'];
+    } else if (tabel === 'pengeluaran') {
+      return ['No.', 'Tanggal', 'Kategori', 'Unit', 'Detail Keperluan / Item', 'Nominal Total', 'Penanggung Jawab (PIC)', 'Pencatat', 'Catatan', 'Aksi'];
     } else if (tabel === 'points') {
       return ['No.', 'Karyawan', 'Jumlah Poin', 'Sumber', 'Atasan Penilai', 'Keterangan', 'Tanggal', 'Cabang', 'Aksi'];
     } else if (tabel === 'perizinan') {
@@ -4876,6 +5145,43 @@ const Dashboard = () => {
           </td>
           <td><code>{baris.kode_sistem || '-'}</code></td>
           <td><span className="badge bg-secondary">{baris.nama_usaha || '-'}</span></td>
+        </>
+      );
+    } else if (tabel === 'pengeluaran') {
+      const tglFormatted = baris.tanggal 
+        ? new Date(baris.tanggal).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+        : '-';
+
+      const kategoriBadges = {
+        'Gaji': 'bg-success',
+        'Bahan Baku': 'bg-primary',
+        'Inv': 'bg-info',
+        'Operasional': 'bg-warning text-dark',
+        'Lain-lain': 'bg-secondary'
+      };
+
+      const detailKeperluan = (() => {
+        if (baris.kategori === 'Gaji') {
+          return `Penerima Gaji: ${baris.nama_karyawan_gaji || `ID: ${baris.karyawan_gaji_id}`}`;
+        }
+        if (baris.kategori === 'Bahan Baku' || baris.kategori === 'Inv') {
+          const diskonTeks = Number(baris.diskon || 0) > 0 ? ` [Diskon: ${formatRupiah(baris.diskon)}]` : '';
+          return `Restok: ${baris.nama_produk || `ID: ${baris.produk_id}`} (${baris.qty} ${baris.satuan || 'pcs'} @ ${formatRupiah(baris.harga_satuan)})${diskonTeks}`;
+        }
+        return baris.deskripsi_keperluan || '-';
+      })();
+
+      return (
+        <>
+          <td>{noUrut}</td>
+          <td><span className="text-main small">{tglFormatted}</span></td>
+          <td><span className={`badge ${kategoriBadges[baris.kategori] || 'bg-dark'}`}>{baris.kategori}</span></td>
+          <td><span className="badge bg-light text-dark">{baris.nama_unit || 'Global'}</span></td>
+          <td><span className="text-main small">{detailKeperluan}</span></td>
+          <td><strong className="text-danger">{formatRupiah(baris.nominal_total)}</strong></td>
+          <td><span className="badge bg-dark fw-normal">{baris.nama_penanggung_jawab || '-'}</span></td>
+          <td><span className="text-muted small">{baris.nama_pencatat || '-'}</span></td>
+          <td><span className="text-muted small" style={{ fontSize: '0.72rem' }}>{baris.keterangan || '-'}</span></td>
         </>
       );
     } else if (tabel === 'points') {
