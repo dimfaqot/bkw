@@ -77,6 +77,7 @@ $routes->group('api/kebersihan', ['filter' => 'jwt'], function($routes) {
 
 // Rute Transaksi & Kasir POS
 $routes->group('api/transaksi', ['filter' => 'jwt'], function($routes) {
+    $routes->get('staff', '\App\Modules\Manajemen\Controllers\Transaksi::ambilStaff');
     $routes->post('checkout', '\App\Modules\Manajemen\Controllers\Transaksi::checkout');
     $routes->get('riwayat', '\App\Modules\Manajemen\Controllers\Transaksi::riwayat');
     $routes->get('members', '\App\Modules\Manajemen\Controllers\Transaksi::members');

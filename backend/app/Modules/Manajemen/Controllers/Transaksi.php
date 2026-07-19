@@ -8,6 +8,36 @@ class Transaksi extends ResourceController
 {
     protected $format = 'json';
 
+    // GET /api/transaksi/staff
+    public function ambilStaff()
+    {
+        $penggunaAktif = \App\Modules\Auth\Filters\JWTFilter::getPenggunaAktif();
+        if (!$penggunaAktif) {
+            return $this->failUnauthorized('Token tidak valid.');
+        }
+
+        $usahaId = $penggunaAktif['usaha_id'] ?? null;
+        if (!$usahaId) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Konteks usaha tidak ditemukan.'], 400);
+        }
+
+        $db = \Config\Database::connect();
+        
+        $staff = $db->table('user_role')
+                    ->select('users.id, users.nama, users.wa, roles.nama_role')
+                    ->join('users', 'users.id = user_role.user_id')
+                    ->join('roles', 'roles.id = user_role.role_id')
+                    ->where('user_role.usaha_id', $usahaId)
+                    ->orderBy('users.nama', 'ASC')
+                    ->get()
+                    ->getResultArray();
+
+        return $this->respond([
+            'status' => 'sukses',
+            'data'   => $staff
+        ]);
+    }
+
     // POST /api/transaksi/checkout
     public function checkout()
     {
@@ -109,9 +139,9 @@ class Transaksi extends ResourceController
             }
 
             $produk = $db->table('produk_jasa')
-                         ->where('id', $produkId)
-                         ->where('usaha_id', $usahaId)
-                         ->get()->getRow();
+                          ->where('id', $produkId)
+                          ->where('usaha_id', $usahaId)
+                          ->get()->getRow();
 
             if (!$produk) {
                 $db->transRollback();
@@ -130,6 +160,23 @@ class Transaksi extends ResourceController
             $totalHarga += $subtotal;
 
             $statusPengerjaan = ($produk->butuh_persiapan == 1) ? 'Menunggu' : 'Selesai';
+            
+            // Integrasi pemilihan stylist/petugas dan hitung komisi
+            $petugasId = !empty($item['petugas_id']) ? (int)$item['petugas_id'] : null;
+            $komisiPetugas = isset($item['komisi_petugas']) && $item['komisi_petugas'] !== '' ? (float)$item['komisi_petugas'] : null;
+
+            if ($petugasId && $komisiPetugas === null) {
+                // Hitung komisi default jika petugas terpilih namun nominal komisi kosong
+                $komisiTipe = $produk->komisi_tipe ?? 'nominal';
+                $komisiNilai = (float)($produk->komisi_nilai ?? 0);
+                if ($komisiTipe === 'persen') {
+                    $komisiPetugas = ($komisiNilai / 100) * $hargaSatuan * $qty;
+                } else {
+                    $komisiPetugas = $komisiNilai * $qty;
+                }
+            } else if (!$petugasId) {
+                $komisiPetugas = 0.00;
+            }
 
             $detailData = [
                 'transaksi_id'      => $transaksiId,
@@ -138,11 +185,30 @@ class Transaksi extends ResourceController
                 'harga_satuan'      => $hargaSatuan,
                 'subtotal'          => $subtotal,
                 'status_pengerjaan' => $statusPengerjaan,
+                'petugas_id'        => $petugasId,
+                'komisi_petugas'    => $komisiPetugas,
                 'created_at'        => $now,
                 'updated_at'        => $now
             ];
 
             $db->table('transaksi_detail')->insert($detailData);
+            $detailId = $db->insertID();
+
+            // Poin Otomatis (+5 Poin) langsung ditambahkan jika langsung selesai di kasir
+            $namaProduk = $produk->nama_produk;
+            if ($statusPengerjaan === 'Selesai' && $petugasId) {
+                $db->table('points')->insert([
+                    'karyawan_id'     => $petugasId,
+                    'jumlah_poin'     => 5,
+                    'sumber'          => 'pengerjaan_pesanan',
+                    'referensi_id'    => $detailId,
+                    'pemberi_poin_id' => null,
+                    'keterangan'      => "Menyelesaikan pengerjaan $namaProduk (Nota: $nomorInvoice) - Langsung POS",
+                    'tanggal'         => date('Y-m-d'),
+                    'created_at'      => $now,
+                    'updated_at'      => $now
+                ]);
+            }
         }
 
         // Update total_harga
@@ -244,8 +310,9 @@ class Transaksi extends ResourceController
         // Ambil detail masing-masing transaksi
         foreach ($riwayat as &$r) {
             $r['detail'] = $db->table('transaksi_detail td')
-                              ->select('td.*, p.nama_produk, p.satuan, p.tipe')
+                              ->select('td.*, p.nama_produk, p.satuan, p.tipe, u.nama as nama_petugas')
                               ->join('produk_jasa p', 'p.id = td.produk_id', 'left')
+                              ->join('users u', 'u.id = td.petugas_id', 'left')
                               ->where('td.transaksi_id', $r['id'])
                               ->get()->getResultArray();
         }
@@ -342,8 +409,9 @@ class Transaksi extends ResourceController
         }
 
         $tx['detail'] = $db->table('transaksi_detail td')
-                           ->select('td.*, p.nama_produk, p.satuan, p.tipe')
+                           ->select('td.*, p.nama_produk, p.satuan, p.tipe, u.nama as nama_petugas')
                            ->join('produk_jasa p', 'p.id = td.produk_id', 'left')
+                           ->join('users u', 'u.id = td.petugas_id', 'left')
                            ->where('td.transaksi_id', $id)
                            ->get()->getResultArray();
 

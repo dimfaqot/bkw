@@ -971,6 +971,33 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
                     </div>
                   </>
                 )}
+                {formState.tipe === 'jasa' && (
+                  <div className="row g-2 mt-2">
+                    <div className="col-6">
+                      <label className="form-label small fw-semibold">Tipe Komisi Staf</label>
+                      <select
+                        name="komisi_tipe"
+                        className="form-select input-premium"
+                        value={formState.komisi_tipe || 'nominal'}
+                        onChange={handleChange}
+                      >
+                        <option value="nominal">Nominal Rupiah (Rp)</option>
+                        <option value="persen">Persentase (%)</option>
+                      </select>
+                    </div>
+                    <div className="col-6">
+                      <label className="form-label small fw-semibold">Nilai Komisi</label>
+                      <input
+                        type="number"
+                        name="komisi_nilai"
+                        className="form-control input-premium"
+                        value={formState.komisi_nilai || '0'}
+                        onChange={handleChange}
+                        placeholder="cth: 5000 atau 10"
+                      />
+                    </div>
+                  </div>
+                )}
                 <div>
                   <label className="form-label small fw-semibold">Satuan</label>
                   <input type="text" name="satuan" className="form-control input-premium" value={formState.satuan ?? 'pcs'} onChange={handleChange} placeholder="pcs, porsi, jam, hari" />
@@ -3110,6 +3137,7 @@ const Dashboard = () => {
 
   // State khusus untuk Kasir POS
   const [posProducts, setPosProducts] = useState([]);
+  const [posStaff, setPosStaff] = useState([]);
   const [posLoading, setPosLoading] = useState(false);
   const [cart, setCart] = useState([]);
   const [searchProductQuery, setSearchProductQuery] = useState('');
@@ -3735,6 +3763,7 @@ const Dashboard = () => {
       setTabelTerpilih(null);
       lastTabelRef.current = null;
       fetchPosProducts();
+      fetchPosStaff();
       fetchRiwayatTransaksi(filterTanggalPos);
       return;
     }
@@ -3804,6 +3833,21 @@ const Dashboard = () => {
     setPosLoading(false);
   };
 
+  const fetchPosStaff = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const r = await fetch(`${API_BASE_URL}/transaksi/staff`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const json = await r.json();
+      if (r.ok && json.status === 'sukses') {
+        setPosStaff(json.data || []);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const fetchRiwayatTransaksi = async (tgl = filterTanggalPos) => {
     try {
       const token = localStorage.getItem('token');
@@ -3827,13 +3871,29 @@ const Dashboard = () => {
           ui.notif('gagal', `Stok '${prod.nama_produk}' tidak mencukupi untuk ditambah lagi.`);
           return prev;
         }
-        return prev.map(item => item.id === prod.id ? { ...item, qty: item.qty + 1 } : item);
+        return prev.map(item => {
+          if (item.id === prod.id) {
+            const newQty = item.qty + 1;
+            let komisi = item.komisi_petugas;
+            if (item.petugas_id) {
+              const tipe = item.komisi_tipe || 'nominal';
+              const nilai = parseFloat(item.komisi_nilai || 0);
+              if (tipe === 'persen') {
+                komisi = (nilai / 100) * parseFloat(item.harga_jual) * newQty;
+              } else {
+                komisi = nilai * newQty;
+              }
+            }
+            return { ...item, qty: newQty, komisi_petugas: komisi };
+          }
+          return item;
+        });
       } else {
         if (prod.tipe === 'barang' && prod.is_stok_dikelola == 1 && prod.stok <= 0) {
           ui.notif('gagal', `Stok '${prod.nama_produk}' sedang habis.`);
           return prev;
         }
-        return [...prev, { ...prod, qty: 1 }];
+        return [...prev, { ...prod, qty: 1, petugas_id: '', komisi_petugas: '' }];
       }
     });
   };
@@ -3842,11 +3902,46 @@ const Dashboard = () => {
     setCart(prev => {
       const existing = prev.find(item => item.id === prodId);
       if (existing && existing.qty > 1) {
-        return prev.map(item => item.id === prodId ? { ...item, qty: item.qty - 1 } : item);
+        return prev.map(item => {
+          if (item.id === prodId) {
+            const newQty = item.qty - 1;
+            let komisi = item.komisi_petugas;
+            if (item.petugas_id) {
+              const tipe = item.komisi_tipe || 'nominal';
+              const nilai = parseFloat(item.komisi_nilai || 0);
+              if (tipe === 'persen') {
+                komisi = (nilai / 100) * parseFloat(item.harga_jual) * newQty;
+              } else {
+                komisi = nilai * newQty;
+              }
+            }
+            return { ...item, qty: newQty, komisi_petugas: komisi };
+          }
+          return item;
+        });
       } else {
         return prev.filter(item => item.id !== prodId);
       }
     });
+  };
+
+  const updatePetugasKeranjang = (prodId, petugasId) => {
+    setCart(prev => prev.map(item => {
+      if (item.id === prodId) {
+        let komisi = '';
+        if (petugasId) {
+          const tipe = item.komisi_tipe || 'nominal';
+          const nilai = parseFloat(item.komisi_nilai || 0);
+          if (tipe === 'persen') {
+            komisi = (nilai / 100) * parseFloat(item.harga_jual) * item.qty;
+          } else {
+            komisi = nilai * item.qty;
+          }
+        }
+        return { ...item, petugas_id: petugasId, komisi_petugas: komisi };
+      }
+      return item;
+    }));
   };
 
   const hapusDariKeranjang = (prodId) => {
@@ -3906,7 +4001,9 @@ const Dashboard = () => {
           metode_pembayaran: pembayaranTipePos === 'lunas' ? metodePembayaranPos : null,
           items: cart.map(item => ({
             produk_id: item.id,
-            qty: item.qty
+            qty: item.qty,
+            petugas_id: item.petugas_id ? Number(item.petugas_id) : null,
+            komisi_petugas: item.komisi_petugas !== '' && item.komisi_petugas !== undefined && item.komisi_petugas !== null ? Number(item.komisi_petugas) : null
           }))
         })
       });
@@ -6731,22 +6828,50 @@ const Dashboard = () => {
                           ) : (
                             <div className="d-flex flex-column gap-3" style={{ maxHeight: '300px', overflowY: 'auto' }}>
                               {cart.map(item => (
-                                <div key={item.id} className="d-flex align-items-center justify-content-between pb-2" style={{ borderBottom: '1px dashed var(--warna-border)' }}>
-                                  <div style={{ maxWidth: '60%' }}>
-                                    <div className="fw-bold text-main" style={{ fontSize: '0.78rem' }}>{item.nama_produk}</div>
-                                    <div className="text-muted small" style={{ fontSize: '0.68rem' }}>
-                                      {item.qty} x {formatRupiah(item.harga_jual)}
+                                <div key={item.id} className="pb-2 mb-2" style={{ borderBottom: '1px dashed var(--warna-border)' }}>
+                                  <div className="d-flex align-items-center justify-content-between">
+                                    <div style={{ maxWidth: '60%' }}>
+                                      <div className="fw-bold text-main" style={{ fontSize: '0.78rem' }}>{item.nama_produk}</div>
+                                      <div className="text-muted small" style={{ fontSize: '0.68rem' }}>
+                                        {item.qty} x {formatRupiah(item.harga_jual)}
+                                      </div>
+                                    </div>
+                                    <div className="d-flex align-items-center gap-2">
+                                      <span className="fw-bold text-main" style={{ fontSize: '0.78rem' }}>{formatRupiah(item.harga_jual * item.qty)}</span>
+                                      <button 
+                                        onClick={() => hapusDariKeranjang(item.id)}
+                                        className="btn btn-link text-danger p-0 ms-1"
+                                        title="Hapus"
+                                        style={{ border: 'none', background: 'none' }}
+                                      >🗑️</button>
                                     </div>
                                   </div>
-                                  <div className="d-flex align-items-center gap-2">
-                                    <span className="fw-bold text-main" style={{ fontSize: '0.78rem' }}>{formatRupiah(item.harga_jual * item.qty)}</span>
-                                    <button 
-                                      onClick={() => hapusDariKeranjang(item.id)}
-                                      className="btn btn-link text-danger p-0 ms-1"
-                                      title="Hapus"
-                                      style={{ border: 'none', background: 'none' }}
-                                    >🗑️</button>
-                                  </div>
+                                  
+                                  {/* Pilihan Stylist untuk Jasa */}
+                                  {item.tipe === 'jasa' && (
+                                    <div className="mt-2 p-1.5 rounded" style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--warna-border)' }}>
+                                      <div className="d-flex align-items-center justify-content-between gap-2">
+                                        <span className="text-muted" style={{ fontSize: '0.65rem' }}>✂️ Stylist:</span>
+                                        <select
+                                          className="form-select form-select-sm py-0.5 px-2 input-premium"
+                                          style={{ width: 'auto', minWidth: '120px', fontSize: '0.68rem' }}
+                                          value={item.petugas_id || ''}
+                                          onChange={e => updatePetugasKeranjang(item.id, e.target.value)}
+                                        >
+                                          <option value="">-- Pilih Staf --</option>
+                                          {posStaff.map(st => (
+                                            <option key={st.id} value={st.id}>{st.nama} ({st.nama_role})</option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                      {item.petugas_id && item.komisi_petugas !== '' && (
+                                        <div className="d-flex justify-content-between align-items-center mt-1" style={{ fontSize: '0.62rem' }}>
+                                          <span className="text-muted">Komisi Terhitung:</span>
+                                          <span className="text-success fw-semibold">{formatRupiah(item.komisi_petugas)}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -9540,9 +9665,19 @@ const Dashboard = () => {
                 <div className="fw-bold text-main mb-2" style={{ borderBottom: '1px dashed var(--warna-border)', paddingBottom: '4px' }}>Daftar Belanja:</div>
                 <div className="d-flex flex-column gap-2">
                   {selectedTransaksi.detail?.map(d => (
-                    <div key={d.id} className="d-flex justify-content-between align-items-center">
-                      <div className="text-main">• {d.nama_produk} (x{d.qty})</div>
-                      <div className="fw-bold text-main">{formatRupiah(d.harga_satuan * d.qty)}</div>
+                    <div key={d.id} className="pb-1 mb-1" style={{ borderBottom: '1px dashed rgba(255,255,255,0.05)' }}>
+                      <div className="d-flex justify-content-between align-items-center">
+                        <div className="text-main">• {d.nama_produk} (x{d.qty})</div>
+                        <div className="fw-bold text-main">{formatRupiah(d.harga_satuan * d.qty)}</div>
+                      </div>
+                      {d.nama_petugas && (
+                        <div className="d-flex justify-content-between align-items-center text-muted ps-3 mt-0.5" style={{ fontSize: '0.68rem' }}>
+                          <span>✂️ Stylist: <strong>{d.nama_petugas}</strong></span>
+                          {Number(d.komisi_petugas) > 0 && (
+                            <span>Komisi: <strong className="text-success">{formatRupiah(d.komisi_petugas)}</strong></span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

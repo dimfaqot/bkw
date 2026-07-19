@@ -621,7 +621,9 @@ class Manajemen extends ResourceController
                 'stok_minimum'     => 'permit_empty|numeric',
                 'is_stok_dikelola' => 'permit_empty|in_list[0,1]',
                 'butuh_persiapan'  => 'permit_empty|in_list[0,1]',
-                'satuan'           => 'permit_empty'
+                'satuan'           => 'permit_empty',
+                'komisi_tipe'      => 'permit_empty|in_list[persen,nominal]',
+                'komisi_nilai'     => 'permit_empty|numeric'
             ];
         } else if ($tabel === 'transaksi') {
             $aturan = [
