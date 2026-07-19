@@ -197,7 +197,7 @@ class Manajemen extends ResourceController
         // 6. Rekomendasi Bisnis Pintar (Insights)
         $rekomendasi = [];
 
-        // Rekomendasi 1: Warning stok menipis (khusus unit Kantin/F&B)
+        // Rekomendasi 1: Warning stok menipis / ketersediaan barang
         $stockWarningQuery = $db->table('produk_jasa')
                                ->where('is_stok_dikelola', 1)
                                ->where('stok <= stok_minimum');
@@ -207,13 +207,15 @@ class Manajemen extends ResourceController
         if ($unitId) {
             $stockWarningQuery->where('unit_id', $unitId);
         }
-        $lowStocks = $stockWarningQuery->limit(3)->get()->getResultArray();
+        $lowStocks = $stockWarningQuery->limit(5)->get()->getResultArray();
         if (!empty($lowStocks)) {
             $itemNames = array_column($lowStocks, 'nama_produk');
             $rekomendasi[] = "Stok barang [" . implode(', ', $itemNames) . "] telah berada di bawah batas minimum. Segera lakukan restok untuk menghindari kekosongan persediaan penjualan.";
+        } else {
+            $rekomendasi[] = "Ketersediaan stok produk Anda saat ini dalam kondisi aman. Pertahankan manajemen rantai pasok agar selalu siap melayani pelanggan.";
         }
 
-        // Rekomendasi 2: Deteksi hari penjualan terlemah
+        // Rekomendasi 2: Deteksi hari penjualan terlemah & tertinggi
         $hariPenjualan = [
             'Senin' => 0.00, 'Selasa' => 0.00, 'Rabu' => 0.00, 'Kamis' => 0.00,
             'Jumat' => 0.00, 'Sabtu' => 0.00, 'Minggu' => 0.00
@@ -234,13 +236,40 @@ class Manajemen extends ResourceController
             asort($activeDays);
             $hariTerendah = array_key_first($activeDays);
             $rekomendasi[] = "Hari {$hariTerendah} mencatatkan penjualan terendah periode ini. Pertimbangkan untuk memberikan promo khusus (Happy Hour/Diskon Member) pada hari {$hariTerendah} guna memicu antusiasme transaksi.";
+            
+            arsort($activeDays);
+            $hariTertinggi = array_key_first($activeDays);
+            if ($hariTertinggi !== $hariTerendah) {
+                $nominalHariTertinggi = number_format($activeDays[$hariTertinggi], 0, ',', '.');
+                $rekomendasi[] = "Hari {$hariTertinggi} mencatatkan penjualan tertinggi periode ini sebesar Rp {$nominalHariTertinggi}. Pertimbangkan menambah kapasitas pelayanan atau meningkatkan promosi di hari tersebut.";
+            }
+        } else {
+            $rekomendasi[] = "Belum ada transaksi penjualan yang tercatat pada rentang periode ini. Pastikan kasir telah melayani pelanggan dan menyelesaikan transaksi kasir (POS) secara lunas.";
         }
 
-        // Rekomendasi 3: Efisiensi pengeluaran
-        if ($totalExpenses > $totalSales && $totalSales > 0) {
-            $rekomendasi[] = "Total pengeluaran saat ini melebihi pendapatan kotor. Disarankan untuk meninjau kembali pengeluaran operasional non-esensial dan meminimalkan pembelian aset/inventaris baru hingga margin pulih.";
+        // Rekomendasi 3: Efisiensi pengeluaran & Analisis Margin Laba
+        if ($totalSales == 0) {
+            if ($totalExpenses > 0) {
+                $rekomendasi[] = "Belum ada pendapatan terakumulasi sementara biaya pengeluaran berjalan. Harap segera sinkronisasikan transaksi lunas POS atau tinjau kembali pengeluaran kasir.";
+            }
         } else {
-            $rekomendasi[] = "Margin laba bersih Anda saat ini berada pada angka {$marginKeuntungan}%. Kondisi keuangan berjalan sehat, pertahankan konsistensi arus kas masuk.";
+            if ($totalExpenses > $totalSales) {
+                $rekomendasi[] = "Total pengeluaran saat ini melebihi pendapatan kotor. Disarankan untuk meninjau kembali pengeluaran operasional non-esensial dan meminimalkan pembelian aset/inventaris baru hingga margin pulih.";
+            } else if ($marginKeuntungan > 40) {
+                $rekomendasi[] = "Margin laba bersih Anda sangat sehat ({$marginKeuntungan}%). Pertimbangkan mengalokasikan surplus keuntungan untuk investasi ekspansi unit usaha atau modal produk baru.";
+            } else if ($marginKeuntungan > 0 && $marginKeuntungan <= 15) {
+                $rekomendasi[] = "Margin laba bersih Anda saat ini tipis ({$marginKeuntungan}%). Pertimbangkan strategi untuk efisiensi harga beli bahan baku atau menaikkan sedikit harga jual produk non-sensitif.";
+            } else {
+                $rekomendasi[] = "Margin laba bersih Anda saat ini berada pada angka {$marginKeuntungan}%. Kondisi keuangan berjalan sehat, pertahankan konsistensi arus kas masuk.";
+            }
+        }
+
+        // Rekomendasi 4: Analisis Rasio HPP (jika ada HPP produk)
+        if ($totalSales > 0 && $totalHpp > 0) {
+            $hppRatio = round(($totalHpp / $totalSales) * 100, 1);
+            if ($hppRatio > 60) {
+                $rekomendasi[] = "Rasio Harga Pokok Penjualan (HPP) cukup tinggi ({$hppRatio}% dari total penjualan). Disarankan meninjau ulang biaya pembelian bahan baku atau mencari alternatif pemasok/vendor yang lebih kompetitif.";
+            }
         }
 
         return $this->respond([

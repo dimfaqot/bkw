@@ -8617,7 +8617,7 @@ const Dashboard = () => {
 
                         {subTabLaporan === 'penjualan' ? (
                           <div className="table-responsive">
-                            <table className="table table-hover table-striped align-middle small">
+                            <table className={`table ${theme === 'dark' ? 'table-dark' : ''} table-hover table-striped align-middle small`} style={{ backgroundColor: 'transparent', borderColor: 'var(--warna-border)' }}>
                               <thead>
                                 <tr>
                                   <th>No. Invoice</th>
@@ -8652,7 +8652,7 @@ const Dashboard = () => {
                           </div>
                         ) : (
                           <div className="table-responsive">
-                            <table className="table table-hover table-striped align-middle small">
+                            <table className={`table ${theme === 'dark' ? 'table-dark' : ''} table-hover table-striped align-middle small`} style={{ backgroundColor: 'transparent', borderColor: 'var(--warna-border)' }}>
                               <thead>
                                 <tr>
                                   <th>No. Inv / Aset</th>
