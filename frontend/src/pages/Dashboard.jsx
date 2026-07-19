@@ -476,6 +476,7 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
     } else if (tabel === 'produk_jasa') {
       dataAkhir.usaha_id = ekstrakId(dataAkhir.usaha_id, opsiUsaha.map(u => ({ value: u.id, label: u.nama_usaha })));
       dataAkhir.unit_id = ekstrakId(dataAkhir.unit_id, opsiUnit.map(u => ({ value: u.id, label: u.nama_unit })));
+      dataAkhir.iot_id = dataAkhir.iot_id ? ekstrakId(dataAkhir.iot_id, opsiAlokasi.map(a => ({ value: a.iot_id, label: `${a.nama_perangkat} (${a.tipe_perangkat?.toUpperCase()})` }))) : null;
     } else if (tabel === 'produk_komposisi') {
       dataAkhir.produk_induk_id = ekstrakId(dataAkhir.produk_induk_id, opsiProduk.map(p => ({ value: p.id, label: `${p.nama_produk} [${p.tipe}]` })));
       
@@ -1005,23 +1006,24 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
                 {formState.tipe === 'sewa' && (
                   <div className="mt-3">
                     <label className="form-label small fw-semibold">Hubungkan ke Perangkat IoT (Relay / TV)</label>
-                    <select
+                    <PilihRelasi
                       name="iot_id"
-                      className="form-select input-premium"
+                      placeholder="Pilih perangkat IoT..."
                       value={formState.iot_id || ''}
                       onChange={handleChange}
-                    >
-                      <option value="">-- Pilih Perangkat IoT --</option>
-                      {opsiAlokasi
-                        .filter(a => String(a.unit_id) === String(formState.unit_id))
-                        .map(a => (
-                          <option key={a.iot_id} value={a.iot_id}>
-                            🔌 {a.nama_perangkat} ({a.tipe_perangkat?.toUpperCase()})
-                          </option>
-                        ))}
-                    </select>
+                      options={opsiAlokasi
+                        .filter(a => {
+                          const matchUsaha = String(a.usaha_id) === String(formState.usaha_id || profile?.usaha_id);
+                          const matchUnit = !formState.unit_id || String(a.unit_id) === String(formState.unit_id);
+                          return matchUsaha && matchUnit;
+                        })
+                        .map(a => ({
+                          value: a.iot_id,
+                          label: `${a.nama_perangkat} (${a.tipe_perangkat?.toUpperCase()})`
+                        }))}
+                    />
                     <div className="text-muted" style={{ fontSize: '0.68rem' }}>
-                      Perangkat yang muncul di atas adalah yang sudah dialokasikan ke Unit Cabang ini di menu Alokasi IoT.
+                      Perangkat yang muncul di atas adalah yang sudah dialokasikan ke Usaha/Unit Cabang ini di menu Alokasi IoT.
                     </div>
                   </div>
                 )}
