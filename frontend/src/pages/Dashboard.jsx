@@ -2352,7 +2352,7 @@ const Dashboard = () => {
     if (!token) return;
     const yakin = await ui.notif('konfirmasi', 'Apakah Anda yakin ingin mengambil/mengerjakan tugas ini?');
     if (!yakin) return;
-    ui.loading(true, 'claiming', 'Mengambil pekerjaan...');
+    ui.loading(true, 'fullscreen', 'Mengambil pekerjaan...');
     try {
       const response = await fetch(`http://localhost:8080/api/transaksi/job-board/klaim/${detailId}`, {
         method: 'POST',
@@ -2378,7 +2378,7 @@ const Dashboard = () => {
     if (!token) return;
     const yakin = await ui.notif('konfirmasi', 'Apakah Anda yakin pekerjaan ini telah selesai dikerjakan?');
     if (!yakin) return;
-    ui.loading(true, 'completing', 'Menyelesaikan pekerjaan...');
+    ui.loading(true, 'fullscreen', 'Menyelesaikan pekerjaan...');
     try {
       const response = await fetch(`http://localhost:8080/api/transaksi/job-board/selesai/${detailId}`, {
         method: 'POST',
