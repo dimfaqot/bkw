@@ -246,7 +246,7 @@ const PilihRelasi = ({ options, value, onChange, name, placeholder, dropUp = fal
   const [cari, setCari] = useState(() => {
     if (!value || !options || options.length === 0) return '';
     const matched = options.find(opt => String(opt.value) === String(value));
-    return matched ? matched.label : '';
+    return matched ? String(matched.label || '') : '';
   });
   const ref = useRef(null);
   const cariRef = useRef(cari);
@@ -263,9 +263,9 @@ const PilihRelasi = ({ options, value, onChange, name, placeholder, dropUp = fal
         // Validasi ketat: jika teks yang diketik tidak ada di daftar opsi (sama persis), kosongkan!
         const currentCari = cariRef.current;
         if (currentCari) {
-          const matched = options.find(opt => String(opt.label).toLowerCase() === currentCari.toLowerCase());
+          const matched = options.find(opt => String(opt.label || '').toLowerCase() === String(currentCari || '').toLowerCase());
           if (matched) {
-            setCari(matched.label);
+            setCari(String(matched.label || ''));
             onChange({ target: { name, value: matched.value } });
           } else {
             // Teks tidak valid (ngawur), paksa kosongkan
@@ -284,15 +284,16 @@ const PilihRelasi = ({ options, value, onChange, name, placeholder, dropUp = fal
   useEffect(() => {
     if (value && options.length > 0) {
       const matched = options.find(opt => String(opt.value) === String(value));
-      if (matched && cari !== matched.label) {
-        setCari(matched.label);
+      const targetLabel = matched ? String(matched.label || '') : '';
+      if (matched && cari !== targetLabel) {
+        setCari(targetLabel);
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, options]);
 
   const filteredOptions = options.filter(opt => 
-    String(opt.label).toLowerCase().includes(cari.toLowerCase())
+    String(opt.label || '').toLowerCase().includes(String(cari || '').toLowerCase())
   );
 
   return (
@@ -1226,7 +1227,7 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
                     placeholder="Pilih produk untuk restok..."
                     value={formState.produk_id || ''}
                     onChange={handleChange}
-                    options={posProducts.map(p => ({ value: p.id, label: `${p.nama_produk} (Stok: ${p.stok || 0} ${p.satuan})` }))}
+                    options={opsiProduk.map(p => ({ value: p.id, label: `${p.nama_produk} (Stok: ${p.stok || 0} ${p.satuan})` }))}
                   />
                 </div>
                 <div className="row g-2 mt-2">
@@ -3083,9 +3084,9 @@ const Dashboard = () => {
       return profile?.menus?.some(m => m.tabel === namaTabel && (m.can_read == 1 || m.permissions?.can_read == 1));
     };
 
-    const butuhUsaha = bolehBaca('usaha') || bolehBaca('unit') || bolehBaca('user_role') || bolehBaca('iot_alokasi') || bolehBaca('shift') || bolehBaca('jadwal_karyawan') || bolehBaca('absensi') || bolehBaca('kriteria_poin') || bolehBaca('points') || bolehBaca('perizinan') || bolehBaca('produk_jasa') || bolehBaca('transaksi') || bolehBaca('produk_komposisi');
-    const butuhUsers = bolehBaca('users') || bolehBaca('user_role') || bolehBaca('jadwal_karyawan') || bolehBaca('absensi') || bolehBaca('points') || bolehBaca('perizinan') || bolehBaca('transaksi') || bolehBaca('transaksi_detail');
-    const butuhUnit = bolehBaca('unit') || bolehBaca('user_role') || bolehBaca('iot_alokasi') || bolehBaca('produk_jasa') || bolehBaca('produk_komposisi');
+    const butuhUsaha = bolehBaca('usaha') || bolehBaca('unit') || bolehBaca('user_role') || bolehBaca('iot_alokasi') || bolehBaca('shift') || bolehBaca('jadwal_karyawan') || bolehBaca('absensi') || bolehBaca('kriteria_poin') || bolehBaca('points') || bolehBaca('perizinan') || bolehBaca('produk_jasa') || bolehBaca('transaksi') || bolehBaca('produk_komposisi') || bolehBaca('pengeluaran');
+    const butuhUsers = bolehBaca('users') || bolehBaca('user_role') || bolehBaca('jadwal_karyawan') || bolehBaca('absensi') || bolehBaca('points') || bolehBaca('perizinan') || bolehBaca('transaksi') || bolehBaca('transaksi_detail') || bolehBaca('pengeluaran');
+    const butuhUnit = bolehBaca('unit') || bolehBaca('user_role') || bolehBaca('iot_alokasi') || bolehBaca('produk_jasa') || bolehBaca('produk_komposisi') || bolehBaca('pengeluaran');
     const butuhRoles = bolehBaca('roles') || bolehBaca('user_role') || bolehBaca('role_permissions');
     const butuhMenus = bolehBaca('menus') || bolehBaca('role_permissions');
     const butuhIot = bolehBaca('iot') || bolehBaca('iot_alokasi');
@@ -3093,7 +3094,7 @@ const Dashboard = () => {
     const butuhShift = bolehBaca('shift') || bolehBaca('jadwal_karyawan') || bolehBaca('absensi');
     const butuhKriteriaPoin = bolehBaca('kriteria_poin') || bolehBaca('points');
     const butuhJadwal = bolehBaca('jadwal_karyawan') || bolehBaca('absensi');
-    const butuhProduk = bolehBaca('produk_jasa') || bolehBaca('produk_komposisi');
+    const butuhProduk = bolehBaca('produk_jasa') || bolehBaca('produk_komposisi') || bolehBaca('pengeluaran');
     
     const safeFetch = async (url) => {
       try {
