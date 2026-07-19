@@ -1228,23 +1228,37 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
 
             {(formState.kategori === 'Bahan Baku' || formState.kategori === 'Inv') && (
               <div className="fade-in mt-3">
-                <div>
-                  <label className="form-label small fw-semibold">Pilih Produk / Barang</label>
-                  <PilihRelasi
-                    name="produk_id"
-                    placeholder="Pilih produk untuk restok..."
-                    value={formState.produk_id || ''}
-                    onChange={handleChange}
-                    options={opsiProduk
-                      .filter(p => {
-                        const kelolaStok = p.is_stok_dikelola == 1 || p.is_stok_dikelola === '1';
-                        const matchUnit = !formState.unit_id || p.unit_id == formState.unit_id;
-                        return kelolaStok && matchUnit;
-                      })
-                      .map(p => ({ value: p.id, label: `${p.nama_produk} (Stok: ${p.stok || 0} ${p.satuan})` }))
-                    }
-                  />
-                </div>
+                {formState.kategori === 'Bahan Baku' ? (
+                  <div>
+                    <label className="form-label small fw-semibold">Pilih Produk / Barang</label>
+                    <PilihRelasi
+                      name="produk_id"
+                      placeholder="Pilih produk untuk restok..."
+                      value={formState.produk_id || ''}
+                      onChange={handleChange}
+                      options={opsiProduk
+                        .filter(p => {
+                          const kelolaStok = p.is_stok_dikelola == 1 || p.is_stok_dikelola === '1';
+                          const matchUnit = !formState.unit_id || p.unit_id == formState.unit_id;
+                          return kelolaStok && matchUnit;
+                        })
+                        .map(p => ({ value: p.id, label: `${p.nama_produk} (Stok: ${p.stok || 0} ${p.satuan})` }))
+                      }
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="form-label small fw-semibold">Nama Barang / Aset Inventaris</label>
+                    <input
+                      type="text"
+                      name="deskripsi_keperluan"
+                      className="form-control input-premium"
+                      value={formState.deskripsi_keperluan || ''}
+                      onChange={handleChange}
+                      placeholder="cth: Kulkas Showcase Polytron, Laptop Admin"
+                    />
+                  </div>
+                )}
                 <div className="row g-2 mt-2">
                   <div className="col-4">
                     <label className="form-label small fw-semibold">Jumlah (Qty)</label>
@@ -5180,9 +5194,13 @@ const Dashboard = () => {
         if (baris.kategori === 'Gaji') {
           return `Penerima Gaji: ${baris.nama_karyawan_gaji || `ID: ${baris.karyawan_gaji_id}`}`;
         }
-        if (baris.kategori === 'Bahan Baku' || baris.kategori === 'Inv') {
+        if (baris.kategori === 'Bahan Baku') {
           const diskonTeks = Number(baris.diskon || 0) > 0 ? ` [Diskon: ${formatRupiah(baris.diskon)}]` : '';
           return `Restok: ${baris.nama_produk || `ID: ${baris.produk_id}`} (${baris.qty} ${baris.satuan || 'pcs'} @ ${formatRupiah(baris.harga_satuan)})${diskonTeks}`;
+        }
+        if (baris.kategori === 'Inv') {
+          const diskonTeks = Number(baris.diskon || 0) > 0 ? ` [Diskon: ${formatRupiah(baris.diskon)}]` : '';
+          return `Aset: ${baris.deskripsi_keperluan || 'Aset Baru'} (${baris.qty} pcs @ ${formatRupiah(baris.harga_satuan)})${diskonTeks}`;
         }
         return baris.deskripsi_keperluan || '-';
       })();
