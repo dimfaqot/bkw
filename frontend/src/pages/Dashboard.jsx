@@ -8285,19 +8285,13 @@ const Dashboard = () => {
                               {laporanFilter.unit_id && ` · Cabang: ${opsiUnit.find(u => u.id == laporanFilter.unit_id)?.nama_unit || ''}`}
                             </p>
                           </div>
-                          {(() => {
-                            const activeUsaha = opsiUsaha.find(u => u.id == profile?.usaha_id);
-                            if (activeUsaha?.logo) {
-                              return (
-                                <img 
-                                  src={`http://localhost:8080/api/ambil-logo/${activeUsaha.logo}`} 
-                                  alt="Logo Usaha" 
-                                  style={{ height: '50px', objectFit: 'contain' }} 
-                                />
-                              );
-                            }
-                            return null;
-                          })()}
+                          {profile?.logo_usaha ? (
+                            <img 
+                              src={`http://localhost:8080/api/ambil-logo/${profile.logo_usaha}`} 
+                              alt="Logo Usaha" 
+                              style={{ height: '50px', objectFit: 'contain' }} 
+                            />
+                          ) : null}
                         </div>
 
                         <h4 className="text-center fw-bold mb-4">
