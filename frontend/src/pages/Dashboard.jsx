@@ -3134,6 +3134,16 @@ const Dashboard = () => {
   const [subTabLaporan, setSubTabLaporan] = useState('penjualan');
   const [isCetakMode, setIsCetakMode] = useState(null); // null / 'singkat' / 'detail'
 
+  useEffect(() => {
+    if (isCetakMode) {
+      const timer = setTimeout(() => {
+        window.print();
+        setIsCetakMode(null);
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [isCetakMode]);
+
   const ambilLaporanData = useCallback(async () => {
     const token = localStorage.getItem('token');
     if (!token) return;
