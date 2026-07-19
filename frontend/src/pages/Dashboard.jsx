@@ -2603,32 +2603,6 @@ const Dashboard = () => {
   const ui = useUI();
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
-  
-  useEffect(() => {
-    if (profile?.usaha_id) {
-      const activeUsaha = opsiUsaha?.find(u => u.id == profile.usaha_id);
-      const currentLogo = profile.logo_usaha || activeUsaha?.logo;
-      
-      let link = document.querySelector("link[rel~='icon']");
-      if (!link) {
-        link = document.createElement('link');
-        link.rel = 'icon';
-        document.getElementsByTagName('head')[0].appendChild(link);
-      }
-      
-      if (currentLogo) {
-        link.href = `http://localhost:8080/api/ambil-logo/${currentLogo}`;
-      } else {
-        link.href = '/favicon.ico';
-      }
-    } else {
-      let link = document.querySelector("link[rel~='icon']");
-      if (link) {
-        link.href = '/favicon.ico';
-      }
-    }
-  }, [profile, opsiUsaha]);
-
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [error, setError] = useState('');
   const [sidebarTerbuka, setSidebarTerbuka] = useState(true);
@@ -3148,6 +3122,31 @@ const Dashboard = () => {
   const [pilihanProdukHutang, setPilihanProdukHutang] = useState('');
   const [pilihanQtyHutang, setPilihanQtyHutang] = useState(1);
   const [metodePelunasanHutang, setMetodePelunasanHutang] = useState('cash');
+
+  useEffect(() => {
+    if (profile?.usaha_id) {
+      const activeUsaha = opsiUsaha?.find(u => u.id == profile.usaha_id);
+      const currentLogo = profile.logo_usaha || activeUsaha?.logo;
+      
+      let link = document.querySelector("link[rel~='icon']");
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        document.getElementsByTagName('head')[0].appendChild(link);
+      }
+      
+      if (currentLogo) {
+        link.href = `http://localhost:8080/api/ambil-logo/${currentLogo}`;
+      } else {
+        link.href = '/favicon.ico';
+      }
+    } else {
+      let link = document.querySelector("link[rel~='icon']");
+      if (link) {
+        link.href = '/favicon.ico';
+      }
+    }
+  }, [profile, opsiUsaha]);
 
   // Dipisah sebagai useCallback agar bisa dipanggil ulang setelah CRUD (tanpa reload)
   const fetchGlobalOptions = useCallback(async () => {
