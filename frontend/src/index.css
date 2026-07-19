@@ -540,6 +540,12 @@ body {
   }
 }
 
+@media (max-width: 575.98px) {
+  .konten-utama-wrapper main {
+    padding-bottom: 130px !important;
+  }
+}
+
 /* Bottom Bar (Mobile Only) */
 .bottombar-premium {
   position: fixed;
