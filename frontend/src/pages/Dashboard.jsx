@@ -8338,6 +8338,83 @@ const Dashboard = () => {
                           </div>
                         </div>
 
+                        {/* ===== HALAMAN 1: RINGKASAN BULANAN PER TAHUN ===== */}
+                        {(laporanData?.ringkasan_bulanan || []).map((tahunData) => {
+                          const totalPend = tahunData.bulan.reduce((s, b) => s + b.pendapatan, 0);
+                          const totalPengl = tahunData.bulan.reduce((s, b) => s + b.pengeluaran, 0);
+                          const totalSaldo = totalPend - totalPengl;
+                          return (
+                            <div key={tahunData.tahun} style={{ marginBottom: '16px' }}>
+                              <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#111', borderBottom: '1px solid #999', paddingBottom: '4px', marginBottom: '8px' }}>
+                                RINGKASAN KEUANGAN TAHUN {tahunData.tahun}
+                              </div>
+                              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+                                <thead>
+                                  <tr style={{ backgroundColor: '#111', color: '#fff' }}>
+                                    <th style={{ padding: '5px 8px', textAlign: 'left', width: '5%' }}>No</th>
+                                    <th style={{ padding: '5px 8px', textAlign: 'left', width: '20%' }}>Bulan</th>
+                                    <th style={{ padding: '5px 8px', textAlign: 'right' }}>Pemasukan (Rp)</th>
+                                    <th style={{ padding: '5px 8px', textAlign: 'right' }}>Pengeluaran (Rp)</th>
+                                    <th style={{ padding: '5px 8px', textAlign: 'right' }}>Saldo (Rp)</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {tahunData.bulan.map((b, idx) => (
+                                    <tr key={b.bulan} style={{ backgroundColor: idx % 2 === 0 ? '#f9f9f9' : '#fff' }}>
+                                      <td style={{ padding: '4px 8px', borderBottom: '1px solid #eee' }}>{idx + 1}</td>
+                                      <td style={{ padding: '4px 8px', borderBottom: '1px solid #eee', fontWeight: 500 }}>{b.nama_bulan}</td>
+                                      <td style={{ padding: '4px 8px', borderBottom: '1px solid #eee', textAlign: 'right' }}>
+                                        {b.pendapatan > 0 ? b.pendapatan.toLocaleString('id-ID') : '-'}
+                                      </td>
+                                      <td style={{ padding: '4px 8px', borderBottom: '1px solid #eee', textAlign: 'right' }}>
+                                        {b.pengeluaran > 0 ? b.pengeluaran.toLocaleString('id-ID') : '-'}
+                                      </td>
+                                      <td style={{ padding: '4px 8px', borderBottom: '1px solid #eee', textAlign: 'right', color: b.saldo >= 0 ? '#166534' : '#991b1b', fontWeight: 600 }}>
+                                        {b.saldo !== 0 ? b.saldo.toLocaleString('id-ID') : '-'}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                                <tfoot>
+                                  <tr style={{ backgroundColor: '#111', color: '#fff', fontWeight: 700 }}>
+                                    <td colSpan={2} style={{ padding: '5px 8px' }}>TOTAL {tahunData.tahun}</td>
+                                    <td style={{ padding: '5px 8px', textAlign: 'right' }}>{totalPend.toLocaleString('id-ID')}</td>
+                                    <td style={{ padding: '5px 8px', textAlign: 'right' }}>{totalPengl.toLocaleString('id-ID')}</td>
+                                    <td style={{ padding: '5px 8px', textAlign: 'right', color: totalSaldo >= 0 ? '#86efac' : '#fca5a5' }}>
+                                      {totalSaldo.toLocaleString('id-ID')}
+                                    </td>
+                                  </tr>
+                                </tfoot>
+                              </table>
+                            </div>
+                          );
+                        })}
+
+                        {/* Grand Total (jika lebih dari 1 tahun) */}
+                        {(laporanData?.ringkasan_bulanan || []).length > 1 && (() => {
+                          const allBulan = (laporanData.ringkasan_bulanan || []).flatMap(t => t.bulan);
+                          const gPend  = allBulan.reduce((s, b) => s + b.pendapatan, 0);
+                          const gPengl = allBulan.reduce((s, b) => s + b.pengeluaran, 0);
+                          const gSaldo = gPend - gPengl;
+                          return (
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem', marginTop: '4px' }}>
+                              <tbody>
+                                <tr style={{ backgroundColor: '#1e3a5f', color: '#fff', fontWeight: 700 }}>
+                                  <td colSpan={2} style={{ padding: '6px 8px', width: '25%' }}>TOTAL KESELURUHAN</td>
+                                  <td style={{ padding: '6px 8px', textAlign: 'right' }}>{gPend.toLocaleString('id-ID')}</td>
+                                  <td style={{ padding: '6px 8px', textAlign: 'right' }}>{gPengl.toLocaleString('id-ID')}</td>
+                                  <td style={{ padding: '6px 8px', textAlign: 'right', color: gSaldo >= 0 ? '#86efac' : '#fca5a5' }}>
+                                    {gSaldo.toLocaleString('id-ID')}
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          );
+                        })()}
+
+                        {/* Page break — halaman 2 dst: Detail Transaksi */}
+                        <div style={{ pageBreakAfter: 'always', height: '0' }} />
+
                         <h4 className="text-center fw-bold mb-4">
                           LAPORAN KEUANGAN {isCetakMode === 'singkat' ? 'SINGKAT (REKAP HARIAN)' : 'DETAIL TRANSAKSI'}
                         </h4>

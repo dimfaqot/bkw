@@ -272,6 +272,62 @@ class Manajemen extends ResourceController
             }
         }
 
+        // ---------------------------------------------------------------
+        // Ringkasan Bulanan per Tahun (untuk halaman pertama cetak PDF)
+        // ---------------------------------------------------------------
+        $startYear = (int)date('Y', strtotime($startDate));
+        $endYear   = (int)date('Y', strtotime($endDate));
+
+        $namaBulanId = [
+            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+        ];
+
+        $ringkasanBulanan = [];
+
+        for ($year = $startYear; $year <= $endYear; $year++) {
+            $bulanList = [];
+
+            for ($m = 1; $m <= 12; $m++) {
+                $mStr      = str_pad($m, 2, '0', STR_PAD_LEFT);
+                $mStart    = "{$year}-{$mStr}-01";
+                $mEnd      = date('Y-m-t', mktime(0, 0, 0, $m, 1, $year));
+
+                // Penjualan bulan ini
+                $penjualanQ = $db->table('transaksi')
+                                ->selectSum('total_harga', 'total')
+                                ->where('status_pembayaran', 'lunas')
+                                ->where('DATE(created_at) >=', $mStart)
+                                ->where('DATE(created_at) <=', $mEnd);
+                if ($usahaId) $penjualanQ->where('usaha_id', $usahaId);
+                if ($unitId)  $penjualanQ->where('unit_id', $unitId);
+                $penjualanBulan = (float)($penjualanQ->get()->getRow()->total ?? 0);
+
+                // Pengeluaran bulan ini
+                $pengeluaranQ = $db->table('pengeluaran')
+                                ->selectSum('jumlah', 'total')
+                                ->where('tanggal >=', $mStart)
+                                ->where('tanggal <=', $mEnd);
+                if ($usahaId) $pengeluaranQ->where('usaha_id', $usahaId);
+                if ($unitId)  $pengeluaranQ->where('unit_id', $unitId);
+                $pengeluaranBulan = (float)($pengeluaranQ->get()->getRow()->total ?? 0);
+
+                $bulanList[] = [
+                    'bulan'       => $m,
+                    'nama_bulan'  => $namaBulanId[$m],
+                    'pendapatan'  => $penjualanBulan,
+                    'pengeluaran' => $pengeluaranBulan,
+                    'saldo'       => $penjualanBulan - $pengeluaranBulan,
+                ];
+            }
+
+            $ringkasanBulanan[] = [
+                'tahun' => $year,
+                'bulan' => $bulanList,
+            ];
+        }
+
         return $this->respond([
             'status' => 'sukses',
             'data' => [
@@ -292,6 +348,7 @@ class Manajemen extends ResourceController
                     'teks_kesimpulan' => $trenTeks
                 ],
                 'rekomendasi' => $rekomendasi,
+                'ringkasan_bulanan' => $ringkasanBulanan,
                 'rincian' => [
                     'penjualan' => $sales,
                     'pengeluaran' => $expenses
