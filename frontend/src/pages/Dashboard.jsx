@@ -2603,6 +2603,7 @@ const Dashboard = () => {
   const ui = useUI();
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
+  const [logoDataUrl, setLogoDataUrl] = useState(null); // base64 data URL logo untuk cetak PDF
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [error, setError] = useState('');
   const [sidebarTerbuka, setSidebarTerbuka] = useState(true);
@@ -3134,6 +3135,22 @@ const Dashboard = () => {
   const [subTabLaporan, setSubTabLaporan] = useState('penjualan');
   const [isCetakMode, setIsCetakMode] = useState(null); // null / 'singkat' / 'detail'
 
+  // Konversi logo usaha ke Data URL agar bisa di-render saat print (gambar tidak di-load dari display:none)
+  useEffect(() => {
+    const logoNama = profile?.logo_usaha;
+    if (!logoNama) { setLogoDataUrl(null); return; }
+    const url = `http://localhost:8080/api/ambil-logo/${logoNama}`;
+    fetch(url)
+      .then(res => res.blob())
+      .then(blob => {
+        const reader = new FileReader();
+        reader.onloadend = () => setLogoDataUrl(reader.result);
+        reader.readAsDataURL(blob);
+      })
+      .catch(() => setLogoDataUrl(null));
+  }, [profile?.logo_usaha]);
+
+  // Trigger window.print() saat isCetakMode berubah
   useEffect(() => {
     if (isCetakMode) {
       const judulAsli = document.title;
@@ -8296,9 +8313,9 @@ const Dashboard = () => {
                         {/* KOP SURAT */}
                         <div className="d-flex justify-content-between align-items-start mb-3 pb-3" style={{ borderBottom: '2px solid #111' }}>
                           <div className="d-flex align-items-center gap-3">
-                            {profile?.logo_usaha && (
+                            {logoDataUrl && (
                               <img
-                                src={`http://localhost:8080/api/ambil-logo/${profile.logo_usaha}`}
+                                src={logoDataUrl}
                                 alt="Logo"
                                 style={{ height: '60px', width: 'auto', objectFit: 'contain', display: 'block' }}
                               />
