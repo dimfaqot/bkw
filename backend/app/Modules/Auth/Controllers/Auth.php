@@ -421,6 +421,7 @@ class Auth extends BaseController
         }
 
         $namaUsaha = null;
+        $logoUsaha = null;
         $namaUnit = null;
 
         $usahaId = $penggunaAktif['usaha_id'] ?? null;
@@ -430,6 +431,7 @@ class Auth extends BaseController
             $usaha = $db->table('usaha')->where('id', $usahaId)->get()->getRowArray();
             if ($usaha) {
                 $namaUsaha = $usaha['nama_usaha'];
+                $logoUsaha = $usaha['logo'] ?? null;
             }
         }
         
@@ -452,6 +454,7 @@ class Auth extends BaseController
                 'wa'                => $user['wa'],
                 'usaha_id'          => $usahaId,
                 'nama_usaha'        => $namaUsaha,
+                'logo_usaha'        => $logoUsaha,
                 'unit_id'           => $unitId,
                 'nama_unit'         => $namaUnit,
                 'role'              => $penggunaAktif['role'],
