@@ -8226,7 +8226,7 @@ const Dashboard = () => {
                     <style dangerouslySetInnerHTML={{ __html: `
                       @page {
                         size: 210mm 330mm;
-                        margin: 15mm 12mm;
+                        margin: 0;
                       }
                       @media print {
                         body {
@@ -8263,7 +8263,8 @@ const Dashboard = () => {
                           width: 100% !important;
                           background: white !important;
                           color: black !important;
-                          padding: 20px !important;
+                          padding: 15mm 12mm !important;
+                          box-sizing: border-box !important;
                         }
                       }
                       
