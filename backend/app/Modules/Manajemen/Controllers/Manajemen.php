@@ -306,7 +306,7 @@ class Manajemen extends ResourceController
 
                 // Pengeluaran bulan ini
                 $pengeluaranQ = $db->table('pengeluaran')
-                                ->selectSum('jumlah', 'total')
+                                ->selectSum('nominal_total', 'total')
                                 ->where('tanggal >=', $mStart)
                                 ->where('tanggal <=', $mEnd);
                 if ($usahaId) $pengeluaranQ->where('usaha_id', $usahaId);
