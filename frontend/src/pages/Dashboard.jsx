@@ -889,7 +889,7 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
                     ...prev,
                     tipe: val,
                     is_stok_dikelola: val === 'barang' ? '' : '0',
-                    butuh_persiapan: '0'
+                    butuh_persiapan: val === 'jasa' ? '1' : '0'
                   }));
                 }}
               >
@@ -919,11 +919,11 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
               </div>
             )}
 
-            {formState.tipe === 'barang' && formState.is_stok_dikelola !== '' && (
+            {(formState.tipe === 'jasa' || formState.tipe === 'sewa' || (formState.tipe === 'barang' && formState.is_stok_dikelola !== '')) && (
               <div className="d-flex align-items-center justify-content-between p-2 rounded mt-3 fade-in" style={{background:'var(--bg-card)', border:'1px solid var(--border-color)'}}>
                 <div>
-                  <div className="small fw-semibold">🍳 Butuh Persiapan / Dapur</div>
-                  <div className="text-muted" style={{fontSize:'0.72rem'}}>Aktifkan jika produk perlu diolah dulu (masuk antrean Job Board)</div>
+                  <div className="small fw-semibold">🍳 Antrean Pengerjaan (Job Board)</div>
+                  <div className="text-muted" style={{fontSize:'0.72rem'}}>Aktifkan jika produk/jasa perlu pengerjaan bertahap (masuk antrean Job Board)</div>
                 </div>
                 <div className="form-check form-switch mb-0 ms-3">
                   <input
