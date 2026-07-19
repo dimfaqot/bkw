@@ -3123,6 +3123,49 @@ const Dashboard = () => {
   const [pilihanQtyHutang, setPilihanQtyHutang] = useState(1);
   const [metodePelunasanHutang, setMetodePelunasanHutang] = useState('cash');
 
+  // State Laporan Finansial
+  const [laporanData, setLaporanData] = useState(null);
+  const [laporanLoading, setLaporanLoading] = useState(false);
+  const [laporanFilter, setLaporanFilter] = useState({
+    start_date: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().substring(0, 10),
+    end_date: new Date().toISOString().substring(0, 10),
+    unit_id: ''
+  });
+  const [subTabLaporan, setSubTabLaporan] = useState('penjualan');
+  const [isCetakMode, setIsCetakMode] = useState(null); // null / 'singkat' / 'detail'
+
+  const ambilLaporanData = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    setLaporanLoading(true);
+    try {
+      const query = new URLSearchParams({
+        start_date: laporanFilter.start_date,
+        end_date: laporanFilter.end_date,
+        unit_id: laporanFilter.unit_id
+      });
+      const response = await fetch(`http://localhost:8080/api/manajemen/laporan-ringkasan?${query.toString()}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const res = await response.json();
+      if (response.ok && res.status === 'sukses') {
+        setLaporanData(res.data);
+      } else {
+        ui.notif('gagal', res.pesan || 'Gagal memuat data laporan.');
+      }
+    } catch (err) {
+      ui.notif('gagal', 'Kesalahan koneksi saat memuat laporan.');
+    } finally {
+      setLaporanLoading(false);
+    }
+  }, [laporanFilter.start_date, laporanFilter.end_date, laporanFilter.unit_id, ui]);
+
+  useEffect(() => {
+    if (menuAktif === 'laporan') {
+      ambilLaporanData();
+    }
+  }, [menuAktif, laporanFilter.start_date, laporanFilter.end_date, laporanFilter.unit_id]);
+
   useEffect(() => {
     if (profile?.usaha_id) {
       const activeUsaha = opsiUsaha?.find(u => u.id == profile.usaha_id);
@@ -8042,20 +8085,612 @@ const Dashboard = () => {
                 </div>
               )}
 
-              {menuAktif === 'laporan' && (
-                <div className="kartu-premium fade-in p-4 text-center">
-                  <div className="d-inline-flex p-3 rounded-circle mb-3" style={{ backgroundColor: 'rgba(99, 102, 241, 0.08)' }}>
-                    <BarChart2 size={40} style={{ color: 'var(--warna-utama)' }} />
+              {menuAktif === 'laporan' && (() => {
+                const formatRupiah = (val) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
+                
+                if (laporanLoading && !laporanData) {
+                  return (
+                    <div className="text-center py-5">
+                      <div className="spinner-border text-primary" role="status">
+                        <span className="visually-hidden">Loading...</span>
+                      </div>
+                      <p className="text-muted mt-2 small">Memuat laporan finansial...</p>
+                    </div>
+                  );
+                }
+
+                if (!laporanData) {
+                  return (
+                    <div className="alert alert-warning text-center">
+                      Gagal memuat data laporan atau akses ditolak.
+                    </div>
+                  );
+                }
+
+                // Render Svg Chart logic inside
+                const chartWidth = 600;
+                const chartHeight = 220;
+                const paddingLeft = 60;
+                const paddingRight = 20;
+                const paddingTop = 20;
+                const paddingBottom = 40;
+                const points = laporanData.grafik || [];
+                const N = points.length;
+                const maxPenjualan = Math.max(...points.map(p => p.penjualan), 0);
+                const maxPengeluaran = Math.max(...points.map(p => p.pengeluaran), 0);
+                const maxVal = Math.max(maxPenjualan, maxPengeluaran, 1000);
+
+                const getX = (index) => {
+                  if (N <= 1) return paddingLeft;
+                  return paddingLeft + (index / (N - 1)) * (chartWidth - paddingLeft - paddingRight);
+                };
+
+                const getY = (val) => {
+                  return chartHeight - paddingBottom - (val / maxVal) * (chartHeight - paddingTop - paddingBottom);
+                };
+
+                let penjualanPath = "";
+                let pengeluaranPath = "";
+                let penjualanAreaPath = "";
+                let pengeluaranAreaPath = "";
+
+                points.forEach((p, idx) => {
+                  const x = getX(idx);
+                  const yPenjualan = getY(p.penjualan);
+                  const yPengeluaran = getY(p.pengeluaran);
+
+                  if (idx === 0) {
+                    penjualanPath = `M ${x} ${yPenjualan}`;
+                    pengeluaranPath = `M ${x} ${yPengeluaran}`;
+                    penjualanAreaPath = `M ${x} ${chartHeight - paddingBottom} L ${x} ${yPenjualan}`;
+                    pengeluaranAreaPath = `M ${x} ${chartHeight - paddingBottom} L ${x} ${yPengeluaran}`;
+                  } else {
+                    penjualanPath += ` L ${x} ${yPenjualan}`;
+                    pengeluaranPath += ` L ${x} ${yPengeluaran}`;
+                    penjualanAreaPath += ` L ${x} ${yPenjualan}`;
+                    pengeluaranAreaPath += ` L ${x} ${yPengeluaran}`;
+                  }
+
+                  if (idx === N - 1) {
+                    penjualanAreaPath += ` L ${x} ${chartHeight - paddingBottom} Z`;
+                    pengeluaranAreaPath += ` L ${x} ${chartHeight - paddingBottom} Z`;
+                  }
+                });
+
+                const gridCount = 4;
+                const gridLines = [];
+                for (let i = 0; i <= gridCount; i++) {
+                  const val = (maxVal / gridCount) * i;
+                  const y = getY(val);
+                  gridLines.push(
+                    <g key={i}>
+                      <line x1={paddingLeft} y1={y} x2={chartWidth - paddingRight} y2={y} stroke="var(--warna-border)" strokeDasharray="4 4" />
+                      <text x={paddingLeft - 10} y={y + 4} textAnchor="end" fontSize="10" fill="var(--text-muted)">
+                        {new Intl.NumberFormat('id-ID', { notation: 'compact' }).format(val)}
+                      </text>
+                    </g>
+                  );
+                }
+
+                const stepX = Math.max(1, Math.floor(N / 6));
+                const xLabels = [];
+                points.forEach((p, idx) => {
+                  if (idx % stepX === 0 || idx === N - 1) {
+                    xLabels.push(
+                      <text key={idx} x={getX(idx)} y={chartHeight - 15} textAnchor="middle" fontSize="10" fill="var(--text-muted)">
+                        {p.tanggal}
+                      </text>
+                    );
+                  }
+                });
+
+                const renderCategoryBars = () => {
+                  const cats = laporanData.pengeluaran_kategori || {};
+                  const maxNom = Math.max(...Object.values(cats), 1);
+                  return (
+                    <div className="d-flex flex-column gap-3 mt-2">
+                      {Object.entries(cats).map(([cat, val]) => {
+                        const pct = Math.round((val / maxNom) * 100);
+                        return (
+                          <div key={cat}>
+                            <div className="d-flex justify-content-between mb-1">
+                              <span className="small fw-semibold">{cat}</span>
+                              <span className="small text-muted">{formatRupiah(val)}</span>
+                            </div>
+                            <div className="progress" style={{ height: '8px', backgroundColor: 'var(--bg-halaman)' }}>
+                              <div 
+                                className={`progress-bar ${cat === 'Gaji' ? 'bg-primary' : (cat === 'Bahan Baku' ? 'bg-success' : (cat === 'Inv' ? 'bg-info' : 'bg-warning'))}`} 
+                                style={{ width: `${pct}%`, borderRadius: '4px' }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                };
+
+                return (
+                  <div className="fade-in laporan-page">
+                    {/* STYLES KHUSUS PRINT PDF & RESPONSIVE FONT */}
+                    <style dangerouslySetInnerHTML={{ __html: `
+                      @media print {
+                        body {
+                          background: white !important;
+                          color: black !important;
+                        }
+                        .sidebar-wrapper, .konten-utama-wrapper > header, .noprint, nav, aside {
+                          display: none !important;
+                        }
+                        .konten-utama-wrapper {
+                          margin-left: 0 !important;
+                          padding: 0 !important;
+                        }
+                        .print-container {
+                          display: block !important;
+                          width: 100% !important;
+                          padding: 10px !important;
+                        }
+                      }
+                      
+                      /* Font size mobile responsive */
+                      @media (max-width: 575.98px) {
+                        .laporan-page, .laporan-page span, .laporan-page td, .laporan-page th, .laporan-page div {
+                          font-size: 0.78rem !important;
+                        }
+                        .laporan-card-title {
+                          font-size: 0.85rem !important;
+                        }
+                      }
+                    ` }} />
+
+                    {/* PRINT SHEET WRAPPER (hanya muncul saat mencetak) */}
+                    {isCetakMode && (
+                      <div className="print-container d-none d-print-block bg-white text-dark">
+                        <div className="d-flex justify-content-between align-items-center mb-4 pb-3" style={{ borderBottom: '2px solid #000' }}>
+                          <div>
+                            <h2 className="fw-bold mb-1">{profile?.nama_usaha || 'Laporan Finansial BKW'}</h2>
+                            <p className="mb-0 text-muted small">
+                              Periode: {formatTanggal(laporanFilter.start_date, 'sedang')} s/d {formatTanggal(laporanFilter.end_date, 'sedang')}
+                              {laporanFilter.unit_id && ` · Cabang: ${opsiUnit.find(u => u.id == laporanFilter.unit_id)?.nama_unit || ''}`}
+                            </p>
+                          </div>
+                          {(() => {
+                            const activeUsaha = opsiUsaha.find(u => u.id == profile?.usaha_id);
+                            if (activeUsaha?.logo) {
+                              return (
+                                <img 
+                                  src={`http://localhost:8080/api/ambil-logo/${activeUsaha.logo}`} 
+                                  alt="Logo Usaha" 
+                                  style={{ height: '50px', objectFit: 'contain' }} 
+                                />
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
+
+                        <h4 className="text-center fw-bold mb-4">
+                          LAPORAN KEUANGAN {isCetakMode === 'singkat' ? 'SINGKAT (REKAP HARIAN)' : 'DETAIL TRANSAKSI'}
+                        </h4>
+
+                        {/* Ringkasan Ringkas */}
+                        <div className="row g-2 mb-4 text-center">
+                          <div className="col-4 border p-2">
+                            <div className="text-muted small" style={{ fontSize: '0.75rem' }}>Total Pendapatan</div>
+                            <div className="fw-bold" style={{ fontSize: '0.9rem' }}>{formatRupiah(laporanData.statistik.total_pendapatan)}</div>
+                          </div>
+                          <div className="col-4 border p-2">
+                            <div className="text-muted small" style={{ fontSize: '0.75rem' }}>Total Pengeluaran</div>
+                            <div className="fw-bold" style={{ fontSize: '0.9rem' }}>{formatRupiah(laporanData.statistik.total_pengeluaran)}</div>
+                          </div>
+                          <div className="col-4 border p-2">
+                            <div className="text-muted small" style={{ fontSize: '0.75rem' }}>Laba Bersih</div>
+                            <div className={`fw-bold ${laporanData.statistik.laba_bersih >= 0 ? 'text-success' : 'text-danger'}`} style={{ fontSize: '0.9rem' }}>
+                              {formatRupiah(laporanData.statistik.laba_bersih)}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Print Tabel data sesuai format */}
+                        {isCetakMode === 'singkat' ? (
+                          <table className="table table-bordered table-sm small">
+                            <thead>
+                              <tr className="bg-light">
+                                <th>No</th>
+                                <th>Tanggal</th>
+                                <th className="text-end">Total Penjualan</th>
+                                <th className="text-end">Total Pengeluaran</th>
+                                <th className="text-end">Laba Bersih</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {laporanData.grafik.map((row, idx) => (
+                                <tr key={idx}>
+                                  <td>{idx + 1}</td>
+                                  <td>{row.tanggal}</td>
+                                  <td className="text-end">{formatRupiah(row.penjualan)}</td>
+                                  <td className="text-end">{formatRupiah(row.pengeluaran)}</td>
+                                  <td className={`text-end ${row.penjualan - row.pengeluaran >= 0 ? 'text-success' : 'text-danger'}`}>
+                                    {formatRupiah(row.penjualan - row.pengeluaran)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        ) : (
+                          <>
+                            <h5 className="fw-bold mb-2" style={{ fontSize: '0.85rem' }}>1. Rincian Transaksi Penjualan</h5>
+                            <table className="table table-bordered table-sm small mb-4">
+                              <thead>
+                                <tr className="bg-light">
+                                  <th>No</th>
+                                  <th>No. Invoice</th>
+                                  <th>Tanggal</th>
+                                  <th>Unit</th>
+                                  <th>Kasir</th>
+                                  <th>Metode</th>
+                                  <th className="text-end">Total</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {laporanData.rincian.penjualan.length === 0 ? (
+                                  <tr><td colSpan="7" className="text-center text-muted">Tidak ada transaksi penjualan</td></tr>
+                                ) : (
+                                  laporanData.rincian.penjualan.map((row, idx) => (
+                                    <tr key={idx}>
+                                      <td>{idx + 1}</td>
+                                      <td>{row.nomor_invoice}</td>
+                                      <td>{formatTanggal(row.tanggal, 'singkat')}</td>
+                                      <td>{row.nama_unit || '-'}</td>
+                                      <td>{row.nama_kasir || '-'}</td>
+                                      <td className="text-uppercase">{row.metode_pembayaran || '-'}</td>
+                                      <td className="text-end">{formatRupiah(row.total_harga)}</td>
+                                    </tr>
+                                  ))
+                                )}
+                              </tbody>
+                            </table>
+
+                            <h5 className="fw-bold mb-2" style={{ fontSize: '0.85rem' }}>2. Rincian Pengeluaran</h5>
+                            <table className="table table-bordered table-sm small">
+                              <thead>
+                                <tr className="bg-light">
+                                  <th>No</th>
+                                  <th>No. Inv / Aset</th>
+                                  <th>Tanggal</th>
+                                  <th>Unit</th>
+                                  <th>Kategori</th>
+                                  <th>Keperluan</th>
+                                  <th className="text-end">Total</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {laporanData.rincian.pengeluaran.length === 0 ? (
+                                  <tr><td colSpan="7" className="text-center text-muted">Tidak ada data pengeluaran</td></tr>
+                                ) : (
+                                  laporanData.rincian.pengeluaran.map((row, idx) => (
+                                    <tr key={idx}>
+                                      <td>{idx + 1}</td>
+                                      <td>{row.nomor_inventaris || '-'}</td>
+                                      <td>{formatTanggal(row.tanggal, 'singkat')}</td>
+                                      <td>{row.nama_unit || '-'}</td>
+                                      <td>{row.kategori}</td>
+                                      <td>{row.detail_keperluan}</td>
+                                      <td className="text-end">{formatRupiah(row.nominal_total)}</td>
+                                    </tr>
+                                  ))
+                                )}
+                              </tbody>
+                            </table>
+                          </>
+                        )}
+
+                        <div className="text-end mt-5 pt-3 small" style={{ borderTop: '1px solid #ddd', fontSize: '0.7rem' }}>
+                          Dicetak pada: {new Date().toLocaleString('id-ID')}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* INTERFACE MONITOR DASHBOARD (Hanya tampil di layar browser) */}
+                    <div className="noprint Laporan-halaman-aktif">
+                      {/* FILTER PANEL */}
+                      <div className="kartu-premium p-3 p-sm-4 mb-4">
+                        <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
+                          <div>
+                            <h4 className="fw-bold mb-1 d-flex align-items-center gap-2">
+                              <BarChart2 size={20} className="text-primary" style={{ color: 'var(--warna-utama)' }} />
+                              <span>Laporan & Analisis Finansial</span>
+                            </h4>
+                            <div className="text-muted small">Kelola pencarian, periode keuangan, dan cetak rangkuman usaha Anda.</div>
+                          </div>
+                          <div className="d-flex flex-column flex-sm-row gap-2 w-100 w-sm-auto align-items-end">
+                            <div>
+                              <label className="form-label small fw-semibold mb-1" style={{ fontSize: '0.7rem' }}>Dari Tanggal</label>
+                              <input 
+                                type="date" 
+                                className="form-control input-premium" 
+                                style={{ fontSize: '0.8rem', padding: '0.4rem' }}
+                                value={laporanFilter.start_date}
+                                onChange={(e) => setLaporanFilter(prev => ({ ...prev, start_date: e.target.value }))}
+                              />
+                            </div>
+                            <div>
+                              <label className="form-label small fw-semibold mb-1" style={{ fontSize: '0.7rem' }}>Hingga Tanggal</label>
+                              <input 
+                                type="date" 
+                                className="form-control input-premium" 
+                                style={{ fontSize: '0.8rem', padding: '0.4rem' }}
+                                value={laporanFilter.end_date}
+                                onChange={(e) => setLaporanFilter(prev => ({ ...prev, end_date: e.target.value }))}
+                              />
+                            </div>
+                            <div>
+                              <label className="form-label small fw-semibold mb-1" style={{ fontSize: '0.7rem' }}>Unit / Cabang</label>
+                              <select 
+                                className="form-select input-premiumSelect" 
+                                style={{ fontSize: '0.8rem', padding: '0.4rem' }}
+                                value={laporanFilter.unit_id}
+                                onChange={(e) => setLaporanFilter(prev => ({ ...prev, unit_id: e.target.value }))}
+                              >
+                                <option value="">Semua Cabang / Unit</option>
+                                {opsiUnit.map(u => (
+                                  <option key={u.id} value={u.id}>{u.nama_unit}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* SUMMARY CARDS METRICS */}
+                      <div className="row g-3 mb-4">
+                        <div className="col-12 col-sm-6 col-lg-3">
+                          <div className="p-3 rounded-3 h-100" style={{ backgroundColor: 'var(--warna-bg-kartu)', border: '1px solid var(--warna-border)' }}>
+                            <div className="text-muted small">Total Pendapatan (Penjualan)</div>
+                            <div className="fw-bold text-main fs-4 mt-1">{formatRupiah(laporanData.statistik.total_pendapatan)}</div>
+                            <div className="text-muted small mt-1">{laporanData.statistik.jumlah_transaksi_sales} Tx Penjualan</div>
+                          </div>
+                        </div>
+                        <div className="col-12 col-sm-6 col-lg-3">
+                          <div className="p-3 rounded-3 h-100" style={{ backgroundColor: 'var(--warna-bg-kartu)', border: '1px solid var(--warna-border)' }}>
+                            <div className="text-muted small">Total Pengeluaran</div>
+                            <div className="fw-bold text-main fs-4 mt-1 text-danger">{formatRupiah(laporanData.statistik.total_pengeluaran)}</div>
+                            <div className="text-muted small mt-1">{laporanData.statistik.jumlah_transaksi_expense} Nota Belanja</div>
+                          </div>
+                        </div>
+                        <div className="col-12 col-sm-6 col-lg-3">
+                          <div className="p-3 rounded-3 h-100" style={{ backgroundColor: 'var(--warna-bg-kartu)', border: '1px solid var(--warna-border)' }}>
+                            <div className="text-muted small">Laba Bersih</div>
+                            <div className={`fw-bold fs-4 mt-1 ${laporanData.statistik.laba_bersih >= 0 ? 'text-success' : 'text-danger'}`}>
+                              {formatRupiah(laporanData.statistik.laba_bersih)}
+                            </div>
+                            <div className="text-muted small mt-1">Margin Laba: {laporanData.statistik.margin_keuntungan}%</div>
+                          </div>
+                        </div>
+                        <div className="col-12 col-sm-6 col-lg-3">
+                          <div className="p-3 rounded-3 h-100" style={{ backgroundColor: 'var(--warna-bg-kartu)', border: '1px solid var(--warna-border)' }}>
+                            <div className="text-muted small">Estimasi HPP (Produk Terjual)</div>
+                            <div className="fw-bold text-main fs-4 mt-1 text-warning">{formatRupiah(laporanData.statistik.estimasi_hpp)}</div>
+                            <div className="text-muted small mt-1">Berdasarkan HPP master produk</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* TREN ANALYTICS BANNER */}
+                      <div className="p-3 rounded-3 mb-4 d-flex align-items-start gap-3" 
+                           style={{ 
+                             backgroundColor: laporanData.tren.status_tren === 'naik' ? 'rgba(16, 185, 129, 0.08)' : (laporanData.tren.status_tren === 'turun' ? 'rgba(239, 68, 68, 0.08)' : 'var(--warna-bg-kartu)'),
+                             border: `1px solid ${laporanData.tren.status_tren === 'naik' ? '#10b981' : (laporanData.tren.status_tren === 'turun' ? '#ef4444' : 'var(--warna-border)')}`
+                           }}>
+                        <div className="fs-3">
+                          {laporanData.tren.status_tren === 'naik' ? '📈' : (laporanData.tren.status_tren === 'turun' ? '📉' : '⚖️')}
+                        </div>
+                        <div>
+                          <h6 className="fw-bold mb-1">
+                            Tren Laba Bersih: {laporanData.tren.status_tren === 'naik' ? 'Meningkat' : (laporanData.tren.status_tren === 'turun' ? 'Menurun' : 'Stabil')}
+                          </h6>
+                          <p className="mb-0 small text-muted" style={{ lineHeight: '1.4' }}>
+                            {laporanData.tren.teks_kesimpulan}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* MAIN GRID: GRAPH & CHARTS */}
+                      <div className="row g-4 mb-4">
+                        {/* Sisi Kiri: Line Chart Tren Finansial */}
+                        <div className="col-12 col-lg-8">
+                          <div className="kartu-premium h-100 p-3 p-sm-4">
+                            <h5 className="fw-bold mb-1">Grafik Tren Arus Kas Masuk & Keluar</h5>
+                            <div className="text-muted small mb-3">Garis hijau melambangkan penjualan kotor, garis merah pengeluaran operasional.</div>
+                            <div className="d-flex align-items-center gap-3 mb-2 justify-content-end">
+                              <div className="d-flex align-items-center gap-1.5 small" style={{ fontSize: '0.75rem' }}>
+                                <span className="d-inline-block rounded-circle" style={{ width: '8px', height: '8px', backgroundColor: '#10b981' }} />
+                                <span>Penjualan</span>
+                              </div>
+                              <div className="d-flex align-items-center gap-1.5 small" style={{ fontSize: '0.75rem' }}>
+                                <span className="d-inline-block rounded-circle" style={{ width: '8px', height: '8px', backgroundColor: '#ef4444' }} />
+                                <span>Pengeluaran</span>
+                              </div>
+                            </div>
+                            {points.length > 0 ? (
+                              <svg width="100%" height={chartHeight} viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="mt-3">
+                                <defs>
+                                  <linearGradient id="gradPenjualan" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="rgba(16, 185, 129, 0.2)" />
+                                    <stop offset="100%" stopColor="rgba(16, 185, 129, 0.0)" />
+                                  </linearGradient>
+                                  <linearGradient id="gradPengeluaran" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="rgba(239, 68, 68, 0.2)" />
+                                    <stop offset="100%" stopColor="rgba(239, 68, 68, 0.0)" />
+                                  </linearGradient>
+                                </defs>
+                                {gridLines}
+                                {/* Areas */}
+                                <path d={penjualanAreaPath} fill="url(#gradPenjualan)" />
+                                <path d={pengeluaranAreaPath} fill="url(#gradPengeluaran)" />
+                                {/* Lines */}
+                                <path d={penjualanPath} fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                                <path d={pengeluaranPath} fill="none" stroke="#ef4444" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                                {xLabels}
+                              </svg>
+                            ) : (
+                              <div className="text-center py-5 text-muted small">Tidak ada data untuk grafik.</div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Sisi Kanan: Alokasi Biaya Kategori */}
+                        <div className="col-12 col-lg-4">
+                          <div className="kartu-premium h-100 p-3 p-sm-4">
+                            <h5 className="fw-bold mb-1">Distribusi Pengeluaran</h5>
+                            <div className="text-muted small mb-3">Persentase pengeluaran berdasarkan kategori.</div>
+                            {renderCategoryBars()}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* INSIGHTS / REKOMENDASI PINTAR */}
+                      <div className="kartu-premium p-3 p-sm-4 mb-4">
+                        <h5 className="fw-bold mb-3 d-flex align-items-center gap-2">
+                          <span>💡 Rekomendasi Peningkatan Operasional</span>
+                        </h5>
+                        {laporanData.rekomendasi.length === 0 ? (
+                          <p className="text-muted small mb-0">Tidak ada saran khusus untuk periode ini.</p>
+                        ) : (
+                          <div className="d-flex flex-column gap-2">
+                            {laporanData.rekomendasi.map((rek, idx) => (
+                              <div key={idx} className="p-2.5 rounded-3 small d-flex align-items-start gap-2" style={{ backgroundColor: 'var(--bg-halaman)', border: '1px solid var(--warna-border)' }}>
+                                <span className="text-primary">✨</span>
+                                <span className="text-muted" style={{ lineHeight: '1.4' }}>{rek}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* PRINT & DOWNLOAD ACTIONS BUTTONS */}
+                      <div className="kartu-premium p-3 p-sm-4 mb-4 d-flex flex-column flex-sm-row justify-content-between align-items-center gap-3">
+                        <div>
+                          <h5 className="fw-bold mb-1">Cetak Dokumen Laporan</h5>
+                          <div className="text-muted small">Cetak laporan harian singkat atau rincian penuh per transaksi ke berkas fisik/PDF.</div>
+                        </div>
+                        <div className="d-flex gap-2 w-100 w-sm-auto">
+                          <button 
+                            onClick={() => setIsCetakMode('singkat')}
+                            className="tombol-sekunder-premium border-0 py-2 px-3 text-main"
+                            style={{ fontSize: '0.78rem', borderRadius: '10px' }}
+                          >
+                            🖨️ Cetak Rekap Harian
+                          </button>
+                          <button 
+                            onClick={() => setIsCetakMode('detail')}
+                            className="tombol-premium border-0 py-2 px-3"
+                            style={{ fontSize: '0.78rem', borderRadius: '10px' }}
+                          >
+                            🖨️ Cetak Detail Transaksi
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* DRILL-DOWN TABLES PANEL */}
+                      <div className="kartu-premium p-3 p-sm-4">
+                        <div className="d-flex align-items-center justify-content-between mb-4 border-bottom pb-3">
+                          <h5 className="fw-bold mb-0">Rincian Buku Kas</h5>
+                          <div className="d-flex gap-1.5">
+                            <button 
+                              onClick={() => setSubTabLaporan('penjualan')}
+                              className={`tombol-sekunder-premium border-0 py-1.5 px-3 ${subTabLaporan === 'penjualan' ? 'aktif bg-primary text-white' : ''}`}
+                              style={{ fontSize: '0.75rem', borderRadius: '8px' }}
+                            >
+                              Penjualan
+                            </button>
+                            <button 
+                              onClick={() => setSubTabLaporan('pengeluaran')}
+                              className={`tombol-sekunder-premium border-0 py-1.5 px-3 ${subTabLaporan === 'pengeluaran' ? 'aktif bg-primary text-white' : ''}`}
+                              style={{ fontSize: '0.75rem', borderRadius: '8px' }}
+                            >
+                              Pengeluaran
+                            </button>
+                          </div>
+                        </div>
+
+                        {subTabLaporan === 'penjualan' ? (
+                          <div className="table-responsive">
+                            <table className="table table-hover table-striped align-middle small">
+                              <thead>
+                                <tr>
+                                  <th>No. Invoice</th>
+                                  <th>Tanggal</th>
+                                  <th>Unit Cabang</th>
+                                  <th>Kasir</th>
+                                  <th>Pembayaran</th>
+                                  <th className="text-end">Nominal Total</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {laporanData.rincian.penjualan.length === 0 ? (
+                                  <tr><td colSpan="6" className="text-center text-muted">Tidak ada transaksi penjualan dalam rentang waktu ini.</td></tr>
+                                ) : (
+                                  laporanData.rincian.penjualan.map((row) => (
+                                    <tr key={row.id}>
+                                      <td className="fw-semibold text-main">{row.nomor_invoice}</td>
+                                      <td>{formatTanggal(row.tanggal, 'singkat')}</td>
+                                      <td>{row.nama_unit || '-'}</td>
+                                      <td>{row.nama_kasir || '-'}</td>
+                                      <td>
+                                        <span className="badge bg-success text-uppercase" style={{ fontSize: '0.65rem' }}>
+                                          {row.metode_pembayaran}
+                                        </span>
+                                      </td>
+                                      <td className="text-end fw-semibold text-success">{formatRupiah(row.total_harga)}</td>
+                                    </tr>
+                                  ))
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <div className="table-responsive">
+                            <table className="table table-hover table-striped align-middle small">
+                              <thead>
+                                <tr>
+                                  <th>No. Inv / Aset</th>
+                                  <th>Tanggal</th>
+                                  <th>Unit Cabang</th>
+                                  <th>Kategori</th>
+                                  <th>Keterangan Keperluan</th>
+                                  <th className="text-end">Nominal Belanja</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {laporanData.rincian.pengeluaran.length === 0 ? (
+                                  <tr><td colSpan="6" className="text-center text-muted">Tidak ada transaksi pengeluaran dalam rentang waktu ini.</td></tr>
+                                ) : (
+                                  laporanData.rincian.pengeluaran.map((row) => (
+                                    <tr key={row.id}>
+                                      <td className="fw-semibold text-main">{row.nomor_inventaris || '-'}</td>
+                                      <td>{formatTanggal(row.tanggal, 'singkat')}</td>
+                                      <td>{row.nama_unit || '-'}</td>
+                                      <td>
+                                        <span className="badge bg-secondary" style={{ fontSize: '0.65rem' }}>
+                                          {row.kategori}
+                                        </span>
+                                      </td>
+                                      <td>{row.detail_keperluan}</td>
+                                      <td className="text-end fw-semibold text-danger">{formatRupiah(row.nominal_total)}</td>
+                                    </tr>
+                                  ))
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <h4 className="fw-bold mb-2">Analisis & Laporan</h4>
-                  <p className="text-muted small mx-auto" style={{ maxWidth: '400px' }}>
-                    Laporan penjualan harian, omset laba-rugi, dan ringkasan performa unit usaha Anda dalam bentuk grafik interaktif.
-                  </p>
-                  <button onClick={() => ui.notif('info', 'Modul analisis laporan sedang disiapkan!')} className="tombol-premium mt-2" style={{ fontSize: '0.82rem', padding: '0.45rem 1.25rem' }}>
-                    Unduh Laporan
-                  </button>
-                </div>
-              )}
+                );
+              })()}
 
               {menuAktif === 'pengaturan' && (
                 <div className="kartu-premium fade-in p-4 text-center">

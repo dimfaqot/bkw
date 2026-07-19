@@ -11,6 +11,266 @@ class Manajemen extends ResourceController
 
     protected $format = 'json';
 
+    public function laporanRingkasan()
+    {
+        $penggunaAktif = \App\Modules\Auth\Filters\JWTFilter::getPenggunaAktif();
+        if (!$penggunaAktif) {
+            return $this->failUnauthorized('Akses ditolak. Token tidak valid.');
+        }
+
+        $role = strtolower($penggunaAktif['role'] ?? 'member');
+        $usahaId = $this->request->getVar('usaha_id');
+        $unitId = $this->request->getVar('unit_id');
+
+        // Batasi akses: selain root/owner/supervisor, tidak boleh melihat laporan
+        if (!in_array($role, ['root', 'owner', 'supervisor'])) {
+            return $this->failForbidden('Hanya Owner, Supervisor, atau Root yang diizinkan mengakses laporan keuangan.');
+        }
+
+        // Paksa usaha_id jika bukan root
+        if ($role !== 'root') {
+            $usahaId = $penggunaAktif['usaha_id'];
+        }
+
+        $startDate = $this->request->getVar('start_date') ?: date('Y-m-01');
+        $endDate = $this->request->getVar('end_date') ?: date('Y-m-t');
+
+        $db = \Config\Database::connect();
+
+        // 1. Ambil Data Penjualan (realized revenue)
+        $salesBuilder = $db->table('transaksi')
+                           ->select('transaksi.*, users.nama as nama_kasir, unit.nama_unit')
+                           ->join('users', 'users.id = transaksi.kasir_id', 'left')
+                           ->join('unit', 'unit.id = transaksi.unit_id', 'left')
+                           ->where('transaksi.status_pembayaran', 'lunas')
+                           ->where('transaksi.tanggal >=', $startDate)
+                           ->where('transaksi.tanggal <=', $endDate);
+        if ($usahaId) {
+            $salesBuilder->where('transaksi.usaha_id', $usahaId);
+        }
+        if ($unitId) {
+            $salesBuilder->where('transaksi.unit_id', $unitId);
+        }
+        $sales = $salesBuilder->orderBy('transaksi.tanggal', 'ASC')->get()->getResultArray();
+
+        // 2. Ambil Data Pengeluaran
+        $expenseBuilder = $db->table('pengeluaran')
+                             ->select('pengeluaran.*, unit.nama_unit, users.nama as nama_penanggung_jawab')
+                             ->join('unit', 'unit.id = pengeluaran.unit_id', 'left')
+                             ->join('users', 'users.id = pengeluaran.penanggung_jawab_id', 'left')
+                             ->where('pengeluaran.tanggal >=', $startDate)
+                             ->where('pengeluaran.tanggal <=', $endDate);
+        if ($usahaId) {
+            $expenseBuilder->where('pengeluaran.usaha_id', $usahaId);
+        }
+        if ($unitId) {
+            $expenseBuilder->where('pengeluaran.unit_id', $unitId);
+        }
+        $expenses = $expenseBuilder->orderBy('pengeluaran.tanggal', 'ASC')->get()->getResultArray();
+
+        // 3. Kalkulasi metrik utama
+        $totalSales = 0.00;
+        foreach ($sales as $s) {
+            $totalSales += (float)$s['total_harga'];
+        }
+
+        $totalExpenses = 0.00;
+        $categoryDist = [
+            'Gaji' => 0.00,
+            'Bahan Baku' => 0.00,
+            'Inv' => 0.00,
+            'Operasional' => 0.00,
+            'Lain-lain' => 0.00
+        ];
+        foreach ($expenses as $e) {
+            $nom = (float)$e['nominal_total'];
+            $totalExpenses += $nom;
+            $cat = $e['kategori'] ?? 'Operasional';
+            if (isset($categoryDist[$cat])) {
+                $categoryDist[$cat] += $nom;
+            } else {
+                $categoryDist[$cat] = $nom;
+            }
+        }
+
+        // HPP Estimasi (untuk Kantin)
+        $totalHpp = 0.00;
+        $salesIds = array_column($sales, 'id');
+        if (!empty($salesIds)) {
+            $details = $db->table('transaksi_detail')
+                          ->select('transaksi_detail.qty, produk_jasa.harga_beli')
+                          ->join('produk_jasa', 'produk_jasa.id = transaksi_detail.produk_id')
+                          ->whereIn('transaksi_detail.transaksi_id', $salesIds)
+                          ->get()->getResultArray();
+            foreach ($details as $d) {
+                $totalHpp += ((float)$d['harga_beli'] * (int)$d['qty']);
+            }
+        }
+
+        $labaBersih = $totalSales - $totalExpenses;
+        $marginKeuntungan = $totalSales > 0 ? round(($labaBersih / $totalSales) * 100, 1) : 0;
+
+        // 4. Bangun data harian untuk Grafik SVG
+        $dailyData = [];
+        $tempDate = $startDate;
+        while (strtotime($tempDate) <= strtotime($endDate)) {
+            $dailyData[$tempDate] = [
+                'tanggal' => date('d M', strtotime($tempDate)),
+                'penjualan' => 0.00,
+                'pengeluaran' => 0.00
+            ];
+            $tempDate = date('Y-m-d', strtotime($tempDate . ' +1 day'));
+        }
+
+        foreach ($sales as $s) {
+            $tgl = $s['tanggal'];
+            if (isset($dailyData[$tgl])) {
+                $dailyData[$tgl]['penjualan'] += (float)$s['total_harga'];
+            }
+        }
+        foreach ($expenses as $e) {
+            $tgl = $e['tanggal'];
+            if (isset($dailyData[$tgl])) {
+                $dailyData[$tgl]['pengeluaran'] += (float)$e['nominal_total'];
+            }
+        }
+
+        // 5. Kesimpulan tren bulanan (Bulan ini vs Bulan lalu)
+        $tglStartPrev = date('Y-m-d', strtotime($startDate . ' -1 month'));
+        $tglEndPrev = date('Y-m-d', strtotime($endDate . ' -1 month'));
+
+        $salesPrevBuilder = $db->table('transaksi')
+                               ->selectSum('total_harga')
+                               ->where('status_pembayaran', 'lunas')
+                               ->where('tanggal >=', $tglStartPrev)
+                               ->where('tanggal <=', $tglEndPrev);
+        if ($usahaId) {
+            $salesPrevBuilder->where('usaha_id', $usahaId);
+        }
+        if ($unitId) {
+            $salesPrevBuilder->where('unit_id', $unitId);
+        }
+        $rowSalesPrev = $salesPrevBuilder->get()->getRow();
+        $totalSalesPrev = (float)($rowSalesPrev ? $rowSalesPrev->total_harga : 0);
+
+        $expensesPrevBuilder = $db->table('pengeluaran')
+                                  ->selectSum('nominal_total')
+                                  ->where('tanggal >=', $tglStartPrev)
+                                  ->where('tanggal <=', $tglEndPrev);
+        if ($usahaId) {
+            $expensesPrevBuilder->where('usaha_id', $usahaId);
+        }
+        if ($unitId) {
+            $expensesPrevBuilder->where('unit_id', $unitId);
+        }
+        $rowExpPrev = $expensesPrevBuilder->get()->getRow();
+        $totalExpensesPrev = (float)($rowExpPrev ? $rowExpPrev->nominal_total : 0);
+
+        $labaPrev = $totalSalesPrev - $totalExpensesPrev;
+        
+        $selisihLabaPersen = 0.00;
+        if ($labaPrev != 0) {
+            $selisihLabaPersen = round((($labaBersih - $labaPrev) / abs($labaPrev)) * 100, 1);
+        } else if ($labaBersih > 0) {
+            $selisihLabaPersen = 100.00;
+        }
+
+        $selisihSalesPersen = 0.00;
+        if ($totalSalesPrev > 0) {
+            $selisihSalesPersen = round((($totalSales - $totalSalesPrev) / $totalSalesPrev) * 100, 1);
+        } else if ($totalSales > 0) {
+            $selisihSalesPersen = 100.00;
+        }
+
+        $trenTeks = "";
+        $statusTren = "stabil";
+        if ($selisihLabaPersen > 0) {
+            $statusTren = "naik";
+            $trenTeks = "Laba bersih periode ini meningkat {$selisihLabaPersen}% dibandingkan periode sebelumnya. Kenaikan ini didorong oleh pertumbuhan pendapatan penjualan bersih sebesar {$selisihSalesPersen}%.";
+        } else if ($selisihLabaPersen < 0) {
+            $statusTren = "turun";
+            $trenTeks = "Laba bersih periode ini menurun " . abs($selisihLabaPersen) . "% dibandingkan periode sebelumnya. Mohon evaluasi pembengkakan pos pengeluaran operasional Anda.";
+        } else {
+            $trenTeks = "Laba bersih stabil dan berjalan seimbang dengan performa periode sebelumnya.";
+        }
+
+        // 6. Rekomendasi Bisnis Pintar (Insights)
+        $rekomendasi = [];
+
+        // Rekomendasi 1: Warning stok menipis (khusus unit Kantin/F&B)
+        $stockWarningQuery = $db->table('produk_jasa')
+                               ->where('is_stok_dikelola', 1)
+                               ->where('stok <= stok_minimum');
+        if ($usahaId) {
+            $stockWarningQuery->where('usaha_id', $usahaId);
+        }
+        if ($unitId) {
+            $stockWarningQuery->where('unit_id', $unitId);
+        }
+        $lowStocks = $stockWarningQuery->limit(3)->get()->getResultArray();
+        if (!empty($lowStocks)) {
+            $itemNames = array_column($lowStocks, 'nama_produk');
+            $rekomendasi[] = "Stok barang [" . implode(', ', $itemNames) . "] telah berada di bawah batas minimum. Segera lakukan restok untuk menghindari kekosongan persediaan penjualan.";
+        }
+
+        // Rekomendasi 2: Deteksi hari penjualan terlemah
+        $hariPenjualan = [
+            'Senin' => 0.00, 'Selasa' => 0.00, 'Rabu' => 0.00, 'Kamis' => 0.00,
+            'Jumat' => 0.00, 'Sabtu' => 0.00, 'Minggu' => 0.00
+        ];
+        $hariMap = [
+            'Monday' => 'Senin', 'Tuesday' => 'Selasa', 'Wednesday' => 'Rabu',
+            'Thursday' => 'Kamis', 'Friday' => 'Jumat', 'Saturday' => 'Sabtu',
+            'Sunday' => 'Minggu'
+        ];
+        foreach ($sales as $s) {
+            $dayOfWeek = date('l', strtotime($s['tanggal']));
+            $indonesianDay = $hariMap[$dayOfWeek] ?? 'Senin';
+            $hariPenjualan[$indonesianDay] += (float)$s['total_harga'];
+        }
+        
+        $activeDays = array_filter($hariPenjualan, function($v) { return $v > 0; });
+        if (!empty($activeDays)) {
+            asort($activeDays);
+            $hariTerendah = array_key_first($activeDays);
+            $rekomendasi[] = "Hari {$hariTerendah} mencatatkan penjualan terendah periode ini. Pertimbangkan untuk memberikan promo khusus (Happy Hour/Diskon Member) pada hari {$hariTerendah} guna memicu antusiasme transaksi.";
+        }
+
+        // Rekomendasi 3: Efisiensi pengeluaran
+        if ($totalExpenses > $totalSales && $totalSales > 0) {
+            $rekomendasi[] = "Total pengeluaran saat ini melebihi pendapatan kotor. Disarankan untuk meninjau kembali pengeluaran operasional non-esensial dan meminimalkan pembelian aset/inventaris baru hingga margin pulih.";
+        } else {
+            $rekomendasi[] = "Margin laba bersih Anda saat ini berada pada angka {$marginKeuntungan}%. Kondisi keuangan berjalan sehat, pertahankan konsistensi arus kas masuk.";
+        }
+
+        return $this->respond([
+            'status' => 'sukses',
+            'data' => [
+                'statistik' => [
+                    'total_pendapatan' => $totalSales,
+                    'total_pengeluaran' => $totalExpenses,
+                    'laba_bersih' => $labaBersih,
+                    'estimasi_hpp' => $totalHpp,
+                    'margin_keuntungan' => $marginKeuntungan,
+                    'jumlah_transaksi_sales' => count($sales),
+                    'jumlah_transaksi_expense' => count($expenses),
+                ],
+                'grafik' => array_values($dailyData),
+                'pengeluaran_kategori' => $categoryDist,
+                'tren' => [
+                    'selisih_laba_persen' => $selisihLabaPersen,
+                    'status_tren' => $statusTren,
+                    'teks_kesimpulan' => $trenTeks
+                ],
+                'rekomendasi' => $rekomendasi,
+                'rincian' => [
+                    'penjualan' => $sales,
+                    'pengeluaran' => $expenses
+                ]
+            ]
+        ], 200);
+    }
+
     private $daftarTabel = ['users', 'usaha', 'unit', 'roles', 'user_role', 'menus', 'role_permissions', 'iot', 'iot_alokasi', 'shift', 'jadwal_karyawan', 'absensi', 'kriteria_poin', 'points', 'perizinan', 'lembur', 'kebersihan', 'kebersihan_tugas', 'produk_jasa', 'transaksi', 'transaksi_detail', 'produk_komposisi', 'pengeluaran'];
 
     // Validasi input untuk masing-masing tabel

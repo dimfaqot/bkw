@@ -20,6 +20,7 @@ $routes->get('api/ambil-logo/(:any)', '\App\Modules\Manajemen\Controllers\Manaje
 
 // CRUD Manajemen Rute (Bahasa Indonesia)
 $routes->group('api/manajemen', ['filter' => 'jwt'], function($routes) {
+    $routes->get('laporan-ringkasan', '\App\Modules\Manajemen\Controllers\Manajemen::laporanRingkasan');
     $routes->get('ambil-bukti/perizinan/(:any)', '\App\Modules\Manajemen\Controllers\Manajemen::ambilBuktiPerizinan/$1');
     $routes->group('', ['filter' => 'rbac'], function($routes) {
         $routes->get('ambil/(:segment)', '\App\Modules\Manajemen\Controllers\Manajemen::ambilData/$1');
