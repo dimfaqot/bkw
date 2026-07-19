@@ -8338,51 +8338,70 @@ const Dashboard = () => {
                           </div>
                         </div>
 
-                        {/* ===== HALAMAN 1: RINGKASAN BULANAN PER TAHUN ===== */}
+                        {/* ===== HALAMAN 1: RINGKASAN BULANAN PER UNIT PER TAHUN ===== */}
                         {(laporanData?.ringkasan_bulanan || []).map((tahunData) => {
-                          const totalPend = tahunData.bulan.reduce((s, b) => s + b.pendapatan, 0);
-                          const totalPengl = tahunData.bulan.reduce((s, b) => s + b.pengeluaran, 0);
+                          const totalPend  = tahunData.bulan.reduce((s, b) => s + b.total_pendapatan, 0);
+                          const totalPengl = tahunData.bulan.reduce((s, b) => s + b.total_pengeluaran, 0);
                           const totalSaldo = totalPend - totalPengl;
+                          const fmt = (v) => v > 0 ? v.toLocaleString('id-ID') : v < 0 ? v.toLocaleString('id-ID') : '-';
+                          const fmtSaldo = (v) => v !== 0 ? v.toLocaleString('id-ID') : '-';
+
                           return (
-                            <div key={tahunData.tahun} style={{ marginBottom: '16px' }}>
+                            <div key={tahunData.tahun} style={{ marginBottom: '20px' }}>
+                              {/* Judul Tahun */}
                               <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#111', borderBottom: '1px solid #999', paddingBottom: '4px', marginBottom: '8px' }}>
                                 RINGKASAN KEUANGAN TAHUN {tahunData.tahun}
                               </div>
-                              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+
+                              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.73rem' }}>
                                 <thead>
-                                  <tr style={{ backgroundColor: '#111', color: '#fff' }}>
-                                    <th style={{ padding: '5px 8px', textAlign: 'left', width: '5%' }}>No</th>
-                                    <th style={{ padding: '5px 8px', textAlign: 'left', width: '20%' }}>Bulan</th>
-                                    <th style={{ padding: '5px 8px', textAlign: 'right' }}>Pemasukan (Rp)</th>
-                                    <th style={{ padding: '5px 8px', textAlign: 'right' }}>Pengeluaran (Rp)</th>
-                                    <th style={{ padding: '5px 8px', textAlign: 'right' }}>Saldo (Rp)</th>
+                                  <tr style={{ backgroundColor: '#1e3a5f', color: '#fff' }}>
+                                    <th style={{ padding: '5px 6px', textAlign: 'left', width: '14%', borderRight: '1px solid #355' }}>Bulan</th>
+                                    <th style={{ padding: '5px 6px', textAlign: 'left', width: '14%', borderRight: '1px solid #355' }}>Unit</th>
+                                    <th style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #355' }}>Pemasukan (Rp)</th>
+                                    <th style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #355' }}>Pengeluaran (Rp)</th>
+                                    <th style={{ padding: '5px 6px', textAlign: 'right' }}>Saldo (Rp)</th>
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {tahunData.bulan.map((b, idx) => (
-                                    <tr key={b.bulan} style={{ backgroundColor: idx % 2 === 0 ? '#f9f9f9' : '#fff' }}>
-                                      <td style={{ padding: '4px 8px', borderBottom: '1px solid #eee' }}>{idx + 1}</td>
-                                      <td style={{ padding: '4px 8px', borderBottom: '1px solid #eee', fontWeight: 500 }}>{b.nama_bulan}</td>
-                                      <td style={{ padding: '4px 8px', borderBottom: '1px solid #eee', textAlign: 'right' }}>
-                                        {b.pendapatan > 0 ? b.pendapatan.toLocaleString('id-ID') : '-'}
-                                      </td>
-                                      <td style={{ padding: '4px 8px', borderBottom: '1px solid #eee', textAlign: 'right' }}>
-                                        {b.pengeluaran > 0 ? b.pengeluaran.toLocaleString('id-ID') : '-'}
-                                      </td>
-                                      <td style={{ padding: '4px 8px', borderBottom: '1px solid #eee', textAlign: 'right', color: b.saldo >= 0 ? '#166534' : '#991b1b', fontWeight: 600 }}>
-                                        {b.saldo !== 0 ? b.saldo.toLocaleString('id-ID') : '-'}
-                                      </td>
-                                    </tr>
-                                  ))}
+                                  {tahunData.bulan.map((b, bidx) => {
+                                    const bgBulan = bidx % 2 === 0 ? '#f5f5f5' : '#fff';
+                                    return (
+                                      <React.Fragment key={b.bulan}>
+                                        {/* Baris tiap unit dalam bulan ini */}
+                                        {b.units.map((u, uidx) => (
+                                          <tr key={u.unit_id} style={{ backgroundColor: bgBulan }}>
+                                            {/* Sel Bulan hanya di baris unit pertama (rowspan) */}
+                                            {uidx === 0 && (
+                                              <td rowSpan={b.units.length + 1}
+                                                style={{ padding: '4px 6px', fontWeight: 600, verticalAlign: 'top', borderBottom: '2px solid #ccc', borderRight: '1px solid #ddd', color: '#222' }}>
+                                                {b.nama_bulan}
+                                              </td>
+                                            )}
+                                            <td style={{ padding: '3px 6px', borderBottom: '1px solid #e5e5e5', borderRight: '1px solid #ddd', color: '#444' }}>{u.nama_unit}</td>
+                                            <td style={{ padding: '3px 6px', textAlign: 'right', borderBottom: '1px solid #e5e5e5', borderRight: '1px solid #ddd' }}>{fmt(u.pendapatan)}</td>
+                                            <td style={{ padding: '3px 6px', textAlign: 'right', borderBottom: '1px solid #e5e5e5', borderRight: '1px solid #ddd' }}>{fmt(u.pengeluaran)}</td>
+                                            <td style={{ padding: '3px 6px', textAlign: 'right', borderBottom: '1px solid #e5e5e5', color: u.saldo >= 0 ? '#166534' : '#991b1b', fontWeight: 600 }}>{fmtSaldo(u.saldo)}</td>
+                                          </tr>
+                                        ))}
+                                        {/* Baris TOTAL per bulan */}
+                                        <tr style={{ backgroundColor: '#334155', color: '#fff', fontWeight: 700 }}>
+                                          <td style={{ padding: '4px 6px', borderBottom: '2px solid #ccc', borderRight: '1px solid #4a6' }}>TOTAL</td>
+                                          <td style={{ padding: '4px 6px', textAlign: 'right', borderBottom: '2px solid #ccc', borderRight: '1px solid #4a6' }}>{fmt(b.total_pendapatan)}</td>
+                                          <td style={{ padding: '4px 6px', textAlign: 'right', borderBottom: '2px solid #ccc', borderRight: '1px solid #4a6' }}>{fmt(b.total_pengeluaran)}</td>
+                                          <td style={{ padding: '4px 6px', textAlign: 'right', borderBottom: '2px solid #ccc', color: b.total_saldo >= 0 ? '#86efac' : '#fca5a5' }}>{fmtSaldo(b.total_saldo)}</td>
+                                        </tr>
+                                      </React.Fragment>
+                                    );
+                                  })}
                                 </tbody>
+                                {/* TOTAL TAHUN */}
                                 <tfoot>
                                   <tr style={{ backgroundColor: '#111', color: '#fff', fontWeight: 700 }}>
-                                    <td colSpan={2} style={{ padding: '5px 8px' }}>TOTAL {tahunData.tahun}</td>
-                                    <td style={{ padding: '5px 8px', textAlign: 'right' }}>{totalPend.toLocaleString('id-ID')}</td>
-                                    <td style={{ padding: '5px 8px', textAlign: 'right' }}>{totalPengl.toLocaleString('id-ID')}</td>
-                                    <td style={{ padding: '5px 8px', textAlign: 'right', color: totalSaldo >= 0 ? '#86efac' : '#fca5a5' }}>
-                                      {totalSaldo.toLocaleString('id-ID')}
-                                    </td>
+                                    <td colSpan={2} style={{ padding: '5px 6px', borderRight: '1px solid #555' }}>TOTAL TAHUN {tahunData.tahun}</td>
+                                    <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #555' }}>{totalPend.toLocaleString('id-ID')}</td>
+                                    <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #555' }}>{totalPengl.toLocaleString('id-ID')}</td>
+                                    <td style={{ padding: '5px 6px', textAlign: 'right', color: totalSaldo >= 0 ? '#86efac' : '#fca5a5' }}>{totalSaldo.toLocaleString('id-ID')}</td>
                                   </tr>
                                 </tfoot>
                               </table>
@@ -8390,22 +8409,20 @@ const Dashboard = () => {
                           );
                         })}
 
-                        {/* Grand Total (jika lebih dari 1 tahun) */}
-                        {(laporanData?.ringkasan_bulanan || []).length > 1 && (() => {
-                          const allBulan = (laporanData.ringkasan_bulanan || []).flatMap(t => t.bulan);
-                          const gPend  = allBulan.reduce((s, b) => s + b.pendapatan, 0);
-                          const gPengl = allBulan.reduce((s, b) => s + b.pengeluaran, 0);
+                        {/* Grand Total Keseluruhan (selalu tampil) */}
+                        {(() => {
+                          const allBulan = (laporanData?.ringkasan_bulanan || []).flatMap(t => t.bulan);
+                          const gPend  = allBulan.reduce((s, b) => s + b.total_pendapatan, 0);
+                          const gPengl = allBulan.reduce((s, b) => s + b.total_pengeluaran, 0);
                           const gSaldo = gPend - gPengl;
                           return (
                             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem', marginTop: '4px' }}>
                               <tbody>
-                                <tr style={{ backgroundColor: '#1e3a5f', color: '#fff', fontWeight: 700 }}>
-                                  <td colSpan={2} style={{ padding: '6px 8px', width: '25%' }}>TOTAL KESELURUHAN</td>
-                                  <td style={{ padding: '6px 8px', textAlign: 'right' }}>{gPend.toLocaleString('id-ID')}</td>
-                                  <td style={{ padding: '6px 8px', textAlign: 'right' }}>{gPengl.toLocaleString('id-ID')}</td>
-                                  <td style={{ padding: '6px 8px', textAlign: 'right', color: gSaldo >= 0 ? '#86efac' : '#fca5a5' }}>
-                                    {gSaldo.toLocaleString('id-ID')}
-                                  </td>
+                                <tr style={{ backgroundColor: '#0f172a', color: '#fff', fontWeight: 800 }}>
+                                  <td colSpan={2} style={{ padding: '7px 8px', width: '28%', letterSpacing: '0.5px' }}>TOTAL KESELURUHAN</td>
+                                  <td style={{ padding: '7px 8px', textAlign: 'right' }}>{gPend.toLocaleString('id-ID')}</td>
+                                  <td style={{ padding: '7px 8px', textAlign: 'right' }}>{gPengl.toLocaleString('id-ID')}</td>
+                                  <td style={{ padding: '7px 8px', textAlign: 'right', color: gSaldo >= 0 ? '#86efac' : '#fca5a5' }}>{gSaldo.toLocaleString('id-ID')}</td>
                                 </tr>
                               </tbody>
                             </table>

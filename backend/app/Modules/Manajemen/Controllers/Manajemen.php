@@ -273,7 +273,7 @@ class Manajemen extends ResourceController
         }
 
         // ---------------------------------------------------------------
-        // Ringkasan Bulanan per Tahun (untuk halaman pertama cetak PDF)
+        // Ringkasan Bulanan per Tahun dengan Rincian per Unit
         // ---------------------------------------------------------------
         $startYear = (int)date('Y', strtotime($startDate));
         $endYear   = (int)date('Y', strtotime($endDate));
@@ -284,47 +284,78 @@ class Manajemen extends ResourceController
             9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
         ];
 
+        // Ambil semua unit milik usaha ini
+        $unitsQuery = $db->table('unit')->select('id, nama_unit');
+        if ($usahaId) $unitsQuery->where('usaha_id', $usahaId);
+        if ($unitId)  $unitsQuery->where('id', $unitId);
+        $allUnits = $unitsQuery->orderBy('id', 'ASC')->get()->getResultArray();
+
         $ringkasanBulanan = [];
 
         for ($year = $startYear; $year <= $endYear; $year++) {
+
+            // Query penjualan dikelompokkan bulan & unit (1 query)
+            $penjualanQ = $db->table('transaksi')
+                ->select('MONTH(created_at) as bulan, unit_id, SUM(total_harga) as total')
+                ->where('status_pembayaran', 'lunas')
+                ->where('YEAR(created_at)', $year);
+            if ($usahaId) $penjualanQ->where('usaha_id', $usahaId);
+            if ($unitId)  $penjualanQ->where('unit_id', $unitId);
+            $penjualanRows = $penjualanQ->groupBy(['MONTH(created_at)', 'unit_id'])->get()->getResultArray();
+
+            // Query pengeluaran dikelompokkan bulan & unit (1 query)
+            $pengeluaranQ = $db->table('pengeluaran')
+                ->select('MONTH(tanggal) as bulan, unit_id, SUM(nominal_total) as total')
+                ->where('YEAR(tanggal)', $year);
+            if ($usahaId) $pengeluaranQ->where('usaha_id', $usahaId);
+            if ($unitId)  $pengeluaranQ->where('unit_id', $unitId);
+            $pengeluaranRows = $pengeluaranQ->groupBy(['MONTH(tanggal)', 'unit_id'])->get()->getResultArray();
+
+            // Buat lookup map [bulan][unit_id] => total
+            $mapPenjualan   = [];
+            foreach ($penjualanRows as $r) {
+                $mapPenjualan[(int)$r['bulan']][(int)$r['unit_id']] = (float)$r['total'];
+            }
+            $mapPengeluaran = [];
+            foreach ($pengeluaranRows as $r) {
+                $mapPengeluaran[(int)$r['bulan']][(int)$r['unit_id']] = (float)$r['total'];
+            }
+
             $bulanList = [];
-
             for ($m = 1; $m <= 12; $m++) {
-                $mStr      = str_pad($m, 2, '0', STR_PAD_LEFT);
-                $mStart    = "{$year}-{$mStr}-01";
-                $mEnd      = date('Y-m-t', mktime(0, 0, 0, $m, 1, $year));
+                $unitRows  = [];
+                $totPend   = 0.0;
+                $totPengl  = 0.0;
 
-                // Penjualan bulan ini
-                $penjualanQ = $db->table('transaksi')
-                                ->selectSum('total_harga', 'total')
-                                ->where('status_pembayaran', 'lunas')
-                                ->where('DATE(created_at) >=', $mStart)
-                                ->where('DATE(created_at) <=', $mEnd);
-                if ($usahaId) $penjualanQ->where('usaha_id', $usahaId);
-                if ($unitId)  $penjualanQ->where('unit_id', $unitId);
-                $penjualanBulan = (float)($penjualanQ->get()->getRow()->total ?? 0);
-
-                // Pengeluaran bulan ini
-                $pengeluaranQ = $db->table('pengeluaran')
-                                ->selectSum('nominal_total', 'total')
-                                ->where('tanggal >=', $mStart)
-                                ->where('tanggal <=', $mEnd);
-                if ($usahaId) $pengeluaranQ->where('usaha_id', $usahaId);
-                if ($unitId)  $pengeluaranQ->where('unit_id', $unitId);
-                $pengeluaranBulan = (float)($pengeluaranQ->get()->getRow()->total ?? 0);
+                foreach ($allUnits as $unit) {
+                    $uid  = (int)$unit['id'];
+                    $pend = $mapPenjualan[$m][$uid] ?? 0.0;
+                    $pengl = $mapPengeluaran[$m][$uid] ?? 0.0;
+                    $totPend  += $pend;
+                    $totPengl += $pengl;
+                    $unitRows[] = [
+                        'unit_id'     => $uid,
+                        'nama_unit'   => $unit['nama_unit'],
+                        'pendapatan'  => $pend,
+                        'pengeluaran' => $pengl,
+                        'saldo'       => $pend - $pengl,
+                    ];
+                }
 
                 $bulanList[] = [
-                    'bulan'       => $m,
-                    'nama_bulan'  => $namaBulanId[$m],
-                    'pendapatan'  => $penjualanBulan,
-                    'pengeluaran' => $pengeluaranBulan,
-                    'saldo'       => $penjualanBulan - $pengeluaranBulan,
+                    'bulan'            => $m,
+                    'nama_bulan'       => $namaBulanId[$m],
+                    'units'            => $unitRows,
+                    'total_pendapatan' => $totPend,
+                    'total_pengeluaran'=> $totPengl,
+                    'total_saldo'      => $totPend - $totPengl,
                 ];
             }
 
             $ringkasanBulanan[] = [
-                'tahun' => $year,
-                'bulan' => $bulanList,
+                'tahun'      => $year,
+                'nama_units' => array_column($allUnits, 'nama_unit'),
+                'bulan'      => $bulanList,
             ];
         }
 
