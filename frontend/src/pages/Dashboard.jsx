@@ -1227,7 +1227,14 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
                     placeholder="Pilih produk untuk restok..."
                     value={formState.produk_id || ''}
                     onChange={handleChange}
-                    options={opsiProduk.map(p => ({ value: p.id, label: `${p.nama_produk} (Stok: ${p.stok || 0} ${p.satuan})` }))}
+                    options={opsiProduk
+                      .filter(p => {
+                        const kelolaStok = p.is_stok_dikelola == 1 || p.is_stok_dikelola === '1';
+                        const matchUnit = !formState.unit_id || p.unit_id == formState.unit_id;
+                        return kelolaStok && matchUnit;
+                      })
+                      .map(p => ({ value: p.id, label: `${p.nama_produk} (Stok: ${p.stok || 0} ${p.satuan})` }))
+                    }
                   />
                 </div>
                 <div className="row g-2 mt-2">
