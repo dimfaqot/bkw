@@ -623,7 +623,8 @@ class Manajemen extends ResourceController
                 'butuh_persiapan'  => 'permit_empty|in_list[0,1]',
                 'satuan'           => 'permit_empty',
                 'komisi_tipe'      => 'permit_empty|in_list[persen,nominal]',
-                'komisi_nilai'     => 'permit_empty|numeric'
+                'komisi_nilai'     => 'permit_empty|numeric',
+                'iot_id'           => 'permit_empty|numeric'
             ];
         } else if ($tabel === 'transaksi') {
             $aturan = [
@@ -802,7 +803,7 @@ class Manajemen extends ResourceController
         }
         // JOIN relasi untuk iot_alokasi agar response mengandung nama perangkat & unit
         if ($tabel === 'iot_alokasi') {
-            $builder->select('iot_alokasi.*, iot.nama_perangkat, iot.tipe_perangkat, iot.mac_address, iot.is_aktif as iot_is_aktif, unit.nama_unit, usaha.nama_usaha')
+            $builder->select('iot_alokasi.*, iot.nama_perangkat, iot.tipe_perangkat, iot.mac_address, iot.is_aktif as iot_is_aktif, unit.nama_unit, unit.kategori as kategori_unit, usaha.nama_usaha')
                     ->join('iot', 'iot.id = iot_alokasi.iot_id', 'left')
                     ->join('unit', 'unit.id = iot_alokasi.unit_id', 'left')
                     ->join('usaha', 'usaha.id = iot_alokasi.usaha_id', 'left');

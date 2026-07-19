@@ -87,6 +87,13 @@ $routes->group('api/transaksi', ['filter' => 'jwt'], function($routes) {
     $routes->get('job-board', '\App\Modules\Manajemen\Controllers\Transaksi::jobBoard');
     $routes->post('job-board/klaim/(:num)', '\App\Modules\Manajemen\Controllers\Transaksi::klaimJob/$1');
     $routes->post('job-board/selesai/(:num)', '\App\Modules\Manajemen\Controllers\Transaksi::selesaiJob/$1');
+
+    // Billiard & PlayStation IoT Billing
+    $routes->post('billiard/mulai', '\App\Modules\Manajemen\Controllers\Transaksi::mulaiBilliard');
+    $routes->post('billiard/stop', '\App\Modules\Manajemen\Controllers\Transaksi::stopBilliard');
+    $routes->post('billiard/tambah-durasi', '\App\Modules\Manajemen\Controllers\Transaksi::tambahDurasiBilliard');
+    $routes->post('billiard/kedip', '\App\Modules\Manajemen\Controllers\Transaksi::kedipBilliard');
+    $routes->get('billiard/status', '\App\Modules\Manajemen\Controllers\Transaksi::statusBilliard');
 });
 
 // Rute Transaksi Publik (tanpa JWT filter untuk Nota digital Opsi B)

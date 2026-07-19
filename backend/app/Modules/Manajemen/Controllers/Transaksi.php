@@ -717,6 +717,8 @@ class Transaksi extends ResourceController
                'updated_at'        => $dateTimeNow
            ]);
 
+        $this->matikanLampuBilliardJikaLunas($db, $id, $dateTimeNow);
+
         $db->transComplete();
 
         if ($db->transStatus() === false) {
@@ -1086,10 +1088,485 @@ class Transaksi extends ResourceController
             $karyawanIds = array_column($allEmployees, 'user_id');
         }
 
-        if ($pelangganId) {
-            $karyawanIds[] = (int)$pelangganId;
+        return array_unique(array_map('intval', $karyawanIds));
+    }
+
+    // ==========================================
+    // BILLIARD & PLAYSTATION BILLING & TIMER
+    // ==========================================
+
+    public function statusBilliard()
+    {
+        $penggunaAktif = \App\Modules\Auth\Filters\JWTFilter::getPenggunaAktif();
+        if (!$penggunaAktif) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Token tidak valid.'], 401);
         }
 
-        return array_unique(array_map('intval', $karyawanIds));
+        $usahaId = $penggunaAktif['usaha_id'];
+        $unitId = $this->request->getGet('unit_id');
+
+        if (!$unitId) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Parameter unit_id wajib.'], 400);
+        }
+
+        $db = \Config\Database::connect();
+
+        $alokasi = $db->table('iot_alokasi al')
+                      ->select('al.*, i.nama_perangkat, i.tipe_perangkat, i.ip_address')
+                      ->join('iot i', 'i.id = al.iot_id')
+                      ->where('al.unit_id', $unitId)
+                      ->where('al.usaha_id', $usahaId)
+                      ->where('al.is_aktif', 1)
+                      ->get()->getResultArray();
+
+        $now = time();
+        $updatedList = [];
+
+        foreach ($alokasi as $al) {
+            $device = $al;
+            $device['sisa_detik'] = 0;
+            $device['durasi_berjalan_detik'] = 0;
+            $device['akumulasi_biaya'] = 0;
+
+            if ($al['status_penggunaan'] === 'dipakai' && $al['waktu_mulai']) {
+                $startTime = strtotime($al['waktu_mulai']);
+                $elapsed = $now - $startTime;
+                if ($elapsed < 0) $elapsed = 0;
+
+                if ($al['prepaid_durasi_menit'] > 0) {
+                    $totalLimit = $al['prepaid_durasi_menit'] * 60;
+                    $remaining = $totalLimit - $elapsed;
+
+                    if ($remaining <= 0) {
+                        $this->eksekusiAutoStop($db, $al['id']);
+                        $device['status_relay'] = 0;
+                        $device['status_penggunaan'] = 'tersedia';
+                        $device['transaksi_aktif_id'] = null;
+                        $device['sisa_detik'] = 0;
+                    } else {
+                        $device['sisa_detik'] = $remaining;
+                        if ($remaining <= 300 && (int)$al['warning_sent'] === 0) {
+                            $db->table('iot_alokasi')->where('id', $al['id'])->update(['warning_sent' => 1]);
+                            $this->pemicuKedip($al['ip_address']);
+                            $device['warning_sent'] = 1;
+                        }
+                    }
+                } else {
+                    $device['durasi_berjalan_detik'] = $elapsed;
+                    if ($al['transaksi_aktif_id']) {
+                        $detail = $db->table('transaksi_detail')
+                                    ->where('transaksi_id', $al['transaksi_aktif_id'])
+                                    ->get()->getRow();
+                        if ($detail) {
+                            $hargaSatuan = (float)$detail->harga_satuan;
+                            $device['akumulasi_biaya'] = round((($elapsed / 60) / 60) * $hargaSatuan);
+                        }
+                    }
+                }
+            } else if ($al['status_penggunaan'] === 'selesai_menunggu_pembayaran') {
+                if ($al['transaksi_aktif_id']) {
+                    $detail = $db->table('transaksi_detail')
+                                ->where('transaksi_id', $al['transaksi_aktif_id'])
+                                ->get()->getRow();
+                    if ($detail) {
+                        $device['akumulasi_biaya'] = (float)$detail->subtotal;
+                        $device['durasi_berjalan_detik'] = (int)($detail->qty * 3600);
+                    }
+                }
+            }
+
+            $updatedList[] = $device;
+        }
+
+        return $this->respond(['status' => 'sukses', 'data' => $updatedList]);
+    }
+
+    public function mulaiBilliard()
+    {
+        $penggunaAktif = \App\Modules\Auth\Filters\JWTFilter::getPenggunaAktif();
+        if (!$penggunaAktif) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Token tidak valid.'], 401);
+        }
+
+        $kasirId = $penggunaAktif['uid'];
+        $usahaId = $penggunaAktif['usaha_id'];
+
+        $input = $this->request->getJSON(true) ?: $this->request->getPost();
+        $alokasiId = $input['iot_alokasi_id'] ?? null;
+        $tipeBilling = $input['tipe_billing'] ?? 'open';
+        $durasiMenit = isset($input['durasi_menit']) ? (int)$input['durasi_menit'] : 0;
+        $produkId = $input['produk_id'] ?? null;
+
+        if (!$alokasiId || !$produkId) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Alokasi perangkat dan Produk Sewa wajib ditentukan.'], 400);
+        }
+
+        if ($tipeBilling === 'regular' && $durasiMenit <= 0) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Durasi bermain regular wajib diisi.'], 400);
+        }
+
+        $db = \Config\Database::connect();
+
+        $alokasi = $db->table('iot_alokasi')->where('id', $alokasiId)->where('usaha_id', $usahaId)->get()->getRow();
+        if (!$alokasi || $alokasi->status_penggunaan !== 'tersedia') {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Perangkat/meja sedang digunakan atau tidak tersedia.'], 400);
+        }
+
+        $produk = $db->table('produk_jasa')->where('id', $produkId)->where('usaha_id', $usahaId)->get()->getRow();
+        if (!$produk) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Produk Sewa tidak ditemukan.'], 404);
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $db->transStart();
+
+        $nomorInvoice = 'INV/BILLIARD/' . date('Ymd') . '/' . sprintf('%04d', rand(1, 9999));
+        
+        $db->table('transaksi')->insert([
+            'usaha_id'          => $usahaId,
+            'unit_id'           => $alokasi->unit_id,
+            'nomor_invoice'     => $nomorInvoice,
+            'kasir_id'          => $kasirId,
+            'pelanggan_id'      => null,
+            'total_harga'       => 0.00,
+            'uang_jaminan'      => 0.00,
+            'status_pembayaran' => 'belum_bayar',
+            'metode_pembayaran' => null,
+            'created_at'        => $now,
+            'updated_at'        => $now
+        ]);
+
+        $transaksiId = $db->insertID();
+
+        $qty = ($tipeBilling === 'regular') ? round($durasiMenit / 60, 2) : 0.00;
+        $subtotal = $qty * (float)$produk->harga_jual;
+
+        $db->table('transaksi_detail')->insert([
+            'transaksi_id'      => $transaksiId,
+            'produk_id'         => $produkId,
+            'qty'               => $qty,
+            'harga_satuan'      => $produk->harga_jual,
+            'subtotal'          => $subtotal,
+            'status_pengerjaan' => 'Selesai',
+            'created_at'        => $now,
+            'updated_at'        => $now
+        ]);
+
+        if ($tipeBilling === 'regular') {
+            $db->table('transaksi')->where('id', $transaksiId)->update([
+                'total_harga' => $subtotal
+            ]);
+        }
+
+        $db->table('iot_alokasi')->where('id', $alokasiId)->update([
+            'status_relay'         => 1,
+            'status_penggunaan'    => 'dipakai',
+            'transaksi_aktif_id'   => $transaksiId,
+            'prepaid_durasi_menit' => ($tipeBilling === 'regular') ? $durasiMenit : null,
+            'waktu_mulai'          => $now,
+            'warning_sent'         => 0,
+            'updated_at'           => $now
+        ]);
+
+        $db->transComplete();
+
+        if ($db->transStatus() === false) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Gagal memulai sesi.'], 500);
+        }
+
+        $device = $db->table('iot')->where('id', $alokasi->iot_id)->get()->getRow();
+        if ($device && $device->ip_address) {
+            $this->kirimSinyalRelay($device->ip_address, 'on');
+        }
+
+        return $this->respond([
+            'status' => 'sukses',
+            'pesan'  => 'Sesi billing sewa berhasil dimulai!',
+            'data'   => [
+                'transaksi_id' => $transaksiId,
+                'invoice'      => $nomorInvoice
+            ]
+        ]);
+    }
+
+    public function tambahDurasiBilliard()
+    {
+        $penggunaAktif = \App\Modules\Auth\Filters\JWTFilter::getPenggunaAktif();
+        if (!$penggunaAktif) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Token tidak valid.'], 401);
+        }
+
+        $usahaId = $penggunaAktif['usaha_id'];
+
+        $input = $this->request->getJSON(true) ?: $this->request->getPost();
+        $alokasiId = $input['iot_alokasi_id'] ?? null;
+        $tambahanMenit = isset($input['tambahan_menit']) ? (int)$input['tambahan_menit'] : 0;
+
+        if (!$alokasiId || $tambahanMenit <= 0) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'ID alokasi dan tambahan durasi wajib diisi.'], 400);
+        }
+
+        $db = \Config\Database::connect();
+
+        $alokasi = $db->table('iot_alokasi')->where('id', $alokasiId)->where('usaha_id', $usahaId)->get()->getRow();
+        if (!$alokasi || $alokasi->status_penggunaan !== 'dipakai' || !$alokasi->prepaid_durasi_menit) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Hanya sesi regular aktif yang dapat ditambahkan durasi.'], 400);
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $db->transStart();
+
+        $durasiBaru = $alokasi->prepaid_durasi_menit + $tambahanMenit;
+        $db->table('iot_alokasi')->where('id', $alokasiId)->update([
+            'prepaid_durasi_menit' => $durasiBaru,
+            'warning_sent'         => 0,
+            'updated_at'           => $now
+        ]);
+
+        if ($alokasi->transaksi_aktif_id) {
+            $detail = $db->table('transaksi_detail')->where('transaksi_id', $alokasi->transaksi_aktif_id)->get()->getRow();
+            if ($detail) {
+                $qtyBaru = round($durasiBaru / 60, 2);
+                $subtotalBaru = $qtyBaru * (float)$detail->harga_satuan;
+
+                $db->table('transaksi_detail')->where('id', $detail->id)->update([
+                    'qty'        => $qtyBaru,
+                    'subtotal'   => $subtotalBaru,
+                    'updated_at' => $now
+                ]);
+
+                $db->table('transaksi')->where('id', $alokasi->transaksi_aktif_id)->update([
+                    'total_harga' => $subtotalBaru,
+                    'updated_at'  => $now
+                ]);
+            }
+        }
+
+        $db->transComplete();
+
+        if ($db->transStatus() === false) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Gagal menambahkan durasi.'], 500);
+        }
+
+        return $this->respond(['status' => 'sukses', 'pesan' => "Durasi sewa berhasil ditambah $tambahanMenit menit."]);
+    }
+
+    public function kedipBilliard()
+    {
+        $penggunaAktif = \App\Modules\Auth\Filters\JWTFilter::getPenggunaAktif();
+        if (!$penggunaAktif) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Token tidak valid.'], 401);
+        }
+
+        $input = $this->request->getJSON(true) ?: $this->request->getPost();
+        $alokasiId = $input['iot_alokasi_id'] ?? null;
+
+        if (!$alokasiId) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Parameter iot_alokasi_id wajib.'], 400);
+        }
+
+        $db = \Config\Database::connect();
+        $alokasi = $db->table('iot_alokasi al')
+                      ->select('al.*, i.ip_address')
+                      ->join('iot i', 'i.id = al.iot_id')
+                      ->where('al.id', $alokasiId)
+                      ->get()->getRow();
+
+        if ($alokasi && $alokasi->ip_address) {
+            $this->pemicuKedip($alokasi->ip_address);
+        }
+
+        return $this->respond(['status' => 'sukses', 'pesan' => 'Kedipan berhasil dipicu.']);
+    }
+
+    public function stopBilliard()
+    {
+        $penggunaAktif = \App\Modules\Auth\Filters\JWTFilter::getPenggunaAktif();
+        if (!$penggunaAktif) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Token tidak valid.'], 401);
+        }
+
+        $usahaId = $penggunaAktif['usaha_id'];
+
+        $input = $this->request->getJSON(true) ?: $this->request->getPost();
+        $alokasiId = $input['iot_alokasi_id'] ?? null;
+
+        if (!$alokasiId) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Parameter iot_alokasi_id wajib.'], 400);
+        }
+
+        $db = \Config\Database::connect();
+
+        $alokasi = $db->table('iot_alokasi')->where('id', $alokasiId)->where('usaha_id', $usahaId)->get()->getRow();
+        if (!$alokasi || $alokasi->status_penggunaan !== 'dipakai') {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Meja/perangkat tidak sedang digunakan.'], 400);
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $db->transStart();
+
+        $startTime = strtotime($alokasi->waktu_mulai);
+        $elapsedMinutes = ceil((time() - $startTime) / 60);
+        if ($elapsedMinutes < 1) $elapsedMinutes = 1;
+
+        if ($alokasi->prepaid_durasi_menit > 0 && $elapsedMinutes > $alokasi->prepaid_durasi_menit) {
+            $elapsedMinutes = $alokasi->prepaid_durasi_menit;
+        }
+
+        $transaksiId = $alokasi->transaksi_aktif_id;
+        if ($transaksiId) {
+            $detail = $db->table('transaksi_detail')->where('transaksi_id', $transaksiId)->get()->getRow();
+            if ($detail) {
+                $qty = round($elapsedMinutes / 60, 2);
+                $subtotal = $qty * (float)$detail->harga_satuan;
+
+                $db->table('transaksi_detail')->where('id', $detail->id)->update([
+                    'qty'        => $qty,
+                    'subtotal'   => $subtotal,
+                    'updated_at' => $now
+                ]);
+
+                $db->table('transaksi')->where('id', $transaksiId)->update([
+                    'total_harga' => $subtotal,
+                    'updated_at'  => $now
+                ]);
+            }
+        }
+
+        $isRegular = ($alokasi->prepaid_durasi_menit > 0);
+        $statusRelayBaru = $isRegular ? 0 : 1;
+        $statusPenggunaanBaru = $isRegular ? 'tersedia' : 'selesai_menunggu_pembayaran';
+
+        $updateData = [
+            'status_relay'      => $statusRelayBaru,
+            'status_penggunaan' => $statusPenggunaanBaru,
+            'updated_at'        => $now
+        ];
+
+        if ($isRegular) {
+            $updateData['transaksi_aktif_id']   = null;
+            $updateData['prepaid_durasi_menit'] = null;
+            $updateData['waktu_mulai']          = null;
+            $updateData['warning_sent']         = 0;
+        }
+
+        $db->table('iot_alokasi')->where('id', $alokasiId)->update($updateData);
+
+        $db->transComplete();
+
+        if ($db->transStatus() === false) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Gagal menghentikan sewa.'], 500);
+        }
+
+        if ($isRegular) {
+            $device = $db->table('iot')->where('id', $alokasi->iot_id)->get()->getRow();
+            if ($device && $device->ip_address) {
+                $this->kirimSinyalRelay($device->ip_address, 'off');
+            }
+        }
+
+        return $this->respond([
+            'status' => 'sukses',
+            'pesan'  => 'Sesi billing sewa berhasil dihentikan.',
+            'data'   => [
+                'transaksi_id' => $transaksiId,
+                'is_regular'   => $isRegular
+            ]
+        ]);
+    }
+
+    private function eksekusiAutoStop($db, $alokasiId)
+    {
+        $alokasi = $db->table('iot_alokasi')->where('id', $alokasiId)->get()->getRow();
+        if (!$alokasi || $alokasi->status_penggunaan !== 'dipakai') {
+            return;
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $db->transStart();
+
+        $startTime = strtotime($alokasi->waktu_mulai);
+        $elapsedMinutes = ceil((time() - $startTime) / 60);
+        if ($alokasi->prepaid_durasi_menit > 0 && $elapsedMinutes > $alokasi->prepaid_durasi_menit) {
+            $elapsedMinutes = $alokasi->prepaid_durasi_menit;
+        }
+
+        if ($alokasi->transaksi_aktif_id) {
+            $detail = $db->table('transaksi_detail')->where('transaksi_id', $alokasi->transaksi_aktif_id)->get()->getRow();
+            if ($detail) {
+                $qty = round($elapsedMinutes / 60, 2);
+                $subtotal = $qty * (float)$detail->harga_satuan;
+
+                $db->table('transaksi_detail')->where('id', $detail->id)->update([
+                    'qty'        => $qty,
+                    'subtotal'   => $subtotal,
+                    'updated_at' => $now
+                ]);
+
+                $db->table('transaksi')->where('id', $alokasi->transaksi_aktif_id)->update([
+                    'total_harga' => $subtotal,
+                    'updated_at'  => $now
+                ]);
+            }
+        }
+
+        $db->table('iot_alokasi')->where('id', $alokasiId)->update([
+            'status_relay'         => 0,
+            'status_penggunaan'    => 'tersedia',
+            'transaksi_aktif_id'   => null,
+            'prepaid_durasi_menit' => null,
+            'waktu_mulai'          => null,
+            'warning_sent'         => 0,
+            'updated_at'           => $now
+        ]);
+
+        $db->transComplete();
+
+        $device = $db->table('iot')->where('id', $alokasi->iot_id)->get()->getRow();
+        if ($device && $device->ip_address) {
+            $this->kirimSinyalRelay($device->ip_address, 'off');
+        }
+    }
+
+    private function matikanLampuBilliardJikaLunas($db, $transaksiId, $now)
+    {
+        $alokasi = $db->table('iot_alokasi')
+                      ->where('transaksi_aktif_id', $transaksiId)
+                      ->where('status_penggunaan', 'selesai_menunggu_pembayaran')
+                      ->get()->getRow();
+
+        if ($alokasi) {
+            $db->table('iot_alokasi')->where('id', $alokasi->id)->update([
+                'status_relay'         => 0,
+                'status_penggunaan'    => 'tersedia',
+                'transaksi_aktif_id'   => null,
+                'prepaid_durasi_menit' => null,
+                'waktu_mulai'          => null,
+                'warning_sent'         => 0,
+                'updated_at'           => $now
+            ]);
+
+            $device = $db->table('iot')->where('id', $alokasi->iot_id)->get()->getRow();
+            if ($device && $device->ip_address) {
+                $this->kirimSinyalRelay($device->ip_address, 'off');
+            }
+        }
+    }
+
+    private function pemicuKedip($ipAddress)
+    {
+        $this->kirimSinyalRelay($ipAddress, 'off');
+        usleep(1500000);
+        $this->kirimSinyalRelay($ipAddress, 'on');
+    }
+
+    private function kirimSinyalRelay($ipAddress, $status)
+    {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, "http://" . $ipAddress . "/relay/" . $status);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 2);
+        curl_exec($ch);
+        curl_close($ch);
     }
 }

@@ -1002,6 +1002,29 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
                   <label className="form-label small fw-semibold">Satuan</label>
                   <input type="text" name="satuan" className="form-control input-premium" value={formState.satuan ?? 'pcs'} onChange={handleChange} placeholder="pcs, porsi, jam, hari" />
                 </div>
+                {formState.tipe === 'sewa' && (
+                  <div className="mt-3">
+                    <label className="form-label small fw-semibold">Hubungkan ke Perangkat IoT (Relay / TV)</label>
+                    <select
+                      name="iot_id"
+                      className="form-select input-premium"
+                      value={formState.iot_id || ''}
+                      onChange={handleChange}
+                    >
+                      <option value="">-- Pilih Perangkat IoT --</option>
+                      {opsiAlokasi
+                        .filter(a => String(a.unit_id) === String(formState.unit_id))
+                        .map(a => (
+                          <option key={a.iot_id} value={a.iot_id}>
+                            🔌 {a.nama_perangkat} ({a.tipe_perangkat?.toUpperCase()})
+                          </option>
+                        ))}
+                    </select>
+                    <div className="text-muted" style={{ fontSize: '0.68rem' }}>
+                      Perangkat yang muncul di atas adalah yang sudah dialokasikan ke Unit Cabang ini di menu Alokasi IoT.
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </>
@@ -3138,6 +3161,7 @@ const Dashboard = () => {
   // State khusus untuk Kasir POS
   const [posProducts, setPosProducts] = useState([]);
   const [posStaff, setPosStaff] = useState([]);
+  const [billiardDevices, setBilliardDevices] = useState([]);
   const [posLoading, setPosLoading] = useState(false);
   const [cart, setCart] = useState([]);
   const [searchProductQuery, setSearchProductQuery] = useState('');
@@ -3355,7 +3379,7 @@ const Dashboard = () => {
       const unitMap = {};
       dAlokasi.forEach(a => {
         if (a.unit_id && a.nama_unit && !unitMap[a.unit_id]) {
-          unitMap[a.unit_id] = { id: a.unit_id, nama_unit: a.nama_unit, usaha_id: a.usaha_id };
+          unitMap[a.unit_id] = { id: a.unit_id, nama_unit: a.nama_unit, usaha_id: a.usaha_id, kategori: a.kategori_unit };
         }
       });
       setOpsiUnit(Object.values(unitMap));
@@ -3849,6 +3873,364 @@ const Dashboard = () => {
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const fetchBilliardStatus = async () => {
+    if (!filterUnitPos) return;
+    try {
+      const token = localStorage.getItem('token');
+      const r = await fetch(`${API_BASE_URL}/transaksi/billiard/status?unit_id=${filterUnitPos}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const json = await r.json();
+      if (r.ok && json.status === 'sukses') {
+        setBilliardDevices(json.data || []);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    if (menuAktif !== 'kasir' || !filterUnitPos) {
+      setBilliardDevices([]);
+      return;
+    }
+
+    const unitObj = opsiUnit.find(u => String(u.id) === String(filterUnitPos));
+    if (!unitObj || (unitObj.kategori !== 'billiard' && unitObj.kategori !== 'sewa')) {
+      setBilliardDevices([]);
+      return;
+    }
+
+    fetchBilliardStatus();
+    const interval = setInterval(fetchBilliardStatus, 8000);
+    return () => {
+      clearInterval(interval);
+    };
+  }, [menuAktif, filterUnitPos, opsiUnit]);
+
+  const submitMulaiBilliard = async () => {
+    if (!selectedBilliardAlokasi || !billiardProdukId) {
+      ui.notif('gagal', 'Harap lengkapi isian.');
+      return;
+    }
+    ui.loading(true, 'fullscreen', 'Memulai timer...');
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE_URL}/transaksi/billiard/mulai`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          iot_alokasi_id: selectedBilliardAlokasi.id,
+          tipe_billing: billiardTipeBilling,
+          durasi_menit: billiardTipeBilling === 'regular' ? Number(billiardDurasiMenit) : 0,
+          produk_id: Number(billiardProdukId)
+        })
+      });
+      const json = await res.json();
+      ui.loading(false);
+      if (res.ok && json.status === 'sukses') {
+        ui.notif('sukses', json.pesan || 'Timer berhasil dimulai!');
+        setShowMulaiBilliardModal(false);
+        fetchBilliardStatus();
+        fetchRiwayatTransaksi();
+      } else {
+        ui.notif('gagal', json.pesan || 'Gagal memulai timer.');
+      }
+    } catch {
+      ui.loading(false);
+      ui.notif('gagal', 'Kesalahan koneksi internet.');
+    }
+  };
+
+  const submitTambahDurasi = async () => {
+    if (!selectedBilliardAlokasi || billiardTambahanMenit <= 0) {
+      ui.notif('gagal', 'Durasi tambahan tidak valid.');
+      return;
+    }
+    ui.loading(true, 'fullscreen', 'Menambahkan durasi...');
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE_URL}/transaksi/billiard/tambah-durasi`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          iot_alokasi_id: selectedBilliardAlokasi.id,
+          tambahan_menit: Number(billiardTambahanMenit)
+        })
+      });
+      const json = await res.json();
+      ui.loading(false);
+      if (res.ok && json.status === 'sukses') {
+        ui.notif('sukses', json.pesan || 'Durasi sewa berhasil ditambahkan!');
+        setShowTambahDurasiModal(false);
+        fetchBilliardStatus();
+        fetchRiwayatTransaksi();
+      } else {
+        ui.notif('gagal', json.pesan || 'Gagal menambah durasi.');
+      }
+    } catch {
+      ui.loading(false);
+      ui.notif('gagal', 'Kesalahan koneksi internet.');
+    }
+  };
+
+  const handleStopBilliard = async (alokasi) => {
+    const konf = await ui.notif('konfirmasi', `Apakah Anda yakin ingin menghentikan timer untuk ${alokasi.nama_perangkat}?`);
+    if (!konf) return;
+
+    ui.loading(true, 'fullscreen', 'Menghentikan timer...');
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE_URL}/transaksi/billiard/stop`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          iot_alokasi_id: alokasi.id
+        })
+      });
+      const json = await res.json();
+      ui.loading(false);
+      if (res.ok && json.status === 'sukses') {
+        ui.notif('sukses', json.pesan || 'Timer berhasil dihentikan!');
+        fetchBilliardStatus();
+        fetchRiwayatTransaksi();
+
+        if (json.data && json.data.transaksi_id) {
+          const detailRes = await fetch(`${API_BASE_URL}/transaksi-publik/detail/${json.data.transaksi_id}`);
+          const detailJson = await detailRes.json();
+          if (detailRes.ok && detailJson.status === 'sukses') {
+            setSelectedTransaksi(detailJson.data);
+            setShowDetailNotaModal(true);
+          }
+        }
+      } else {
+        ui.notif('gagal', json.pesan || 'Gagal menghentikan timer.');
+      }
+    } catch {
+      ui.loading(false);
+      ui.notif('gagal', 'Kesalahan koneksi internet.');
+    }
+  };
+
+  const bukaModalMulaiBilliard = (dev) => {
+    const linkedProd = posProducts.find(p => Number(p.iot_id) === Number(dev.iot_id));
+    let initialProdukId = linkedProd ? linkedProd.id : '';
+    let tipeBilling = 'open';
+    let durasiMenit = 60;
+
+    const opsiProdukSewa = posProducts.filter(p => String(p.unit_id) === String(filterUnitPos) && p.tipe === 'sewa');
+
+    const renderKonten = (tipe, durasi, prodId) => (
+      <div className="d-flex flex-column gap-3 py-2 text-start">
+        <div>
+          <label className="form-label small fw-semibold text-main">Tipe Billing</label>
+          <select 
+            className="form-select input-premium" 
+            style={{ fontSize: '0.8rem' }}
+            value={tipe} 
+            onChange={(e) => {
+              tipeBilling = e.target.value;
+              updateModal();
+            }}
+          >
+            <option value="open">Open Billing (Play & Pay)</option>
+            <option value="regular">Regular Billing (Prepaid Durasi)</option>
+          </select>
+        </div>
+
+        {tipe === 'regular' && (
+          <div>
+            <label className="form-label small fw-semibold text-main">Durasi Main (Menit)</label>
+            <input 
+              type="number" 
+              className="form-control input-premium" 
+              style={{ fontSize: '0.8rem' }}
+              value={durasi}
+              min="1"
+              onChange={(e) => {
+                durasiMenit = Number(e.target.value);
+                updateModal();
+              }}
+            />
+            <div className="d-flex gap-1 mt-2 flex-wrap">
+              {[30, 60, 90, 120, 180].map(m => (
+                <button 
+                  key={m} 
+                  type="button" 
+                  className="tombol-sekunder-premium py-1 px-2.5" 
+                  style={{ fontSize: '0.7rem' }}
+                  onClick={() => {
+                    durasiMenit = m;
+                    updateModal();
+                  }}
+                >
+                  {m} Menit
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div>
+          <label className="form-label small fw-semibold text-main">Pilih Produk Sewa</label>
+          <select 
+            className="form-select input-premium"
+            style={{ fontSize: '0.8rem' }}
+            value={prodId} 
+            onChange={(e) => {
+              initialProdukId = e.target.value;
+              updateModal();
+            }}
+          >
+            <option value="">-- Pilih Produk Sewa --</option>
+            {opsiProdukSewa.map(p => (
+              <option key={p.id} value={p.id}>
+                {p.nama_produk} - Rp {Number(p.harga_jual).toLocaleString('id-ID')}/jam
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+    );
+
+    const updateModal = () => {
+      ui.modal(
+        `Mulai Sesi Sewa: ${dev.nama_perangkat}`,
+        renderKonten(tipeBilling, durasiMenit, initialProdukId),
+        async () => {
+          if (!initialProdukId) {
+            throw new Error('Harap pilih Produk Sewa.');
+          }
+          if (tipeBilling === 'regular' && durasiMenit <= 0) {
+            throw new Error('Durasi regular harus lebih dari 0 menit.');
+          }
+
+          ui.loading(true, 'fullscreen', 'Memulai timer...');
+          try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_BASE_URL}/transaksi/billiard/mulai`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                iot_alokasi_id: dev.id,
+                tipe_billing: tipeBilling,
+                durasi_menit: tipeBilling === 'regular' ? Number(durasiMenit) : 0,
+                produk_id: Number(initialProdukId)
+              })
+            });
+            const json = await res.json();
+            ui.loading(false);
+            if (res.ok && json.status === 'sukses') {
+              ui.notif('sukses', json.pesan || 'Sesi sewa berhasil dimulai!');
+              fetchBilliardStatus();
+              fetchRiwayatTransaksi();
+            } else {
+              throw new Error(json.pesan || 'Gagal memulai sesi sewa.');
+            }
+          } catch (err) {
+            ui.loading(false);
+            throw err;
+          }
+        },
+        'Mulai Main'
+      );
+    };
+
+    updateModal();
+  };
+
+  const bukaModalTambahDurasi = (dev) => {
+    let tambahanMenit = 30;
+
+    const renderKonten = (menit) => (
+      <div className="py-2 text-start">
+        <label className="form-label small fw-semibold text-main">Tambahan Waktu Main (Menit)</label>
+        <input 
+          type="number" 
+          className="form-control input-premium" 
+          style={{ fontSize: '0.8rem' }}
+          value={menit}
+          min="1"
+          onChange={(e) => {
+            tambahanMenit = Number(e.target.value);
+            updateModal();
+          }}
+        />
+        <div className="d-flex gap-1 mt-2 flex-wrap">
+          {[15, 30, 45, 60, 120].map(m => (
+            <button 
+              key={m} 
+              type="button" 
+              className="tombol-sekunder-premium py-1 px-2.5" 
+              style={{ fontSize: '0.7rem' }}
+              onClick={() => {
+                tambahanMenit = m;
+                updateModal();
+              }}
+            >
+              +{m} Menit
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+
+    const updateModal = () => {
+      ui.modal(
+        `Tambah Durasi: ${dev.nama_perangkat}`,
+        renderKonten(tambahanMenit),
+        async () => {
+          if (tambahanMenit <= 0) {
+            throw new Error('Tambahan waktu harus lebih dari 0 menit.');
+          }
+
+          ui.loading(true, 'fullscreen', 'Menambahkan durasi...');
+          try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_BASE_URL}/transaksi/billiard/tambah-durasi`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                iot_alokasi_id: dev.id,
+                tambahan_menit: Number(tambahanMenit)
+              })
+            });
+            const json = await res.json();
+            ui.loading(false);
+            if (res.ok && json.status === 'sukses') {
+              ui.notif('sukses', json.pesan || 'Durasi sewa berhasil ditambahkan!');
+              fetchBilliardStatus();
+              fetchRiwayatTransaksi();
+            } else {
+              throw new Error(json.pesan || 'Gagal menambahkan durasi.');
+            }
+          } catch (err) {
+            ui.loading(false);
+            throw err;
+          }
+        },
+        'Tambah Durasi'
+      );
+    };
+
+    updateModal();
   };
 
   const fetchRiwayatTransaksi = async (tgl = filterTanggalPos) => {
@@ -6733,6 +7115,156 @@ const Dashboard = () => {
                             </select>
                           </div>
                         </div>
+
+                        {(() => {
+                          const unitTerpilih = opsiUnit.find(u => String(u.id) === String(filterUnitPos));
+                          const isBilliardUnit = unitTerpilih && (unitTerpilih.kategori === 'billiard' || unitTerpilih.kategori === 'sewa');
+                          return isBilliardUnit && billiardDevices.length > 0 ? (
+                            <div className="mb-4 p-3 rounded-4" style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--warna-border)' }}>
+                              <h6 className="fw-bold mb-3 d-flex align-items-center" style={{ fontSize: '0.85rem' }}>
+                                <span className="me-2">🎱</span> Status Meja & Billing Perangkat IoT
+                              </h6>
+                              <div className="row g-2">
+                                {billiardDevices.map(dev => {
+                                  const isUsed = dev.status_penggunaan === 'dipakai';
+                                  const isWaitingPayment = dev.status_penggunaan === 'selesai_menunggu_pembayaran';
+                                  
+                                  let bgCardColor = 'rgba(25, 135, 84, 0.08)';
+                                  let borderCardColor = 'rgba(25, 135, 84, 0.3)';
+                                  let statusBadgeColor = 'bg-success';
+                                  let statusText = 'Tersedia';
+
+                                  if (isUsed) {
+                                    bgCardColor = 'rgba(220, 53, 69, 0.08)';
+                                    borderCardColor = 'rgba(220, 53, 69, 0.3)';
+                                    statusBadgeColor = 'bg-danger';
+                                    statusText = dev.prepaid_durasi_menit > 0 ? 'Regular' : 'Open';
+                                  } else if (isWaitingPayment) {
+                                    bgCardColor = 'rgba(255, 193, 7, 0.08)';
+                                    borderCardColor = 'rgba(255, 193, 7, 0.3)';
+                                    statusBadgeColor = 'bg-warning text-dark';
+                                    statusText = 'Menunggu Pembayaran';
+                                  }
+
+                                  const formatTime = (seconds) => {
+                                    if (!seconds || seconds < 0) return '00:00:00';
+                                    const h = Math.floor(seconds / 3600);
+                                    const m = Math.floor((seconds % 3600) / 60);
+                                    const s = seconds % 60;
+                                    return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
+                                  };
+
+                                  return (
+                                    <div key={dev.id} className="col-6 col-sm-4 col-md-3">
+                                      <div 
+                                        className="p-2 rounded-3 h-100 d-flex flex-column justify-content-between text-center position-relative"
+                                        style={{ 
+                                          backgroundColor: bgCardColor,
+                                          border: `1.5px solid ${borderCardColor}`,
+                                          boxShadow: isUsed ? '0 0 10px rgba(220, 53, 69, 0.05)' : 'none'
+                                        }}
+                                      >
+                                        <div>
+                                          <div className="fw-bold mb-1" style={{ fontSize: '0.78rem' }}>{dev.nama_perangkat}</div>
+                                          <span className={`badge ${statusBadgeColor} mb-2`} style={{ fontSize: '0.58rem' }}>
+                                            {statusText}
+                                          </span>
+                                        </div>
+
+                                        <div className="my-2 py-1 bg-dark bg-opacity-25 rounded">
+                                          {isUsed ? (
+                                            dev.prepaid_durasi_menit > 0 ? (
+                                              <div>
+                                                <div className="text-muted" style={{ fontSize: '0.55rem' }}>SISA WAKTU</div>
+                                                <div className="font-monospace fw-bold text-danger" style={{ fontSize: '0.85rem' }}>
+                                                  {formatTime(dev.sisa_detik)}
+                                                </div>
+                                              </div>
+                                            ) : (
+                                              <div>
+                                                <div className="text-muted" style={{ fontSize: '0.55rem' }}>DURASI MAIN</div>
+                                                <div className="font-monospace fw-bold text-warning" style={{ fontSize: '0.85rem' }}>
+                                                  {formatTime(dev.durasi_berjalan_detik)}
+                                                </div>
+                                                <div className="fw-bold text-success mt-1" style={{ fontSize: '0.78rem' }}>
+                                                  Rp {Number(dev.akumulasi_biaya || 0).toLocaleString('id-ID')}
+                                                </div>
+                                              </div>
+                                            )
+                                          ) : isWaitingPayment ? (
+                                            <div>
+                                              <div className="text-muted" style={{ fontSize: '0.55rem' }}>TAGIHAN AKHIR</div>
+                                              <div className="fw-bold text-success" style={{ fontSize: '0.85rem' }}>
+                                                Rp {Number(dev.akumulasi_biaya || 0).toLocaleString('id-ID')}
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <div className="text-muted py-2" style={{ fontSize: '0.68rem' }}>
+                                              Ready (Lamp OFF)
+                                            </div>
+                                          )}
+                                        </div>
+
+                                        <div className="d-flex flex-wrap gap-1 justify-content-center mt-2">
+                                          {!isUsed && !isWaitingPayment && (
+                                            <button 
+                                              className="tombol-premium w-100 py-1"
+                                              style={{ fontSize: '0.68rem' }}
+                                              onClick={() => bukaModalMulaiBilliard(dev)}
+                                            >
+                                              🚀 Mulai Main
+                                            </button>
+                                          )}
+
+                                          {isUsed && (
+                                            <>
+                                              {dev.prepaid_durasi_menit > 0 && (
+                                                <button 
+                                                  className="tombol-sekunder-premium py-1 px-2"
+                                                  style={{ fontSize: '0.62rem' }}
+                                                  onClick={() => bukaModalTambahDurasi(dev)}
+                                                  title="Tambah Durasi"
+                                                >
+                                                  ➕ Waktu
+                                                </button>
+                                              )}
+                                              <button 
+                                                className="tombol-premium py-1 px-2 flex-grow-1"
+                                                style={{ fontSize: '0.62rem', backgroundColor: 'var(--bs-danger)', borderColor: 'var(--bs-danger)' }}
+                                                onClick={() => handleStopBilliard(dev)}
+                                              >
+                                                🛑 Stop
+                                              </button>
+                                            </>
+                                          )}
+
+                                          {isWaitingPayment && (
+                                            <button 
+                                              className="tombol-premium w-100 py-1"
+                                              style={{ fontSize: '0.68rem', backgroundColor: 'var(--bs-warning)', borderColor: 'var(--bs-warning)', color: '#000' }}
+                                              onClick={async () => {
+                                                const detailRes = await fetch(`${API_BASE_URL}/transaksi-publik/detail/${dev.transaksi_aktif_id}`);
+                                                const detailJson = await detailRes.json();
+                                                if (detailRes.ok && detailJson.status === 'sukses') {
+                                                  setSelectedTransaksi(detailJson.data);
+                                                  setShowDetailNotaModal(true);
+                                                } else {
+                                                  ui.notif('gagal', 'Gagal memuat detail transaksi.');
+                                                }
+                                              }}
+                                            >
+                                              💳 Bayar
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ) : null;
+                        })()}
 
                         {/* Product Grid */}
                         {posLoading ? (
