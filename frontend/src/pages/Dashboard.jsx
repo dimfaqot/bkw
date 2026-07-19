@@ -3146,7 +3146,7 @@ const Dashboard = () => {
   const [riwayatTransaksi, setRiwayatTransaksi] = useState([]);
   const [transaksiLoading, setTransaksiLoading] = useState(false);
 
-  const [filterTanggalPos, setFilterTanggalPos] = useState(new Date().toISOString().substring(0, 10));
+  const [filterTanggalPos, setFilterTanggalPos] = useState(new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().substring(0, 10));
   const [searchRiwayatQuery, setSearchRiwayatQuery] = useState('');
   const [pembayaranTipePos, setPembayaranTipePos] = useState('lunas'); // lunas / belum_bayar
   const [metodePembayaranPos, setMetodePembayaranPos] = useState('cash'); // cash / qris / tap
@@ -3169,8 +3169,11 @@ const Dashboard = () => {
   const [laporanData, setLaporanData] = useState(null);
   const [laporanLoading, setLaporanLoading] = useState(false);
   const [laporanFilter, setLaporanFilter] = useState({
-    start_date: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().substring(0, 10),
-    end_date: new Date().toISOString().substring(0, 10),
+    start_date: (() => {
+      const d = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+    })(),
+    end_date: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().substring(0, 10),
     unit_id: ''
   });
   const [subTabLaporan, setSubTabLaporan] = useState('penjualan');
@@ -4860,10 +4863,10 @@ const Dashboard = () => {
           tanggal: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().substring(0, 10) 
         };
       } else if (targetTabel === 'points') {
-        const today = new Date().toISOString().substring(0, 10);
+        const today = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().substring(0, 10);
         nilaiAwal = { karyawan_id: '', jumlah_poin: 0, sumber: 'penilaian_supervisor', referensi_id: '', pemberi_poin_id: profile?.id || '', keterangan: '', tanggal: today };
       } else if (targetTabel === 'perizinan') {
-        const today = new Date().toISOString().substring(0, 10);
+        const today = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().substring(0, 10);
         nilaiAwal = { 
           karyawan_id: profile?.user_id || '', 
           jenis_izin: 'izin', 
@@ -4875,7 +4878,7 @@ const Dashboard = () => {
           catatan_atasan: '' 
         };
       } else if (targetTabel === 'lembur') {
-        const today = new Date().toISOString().substring(0, 10);
+        const today = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().substring(0, 10);
         nilaiAwal = { 
           usaha_id: profile?.usaha_id || '', 
           karyawan_id: '', 
