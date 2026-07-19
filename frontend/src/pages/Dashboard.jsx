@@ -811,7 +811,8 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
                   { value: 'billiard', label: '🎱 Billiard (IoT & Sewa Jam-Jaman)' },
                   { value: 'rental_mobil', label: '🚗 Rental Mobil (Sewa Aset & Opsi Tambahan)' },
                   { value: 'salon', label: '💅 Salon (Jasa Treatment & Stylist)' },
-                  { value: 'multimedia', label: '📸 Multimedia (Studio & Hybrid POS)' }
+                  { value: 'multimedia', label: '📸 Multimedia (Studio & Hybrid POS)' },
+                  { value: 'cuci_kendaraan', label: '🧼 Cuci Kendaraan (Antrean Layanan & Komisi)' }
                 ]}
               />
             </div>
@@ -2295,6 +2296,25 @@ const Dashboard = () => {
   
   // Job Board States & Handlers
   const [jobBoardList, setJobBoardList] = useState([]);
+
+  const dapatkanEmojiPekerjaan = (kategori) => {
+    switch (kategori) {
+      case 'kantin':
+        return '👨‍🍳';
+      case 'cuci_kendaraan':
+        return '🧼';
+      case 'salon':
+        return '💅';
+      case 'billiard':
+        return '🎱';
+      case 'multimedia':
+        return '📸';
+      case 'rental_mobil':
+        return '🚗';
+      default:
+        return '⚙️';
+    }
+  };
   
   const ambilJobBoard = useCallback(async () => {
     const token = localStorage.getItem('token');
@@ -4563,7 +4583,8 @@ const Dashboard = () => {
         billiard: '🎱 Billiard',
         rental_mobil: '🚗 Rental Mobil',
         salon: '💅 Salon',
-        multimedia: '📸 Multimedia'
+        multimedia: '📸 Multimedia',
+        cuci_kendaraan: '🚗 Cuci Kendaraan'
       };
       return (
         <>
@@ -5964,7 +5985,9 @@ const Dashboard = () => {
                                           {new Date(job.waktu_nota).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                                         </span>
                                       </div>
-                                      <h5 className="fw-bold text-main mb-1" style={{ fontSize: '0.8rem' }}>{job.nama_produk}</h5>
+                                      <h5 className="fw-bold text-main mb-1" style={{ fontSize: '0.8rem' }}>
+                                        {dapatkanEmojiPekerjaan(job.kategori_unit)} {job.nama_produk}
+                                      </h5>
                                       <div className="text-muted small mb-2">
                                         Jumlah: <strong className="text-main">{job.qty} {job.satuan}</strong>
                                       </div>
@@ -5987,7 +6010,7 @@ const Dashboard = () => {
                                           className="w-100 tombol-premium py-1.5 d-flex align-items-center justify-content-center gap-1"
                                           style={{ fontSize: '0.75rem' }}
                                         >
-                                          👨‍🍳 Ambil Tugas
+                                          {dapatkanEmojiPekerjaan(job.kategori_unit)} Ambil Tugas
                                         </button>
                                       ) : isMyJob ? (
                                         <button

@@ -763,9 +763,10 @@ class Transaksi extends ResourceController
 
         $db = \Config\Database::connect();
         $jobs = $db->table('transaksi_detail td')
-                   ->select('td.*, t.nomor_invoice, t.pelanggan_id, pj.nama_produk, pj.satuan, u.nama as nama_petugas, cust.nama as nama_pelanggan, t.created_at as waktu_nota')
+                   ->select('td.*, t.nomor_invoice, t.pelanggan_id, pj.nama_produk, pj.satuan, u.nama as nama_petugas, cust.nama as nama_pelanggan, t.created_at as waktu_nota, un.kategori as kategori_unit')
                    ->join('transaksi t', 't.id = td.transaksi_id')
                    ->join('produk_jasa pj', 'pj.id = td.produk_id')
+                   ->join('unit un', 'un.id = pj.unit_id', 'left')
                    ->join('users u', 'u.id = td.petugas_id', 'left')
                    ->join('users cust', 'cust.id = t.pelanggan_id', 'left')
                    ->where('t.usaha_id', $usahaId)
