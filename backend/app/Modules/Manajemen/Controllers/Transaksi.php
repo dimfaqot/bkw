@@ -780,7 +780,7 @@ class Transaksi extends ResourceController
     public function klaimJob($detailId)
     {
         $penggunaAktif = \App\Modules\Auth\Filters\JWTFilter::getPenggunaAktif();
-        $userId = $penggunaAktif['user_id'];
+        $userId = $penggunaAktif['uid'];
         $usahaId = $penggunaAktif['usaha_id'];
 
         $db = \Config\Database::connect();
@@ -850,7 +850,7 @@ class Transaksi extends ResourceController
     public function selesaiJob($detailId)
     {
         $penggunaAktif = \App\Modules\Auth\Filters\JWTFilter::getPenggunaAktif();
-        $userId = $penggunaAktif['user_id'];
+        $userId = $penggunaAktif['uid'];
         $usahaId = $penggunaAktif['usaha_id'];
 
         $db = \Config\Database::connect();
@@ -862,6 +862,7 @@ class Transaksi extends ResourceController
         if ($detail->petugas_id != $userId) {
             return $this->respond(['status' => 'gagal', 'pesan' => 'Anda bukan petugas yang ditunjuk untuk pekerjaan ini.'], 403);
         }
+
         if ($detail->status_pengerjaan !== 'Dikerjakan') {
             return $this->respond(['status' => 'gagal', 'pesan' => 'Status pengerjaan tidak valid untuk diselesaikan.'], 400);
         }
@@ -870,6 +871,7 @@ class Transaksi extends ResourceController
 
         $db->table('transaksi_detail')->where('id', $detailId)->update([
             'status_pengerjaan' => 'Selesai',
+            'petugas_id'        => $userId,
             'updated_at'        => date('Y-m-d H:i:s')
         ]);
 
@@ -981,7 +983,7 @@ class Transaksi extends ResourceController
 
             foreach ($webPush->flush() as $report) {
                 if (!$report->isSuccess()) {
-                    if ($report->getStatusCode() === 410 || $report->getStatusCode() === 404) {
+                    if ($report->isSubscriptionExpired()) {
                         $db->table('push_subscriptions')
                            ->where('endpoint', $report->getEndpoint())
                            ->delete();

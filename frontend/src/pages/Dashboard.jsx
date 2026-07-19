@@ -886,6 +886,23 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
               <label className="form-label small fw-semibold">Satuan</label>
               <input type="text" name="satuan" className="form-control input-premium" value={formState.satuan || 'pcs'} onChange={handleChange} placeholder="pcs, porsi, jam, hari" />
             </div>
+            <div className="d-flex align-items-center justify-content-between p-2 rounded" style={{background:'var(--bg-card)', border:'1px solid var(--border-color)'}}>
+              <div>
+                <div className="small fw-semibold">🍳 Butuh Persiapan / Dapur</div>
+                <div className="text-muted" style={{fontSize:'0.72rem'}}>Aktifkan jika produk perlu diolah dulu (masuk antrean Job Board)</div>
+              </div>
+              <div className="form-check form-switch mb-0 ms-3">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                  id="switchButuhPersiapan"
+                  checked={formState.butuh_persiapan == '1'}
+                  onChange={e => handleChange({ target: { name: 'butuh_persiapan', value: e.target.checked ? '1' : '0' } })}
+                  style={{width:'2.5em', height:'1.3em', cursor:'pointer'}}
+                />
+              </div>
+            </div>
           </>
         )}
         {tabel === 'produk_komposisi' && (
@@ -2298,6 +2315,8 @@ const Dashboard = () => {
   const handleKlaimJob = async (detailId) => {
     const token = localStorage.getItem('token');
     if (!token) return;
+    const yakin = await ui.notif('konfirmasi', 'Apakah Anda yakin ingin mengambil/mengerjakan tugas ini?');
+    if (!yakin) return;
     ui.loading(true, 'claiming', 'Mengambil pekerjaan...');
     try {
       const response = await fetch(`http://localhost:8080/api/transaksi/job-board/klaim/${detailId}`, {
@@ -2976,9 +2995,25 @@ const Dashboard = () => {
       });
       if (response.ok) {
         await ambilNotifikasi();
+        
+        let targetMenu = 'beranda';
+        let shouldScrollJobBoard = false;
+        
         if (tautan) {
-          // Arahkan ke tautan menu yang bersangkutan
-          setMenuAktif(tautan);
+          if (tautan === '/dashboard' || tautan === 'beranda') {
+            targetMenu = 'beranda';
+            shouldScrollJobBoard = true;
+          } else {
+            targetMenu = tautan;
+          }
+        }
+        
+        setMenuAktif(targetMenu);
+        
+        if (shouldScrollJobBoard) {
+          setTimeout(() => {
+            document.getElementById('job-board-widget')?.scrollIntoView({ behavior: 'smooth' });
+          }, 400);
         }
       }
     } catch (err) {
@@ -3112,7 +3147,14 @@ const Dashboard = () => {
     const queryParams = new URLSearchParams(window.location.search);
     const menuParam = queryParams.get('menu');
     if (menuParam) {
-      setMenuAktif(menuParam);
+      if (menuParam === '/dashboard' || menuParam === 'beranda') {
+        setMenuAktif('beranda');
+        setTimeout(() => {
+          document.getElementById('job-board-widget')?.scrollIntoView({ behavior: 'smooth' });
+        }, 800);
+      } else {
+        setMenuAktif(menuParam);
+      }
       // Bersihkan query param agar jika di-refresh tidak terus membuka menu tersebut
       window.history.replaceState({}, document.title, window.location.pathname);
     }
@@ -3136,7 +3178,14 @@ const Dashboard = () => {
           const urlObj = new URL(event.data.url, window.location.origin);
           const menuParam = urlObj.searchParams.get('menu');
           if (menuParam) {
-            setMenuAktif(menuParam);
+            if (menuParam === '/dashboard' || menuParam === 'beranda') {
+              setMenuAktif('beranda');
+              setTimeout(() => {
+                document.getElementById('job-board-widget')?.scrollIntoView({ behavior: 'smooth' });
+              }, 400);
+            } else {
+              setMenuAktif(menuParam);
+            }
           }
         }
       };
@@ -4206,7 +4255,7 @@ const Dashboard = () => {
       } else if (targetTabel === 'unit') {
         nilaiAwal = { usaha_id: profile?.usaha_id || '', nama_unit: '', kategori: 'kantin' };
       } else if (targetTabel === 'produk_jasa') {
-        nilaiAwal = { usaha_id: profile?.usaha_id || '', unit_id: '', nama_produk: '', tipe: 'barang', harga_beli: '0', harga_jual: '0', stok: '0', stok_minimum: '0', is_stok_dikelola: '1', satuan: 'pcs' };
+        nilaiAwal = { usaha_id: profile?.usaha_id || '', unit_id: '', nama_produk: '', tipe: 'barang', harga_beli: '0', harga_jual: '0', stok: '0', stok_minimum: '0', is_stok_dikelola: '1', butuh_persiapan: '0', satuan: 'pcs' };
       } else if (targetTabel === 'roles') {
         nilaiAwal = { nama_role: '', deskripsi: '' };
       } else if (targetTabel === 'user_role') {
@@ -5881,7 +5930,7 @@ const Dashboard = () => {
                   </div>
                   {/* WIDGET JOB BOARD (ANTREAN PEKERJAAN TERBUKA) */}
                   {!['member'].includes(profile?.role?.toLowerCase()) && (
-                    <div className="col-12 mt-4">
+                    <div className="col-12 mt-4" id="job-board-widget">
                       <div className="kartu-premium fade-in">
                         <div className="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
                           <h4 className="fw-bold mb-0 text-main d-flex align-items-center gap-2" style={{ fontSize: '0.85rem' }}>
@@ -6203,7 +6252,7 @@ const Dashboard = () => {
                             </div>
 
                             {/* Pilihan Pelanggan (Selalu Muncul) */}
-                            <div className="mb-3 fade-in" id="searchable-member-wrapper" style={{ position: 'relative' }}>
+                            <div className="mb-3 fade-in" id="searchable-member-wrapper" style={{ position: 'relative', zIndex: showDropdownMember ? 200 : 'auto' }}>
                               <div className="d-flex align-items-center justify-content-between mb-1">
                                 <label className="text-muted small mb-0">
                                   Pilih Member {pembayaranTipePos === 'belum_bayar' ? '(Wajib)' : '(Opsional)'}:
@@ -6225,7 +6274,7 @@ const Dashboard = () => {
                                 <input
                                   type="text"
                                   className="form-control input-premium text-main py-1.5 px-3"
-                                  style={{ fontSize: '0.78rem', borderRadius: '8px' }}
+                                  style={{ fontSize: '0.78rem', borderRadius: '8px', paddingRight: pelangganIdPos ? '2.2rem' : undefined }}
                                   placeholder="Ketik nama atau wa member..."
                                   value={memberSearchQuery}
                                   onChange={e => {
@@ -6237,6 +6286,7 @@ const Dashboard = () => {
                                     setShowDropdownMember(true);
                                   }}
                                   onFocus={() => setShowDropdownMember(true)}
+                                  onBlur={() => setTimeout(() => setShowDropdownMember(false), 200)}
                                 />
                                 {pelangganIdPos && (
                                   <button
@@ -6264,16 +6314,16 @@ const Dashboard = () => {
 
                                 return (
                                   <div
-                                    className="position-absolute w-100 rounded-3 shadow-lg p-1"
+                                    className="w-100 rounded-3 shadow-lg p-1 mt-1"
                                     style={{
-                                      zIndex: 1050,
-                                      maxHeight: '200px',
+                                      position: 'absolute',
+                                      zIndex: 9999,
+                                      maxHeight: '160px',
                                       overflowY: 'auto',
                                       top: '100%',
                                       left: 0,
                                       backgroundColor: '#1e293b',
                                       border: '1px solid var(--warna-border)',
-                                      marginTop: '4px'
                                     }}
                                   >
                                     {filteredMembers.length === 0 ? (
@@ -6282,7 +6332,7 @@ const Dashboard = () => {
                                       filteredMembers.map(u => (
                                         <div
                                           key={u.id}
-                                          onClick={() => {
+                                          onMouseDown={() => {
                                             setPelangganIdPos(String(u.id));
                                             setMemberSearchQuery(`${u.nama} (${u.wa})`);
                                             setShowDropdownMember(false);
@@ -6293,8 +6343,8 @@ const Dashboard = () => {
                                             fontSize: '0.76rem',
                                             transition: 'background 0.15s'
                                           }}
-                                          onMouseEnter={e => e.target.style.backgroundColor = 'rgba(255,255,255,0.06)'}
-                                          onMouseLeave={e => e.target.style.backgroundColor = 'transparent'}
+                                          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)'}
+                                          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                                         >
                                           👤 {u.nama} ({u.wa})
                                         </div>
@@ -6304,6 +6354,7 @@ const Dashboard = () => {
                                 );
                               })()}
                             </div>
+
 
                             {/* Pilihan Metode Pembayaran (Jika Bayar Sekarang) */}
                             {pembayaranTipePos === 'lunas' && (

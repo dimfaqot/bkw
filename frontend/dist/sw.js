@@ -10,9 +10,13 @@ self.addEventListener('push', function(event) {
   }
 
   // Format tautan agar mengarah ke sub-menu dashboard yang benar (?menu=nama_menu)
-  let linkUrl = '/dashboard';
+  let linkUrl = '/dashboard?menu=beranda';
   if (data.link) {
-    linkUrl = `/dashboard?menu=${data.link}`;
+    if (data.link === '/dashboard' || data.link === 'beranda') {
+      linkUrl = '/dashboard?menu=beranda';
+    } else {
+      linkUrl = `/dashboard?menu=${data.link}`;
+    }
   }
 
   const options = {

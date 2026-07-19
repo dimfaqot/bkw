@@ -93,7 +93,7 @@ class NotificationService
                 if (!$report->isSuccess()) {
                     // Jika subskripsi kedaluwarsa atau tidak valid (expired/gone),
                     // hapus dari database secara otomatis agar tidak membebani server
-                    if ($report->getStatusCode() === 410 || $report->getStatusCode() === 404) {
+                    if ($report->isSubscriptionExpired()) {
                         $db->table('push_subscriptions')
                            ->where('endpoint', $report->getEndpoint())
                            ->delete();
