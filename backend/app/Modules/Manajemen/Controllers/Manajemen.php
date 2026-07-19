@@ -54,13 +54,15 @@ class Manajemen extends ResourceController
                     ]
                 ],
                 'pendiri' => 'permit_empty|min_length[3]',
-                'butuh_absen' => 'permit_empty|in_list[0,1]'
+                'butuh_absen' => 'permit_empty|in_list[0,1]',
+                'kode_usaha' => 'permit_empty'
             ];
         } else if ($tabel === 'unit') {
             $aturan = [
                 'usaha_id'  => 'required|numeric',
                 'nama_unit' => 'required|min_length[3]',
                 'kategori'  => 'required|in_list[kantin,billiard,rental_mobil,salon,multimedia,cuci_kendaraan]',
+                'kode_unit' => 'permit_empty',
             ];
         } else if ($tabel === 'roles') {
             $aturan = [
@@ -289,7 +291,8 @@ class Manajemen extends ResourceController
                 'nominal_total'       => 'permit_empty|numeric',
                 'pencatat_id'         => 'permit_empty|numeric',
                 'penanggung_jawab_id' => 'permit_empty|numeric',
-                'tanggal'             => 'required|valid_date[Y-m-d]'
+                'tanggal'             => 'required|valid_date[Y-m-d]',
+                'nomor_inventaris'    => 'permit_empty'
             ];
         }
         return $aturan;
@@ -879,6 +882,52 @@ class Manajemen extends ResourceController
         if ($tabel === 'pengeluaran') {
             $input['pencatat_id'] = $penggunaAktif['uid'] ?? null;
             $kategori = $input['kategori'] ?? 'Operasional';
+            
+            // Khusus kategori 'Inv' (Inventaris): Tambahkan no. Inv dengan format:
+            // [kode_usaha]/[kode_unit]/[tglbulantahun]/[no_urut]
+            if ($kategori === 'Inv') {
+                $db = \Config\Database::connect();
+                
+                // 1. Ambil kode_usaha
+                $usahaId = $input['usaha_id'] ?? null;
+                $kodeUsaha = 'US';
+                if ($usahaId) {
+                    $uRow = $db->table('usaha')->select('kode_usaha, nama_usaha')->where('id', $usahaId)->get()->getRow();
+                    if ($uRow) {
+                        $kodeUsaha = !empty($uRow->kode_usaha) 
+                            ? strtoupper($uRow->kode_usaha) 
+                            : strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $uRow->nama_usaha), 0, 3));
+                    }
+                }
+                
+                // 2. Ambil kode_unit
+                $unitId = $input['unit_id'] ?? null;
+                $kodeUnit = 'GLB';
+                if ($unitId) {
+                    $unRow = $db->table('unit')->select('kode_unit, nama_unit')->where('id', $unitId)->get()->getRow();
+                    if ($unRow) {
+                        $kodeUnit = !empty($unRow->kode_unit) 
+                            ? strtoupper($unRow->kode_unit) 
+                            : strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $unRow->nama_unit), 0, 3));
+                    }
+                }
+                
+                // 3. Format tglbulantahun (DDMMYYYY)
+                $tglStr = !empty($input['tanggal']) ? date('dmY', strtotime($input['tanggal'])) : date('dmY');
+                
+                // 4. Hitung nomor urut untuk hari ini atau kumulatif untuk kategori Inv di unit/usaha ini
+                $count = $db->table('pengeluaran')
+                            ->where('usaha_id', $usahaId)
+                            ->where('kategori', 'Inv')
+                            ->countAllResults();
+                $noUrut = str_pad($count + 1, 4, '0', STR_PAD_LEFT);
+                
+                // 5. Gabungkan menjadi nomor_inventaris
+                $input['nomor_inventaris'] = "{$kodeUsaha}/{$kodeUnit}/{$tglStr}/{$noUrut}";
+            } else {
+                $input['nomor_inventaris'] = null;
+            }
+
             if ($kategori === 'Bahan Baku' || $kategori === 'Inv') {
                 $qty = (int)($input['qty'] ?? 0);
                 $hargaSatuan = (float)($input['harga_satuan'] ?? 0);
@@ -1394,6 +1443,60 @@ class Manajemen extends ResourceController
             }
             
             $kategori = $input['kategori'] ?? 'Operasional';
+            
+            if ($kategori === 'Inv') {
+                $existingRow = $db->table('pengeluaran')->where('id', $id)->get()->getRow();
+                $lamaNoInv = $existingRow ? $existingRow->nomor_inventaris : null;
+                
+                $usahaId = $input['usaha_id'] ?? ($existingRow ? $existingRow->usaha_id : null);
+                $unitId = isset($input['unit_id']) ? $input['unit_id'] : ($existingRow ? $existingRow->unit_id : null);
+                $tglBaru = !empty($input['tanggal']) ? $input['tanggal'] : ($existingRow ? $existingRow->tanggal : null);
+                
+                $apakahBerubah = !$lamaNoInv 
+                    || ($existingRow && ($existingRow->usaha_id != $usahaId || $existingRow->unit_id != $unitId || date('dmY', strtotime($existingRow->tanggal)) != date('dmY', strtotime($tglBaru))));
+                
+                if ($apakahBerubah) {
+                    // 1. Ambil kode_usaha
+                    $kodeUsaha = 'US';
+                    if ($usahaId) {
+                        $uRow = $db->table('usaha')->select('kode_usaha, nama_usaha')->where('id', $usahaId)->get()->getRow();
+                        if ($uRow) {
+                            $kodeUsaha = !empty($uRow->kode_usaha) 
+                                ? strtoupper($uRow->kode_usaha) 
+                                : strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $uRow->nama_usaha), 0, 3));
+                        }
+                    }
+                    
+                    // 2. Ambil kode_unit
+                    $kodeUnit = 'GLB';
+                    if ($unitId) {
+                        $unRow = $db->table('unit')->select('kode_unit, nama_unit')->where('id', $unitId)->get()->getRow();
+                        if ($unRow) {
+                            $kodeUnit = !empty($unRow->kode_unit) 
+                                ? strtoupper($unRow->kode_unit) 
+                                : strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $unRow->nama_unit), 0, 3));
+                        }
+                    }
+                    
+                    // 3. Format tglbulantahun (DDMMYYYY)
+                    $tglStr = $tglBaru ? date('dmY', strtotime($tglBaru)) : date('dmY');
+                    
+                    // 4. Hitung nomor urut untuk kategori Inv di unit/usaha ini
+                    $count = $db->table('pengeluaran')
+                                ->where('usaha_id', $usahaId)
+                                ->where('kategori', 'Inv')
+                                ->where('id !=', $id)
+                                ->countAllResults();
+                    $noUrut = str_pad($count + 1, 4, '0', STR_PAD_LEFT);
+                    
+                    $input['nomor_inventaris'] = "{$kodeUsaha}/{$kodeUnit}/{$tglStr}/{$noUrut}";
+                } else {
+                    $input['nomor_inventaris'] = $lamaNoInv;
+                }
+            } else {
+                $input['nomor_inventaris'] = null;
+            }
+
             if ($kategori === 'Bahan Baku' || $kategori === 'Inv') {
                 $qty = (int)($input['qty'] ?? 0);
                 $hargaSatuan = (float)($input['harga_satuan'] ?? 0);

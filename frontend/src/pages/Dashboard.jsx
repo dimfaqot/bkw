@@ -720,6 +720,10 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
               <input type="text" name="nama_usaha" className="form-control input-premium" value={formState.nama_usaha || ''} onChange={handleChange} placeholder="cth: Warung Makan Padang" />
             </div>
             <div>
+              <label className="form-label small fw-semibold">Kode Usaha</label>
+              <input type="text" name="kode_usaha" className="form-control input-premium" value={formState.kode_usaha || ''} onChange={handleChange} placeholder="cth: BKW (maks. 50 karakter)" />
+            </div>
+            <div>
               <label className="form-label small fw-semibold">Alamat Usaha</label>
               <textarea name="alamat" className="form-control input-premium" value={formState.alamat || ''} onChange={handleChange} rows="2" placeholder="cth: Jl. Sudirman No. 10, Jakarta"></textarea>
             </div>
@@ -798,6 +802,10 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
             <div>
               <label className="form-label small fw-semibold">Nama Unit Cabang</label>
               <input type="text" name="nama_unit" className="form-control input-premium" value={formState.nama_unit || ''} onChange={handleChange} placeholder="cth: Cabang Pusat" />
+            </div>
+            <div>
+              <label className="form-label small fw-semibold">Kode Unit</label>
+              <input type="text" name="kode_unit" className="form-control input-premium" value={formState.kode_unit || ''} onChange={handleChange} placeholder="cth: KTN (maks. 50 karakter)" />
             </div>
             <div>
               <label className="form-label small fw-semibold">Kategori Unit (Fitur)</label>
@@ -4550,9 +4558,9 @@ const Dashboard = () => {
       if (targetTabel === 'users') {
         nilaiAwal = { nama: '', wa: '', email: '', password: '' };
       } else if (targetTabel === 'usaha') {
-        nilaiAwal = { nama_usaha: '', alamat: '', tanggal_berdiri: '', no_izin: '', latitude: '', longitude: '', radius_absen: '100' };
+        nilaiAwal = { nama_usaha: '', kode_usaha: '', alamat: '', tanggal_berdiri: '', no_izin: '', latitude: '', longitude: '', radius_absen: '100' };
       } else if (targetTabel === 'unit') {
-        nilaiAwal = { usaha_id: profile?.usaha_id || '', nama_unit: '', kategori: 'kantin' };
+        nilaiAwal = { usaha_id: profile?.usaha_id || '', nama_unit: '', kode_unit: '', kategori: 'kantin' };
       } else if (targetTabel === 'produk_jasa') {
         nilaiAwal = { usaha_id: profile?.usaha_id || '', unit_id: '', nama_produk: '', tipe: '', harga_beli: '0', harga_jual: '0', stok: '0', stok_minimum: '0', is_stok_dikelola: '', butuh_persiapan: '0', satuan: 'pcs' };
       } else if (targetTabel === 'roles') {
@@ -4730,7 +4738,7 @@ const Dashboard = () => {
     } else if (tabel === 'kriteria_poin') {
       return ['No.', 'Nama Kriteria', 'Nilai Poin', 'Sifat', 'Kode Sistem', 'Usaha', 'Aksi'];
     } else if (tabel === 'pengeluaran') {
-      return ['No.', 'Tanggal', 'Kategori', 'Unit', 'Detail Keperluan / Item', 'Nominal Total', 'Penanggung Jawab (PIC)', 'Pencatat', 'Catatan', 'Aksi'];
+      return ['No.', 'Tanggal', 'Kategori', 'No. Inv', 'Unit', 'Detail Keperluan / Item', 'Nominal Total', 'Penanggung Jawab (PIC)', 'Pencatat', 'Catatan', 'Aksi'];
     } else if (tabel === 'points') {
       return ['No.', 'Karyawan', 'Jumlah Poin', 'Sumber', 'Atasan Penilai', 'Keterangan', 'Tanggal', 'Cabang', 'Aksi'];
     } else if (tabel === 'perizinan') {
@@ -5184,6 +5192,7 @@ const Dashboard = () => {
           <td>{noUrut}</td>
           <td><span className="text-main small">{tglFormatted}</span></td>
           <td><span className={`badge ${kategoriBadges[baris.kategori] || 'bg-dark'}`}>{baris.kategori}</span></td>
+          <td><code className="text-main small">{baris.nomor_inventaris || '-'}</code></td>
           <td><span className="badge bg-light text-dark">{baris.nama_unit || 'Global'}</span></td>
           <td><span className="text-main small">{detailKeperluan}</span></td>
           <td><strong className="text-danger">{formatRupiah(baris.nominal_total)}</strong></td>
