@@ -3136,8 +3136,15 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (isCetakMode) {
+      const judulAsli = document.title;
       const timer = setTimeout(() => {
+        document.title = ' '; // Kosongkan judul agar header browser tidak muncul
         window.print();
+        // Kembalikan judul setelah dialog cetak selesai
+        window.onafterprint = () => {
+          document.title = judulAsli;
+          window.onafterprint = null;
+        };
         setIsCetakMode(null);
       }, 150);
       return () => clearTimeout(timer);
@@ -8263,7 +8270,7 @@ const Dashboard = () => {
                           width: 100% !important;
                           background: white !important;
                           color: black !important;
-                          padding: 15mm 12mm !important;
+                          padding: 8mm 12mm !important;
                           box-sizing: border-box !important;
                         }
                       }
