@@ -39,19 +39,19 @@ class Manajemen extends ResourceController
 
         // 1. Ambil Data Penjualan (realized revenue)
         $salesBuilder = $db->table('transaksi')
-                           ->select('transaksi.*, users.nama as nama_kasir, unit.nama_unit')
+                           ->select('transaksi.*, DATE(transaksi.created_at) as tanggal, users.nama as nama_kasir, unit.nama_unit')
                            ->join('users', 'users.id = transaksi.kasir_id', 'left')
                            ->join('unit', 'unit.id = transaksi.unit_id', 'left')
                            ->where('transaksi.status_pembayaran', 'lunas')
-                           ->where('transaksi.tanggal >=', $startDate)
-                           ->where('transaksi.tanggal <=', $endDate);
+                           ->where('DATE(transaksi.created_at) >=', $startDate)
+                           ->where('DATE(transaksi.created_at) <=', $endDate);
         if ($usahaId) {
             $salesBuilder->where('transaksi.usaha_id', $usahaId);
         }
         if ($unitId) {
             $salesBuilder->where('transaksi.unit_id', $unitId);
         }
-        $sales = $salesBuilder->orderBy('transaksi.tanggal', 'ASC')->get()->getResultArray();
+        $sales = $salesBuilder->orderBy('transaksi.created_at', 'ASC')->get()->getResultArray();
 
         // 2. Ambil Data Pengeluaran
         $expenseBuilder = $db->table('pengeluaran')
@@ -142,8 +142,8 @@ class Manajemen extends ResourceController
         $salesPrevBuilder = $db->table('transaksi')
                                ->selectSum('total_harga')
                                ->where('status_pembayaran', 'lunas')
-                               ->where('tanggal >=', $tglStartPrev)
-                               ->where('tanggal <=', $tglEndPrev);
+                               ->where('DATE(created_at) >=', $tglStartPrev)
+                               ->where('DATE(created_at) <=', $tglEndPrev);
         if ($usahaId) {
             $salesPrevBuilder->where('usaha_id', $usahaId);
         }
