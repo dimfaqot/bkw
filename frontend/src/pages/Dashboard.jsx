@@ -7114,7 +7114,7 @@ const Dashboard = () => {
                   if (m) currentMenu = m;
                 });
                 
-                if (!currentMenu || !currentMenu.tabel || currentMenu.url === 'kasir') return null;
+                if (!currentMenu || !currentMenu.tabel || currentMenu.url === 'kasir' || currentMenu.url === 'laporan') return null;
                 
                 const canCreate = currentMenu.can_create == 1 || currentMenu.permissions?.can_create == 1;
                 const canUpdate = currentMenu.can_update == 1 || currentMenu.permissions?.can_update == 1;
