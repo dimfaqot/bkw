@@ -1073,6 +1073,17 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
                 dropUp={true}
               />
             </div>
+            <div>
+              <label className="form-label small fw-semibold">Gaji Pokok</label>
+              <input
+                type="number"
+                name="gaji_pokok"
+                className="form-control input-premium"
+                value={formState.gaji_pokok ?? '0'}
+                onChange={handleChange}
+                placeholder="cth: 2500000"
+              />
+            </div>
           </>
         )}
         {tabel === 'menus' && (
@@ -4288,7 +4299,7 @@ const Dashboard = () => {
       } else if (targetTabel === 'roles') {
         nilaiAwal = { nama_role: '', deskripsi: '' };
       } else if (targetTabel === 'user_role') {
-        nilaiAwal = { user_id: '', usaha_id: profile?.usaha_id || '', unit_id: '', role_id: '' };
+        nilaiAwal = { user_id: '', usaha_id: profile?.usaha_id || '', unit_id: '', role_id: '', gaji_pokok: '0' };
       } else if (targetTabel === 'menus') {
         nilaiAwal = { label: '', icon: '', url: '', tabel: '', urutan: '0', is_aktif: '1' };
       } else if (targetTabel === 'role_permissions') {
@@ -4426,7 +4437,7 @@ const Dashboard = () => {
     } else if (tabel === 'roles') {
       return ['No.', 'Nama Role', 'Keterangan', 'Aksi'];
     } else if (tabel === 'user_role') {
-      return ['No.', 'User', 'Usaha', 'Unit', 'Role', 'Aksi'];
+      return ['No.', 'User', 'Usaha', 'Unit', 'Role', 'Gaji Pokok', 'Aksi'];
     } else if (tabel === 'menus') {
       return ['No.', 'Urutan', 'Label', 'Grup', 'Icon', 'URL', 'Tabel Terkait', 'Status', 'Aksi'];
     } else if (tabel === 'role_permissions') {
@@ -4661,6 +4672,7 @@ const Dashboard = () => {
           <td><span className="badge bg-secondary">{namaUsaha}</span></td>
           <td><span className="badge bg-light text-dark">{namaUnit}</span></td>
           <td><span className="badge bg-primary">{namaRole}</span></td>
+          <td><strong className="text-main">{formatRupiah(baris.gaji_pokok)}</strong></td>
         </>
       );
     } else if (tabel === 'menus') {

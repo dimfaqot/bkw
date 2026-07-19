@@ -75,9 +75,10 @@ class Manajemen extends ResourceController
             ];
         } else if ($tabel === 'user_role') {
             $aturan = [
-                'user_id'  => 'required|numeric',
-                'usaha_id' => 'permit_empty|numeric',
-                'role_id'  => 'required|numeric',
+                'user_id'    => 'required|numeric',
+                'usaha_id'   => 'permit_empty|numeric',
+                'role_id'    => 'required|numeric',
+                'gaji_pokok' => 'permit_empty|numeric',
             ];
         } else if ($tabel === 'menus') {
             $aturan = [
