@@ -8165,7 +8165,7 @@ const Dashboard = () => {
                   gridLines.push(
                     <g key={i}>
                       <line x1={paddingLeft} y1={y} x2={chartWidth - paddingRight} y2={y} stroke="var(--warna-border)" strokeDasharray="4 4" />
-                      <text x={paddingLeft - 10} y={y + 4} textAnchor="end" fontSize="10" fill="var(--text-muted)">
+                      <text x={paddingLeft - 10} y={y + 4} textAnchor="end" fontSize="10" fill={theme === 'dark' ? '#a0aec0' : '#718096'}>
                         {new Intl.NumberFormat('id-ID', { notation: 'compact' }).format(val)}
                       </text>
                     </g>
@@ -8177,7 +8177,7 @@ const Dashboard = () => {
                 points.forEach((p, idx) => {
                   if (idx % stepX === 0 || idx === N - 1) {
                     xLabels.push(
-                      <text key={idx} x={getX(idx)} y={chartHeight - 15} textAnchor="middle" fontSize="10" fill="var(--text-muted)">
+                      <text key={idx} x={getX(idx)} y={chartHeight - 15} textAnchor="middle" fontSize="10" fill={theme === 'dark' ? '#a0aec0' : '#718096'}>
                         {p.tanggal}
                       </text>
                     );
