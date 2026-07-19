@@ -1012,11 +1012,7 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
                       value={formState.iot_id || ''}
                       onChange={handleChange}
                       options={opsiAlokasi
-                        .filter(a => {
-                          const matchUsaha = String(a.usaha_id) === String(formState.usaha_id || profile?.usaha_id);
-                          const matchUnit = !formState.unit_id || String(a.unit_id) === String(formState.unit_id);
-                          return matchUsaha && matchUnit;
-                        })
+                        .filter(a => String(a.usaha_id) === String(formState.usaha_id || profile?.usaha_id))
                         .map(a => ({
                           value: a.iot_id,
                           label: `${a.nama_perangkat} (${a.tipe_perangkat?.toUpperCase()})`
