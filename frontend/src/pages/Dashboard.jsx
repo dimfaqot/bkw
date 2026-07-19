@@ -368,6 +368,26 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
   );
 
   useEffect(() => {
+    if (profile?.usaha_id && opsiUsaha.length > 0) {
+      const activeUsaha = opsiUsaha.find(u => u.id == profile?.usaha_id);
+      const currentLogo = activeUsaha?.logo;
+      
+      let link = document.querySelector("link[rel~='icon']");
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        document.getElementsByTagName('head')[0].appendChild(link);
+      }
+      
+      if (currentLogo) {
+        link.href = `http://localhost:8080/api/ambil-logo/${currentLogo}`;
+      } else {
+        link.href = '/favicon.ico';
+      }
+    }
+  }, [profile, opsiUsaha]);
+
+  useEffect(() => {
     if (tabel === 'perizinan') {
       const karyawanId = formState.karyawan_id || profile?.user_id;
       const tanggal = formState.tanggal;
@@ -736,6 +756,30 @@ const ModalForm = ({ tabel, isEdit, dataAwal, onSimpan, onBatal, onError, opsiUs
                 <label className="form-label small fw-semibold">No. Izin Usaha</label>
                 <input type="text" name="no_izin" className="form-control input-premium" value={formState.no_izin || ''} onChange={handleChange} placeholder="cth: NIB-12345" />
               </div>
+            </div>
+            <div className="mt-3">
+              <label className="form-label small fw-semibold">Logo Usaha (Format Gambar, Maks. 2MB)</label>
+              <input
+                type="file"
+                name="logo_file"
+                accept="image/*"
+                className="form-control input-premium"
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  setFormState(prev => ({ ...prev, logo: file }));
+                }}
+              />
+              {formState.id && typeof formState.logo === 'string' && formState.logo && (
+                <div className="small text-muted mt-1 d-flex align-items-center gap-2">
+                  <span>Logo Aktif:</span>
+                  <img
+                    src={`http://localhost:8080/api/ambil-logo/${formState.logo}`}
+                    alt="Logo Usaha"
+                    style={{ height: '30px', objectFit: 'contain', borderRadius: '4px' }}
+                  />
+                  <code>{formState.logo}</code>
+                </div>
+              )}
             </div>
 
             {/* PETA INTERAKTIF LOKASI USAHA */}
@@ -4462,10 +4506,10 @@ const Dashboard = () => {
     let headers = { 'Authorization': `Bearer ${token}` };
     let bodyPayload;
 
-    if (tabelTerpilih === 'perizinan') {
+    if (tabelTerpilih === 'perizinan' || tabelTerpilih === 'usaha') {
       const statusSaatIni = dataForm.status;
       const roleUser = profile?.role?.toLowerCase();
-      const isEvaluasiAtasan = isEdit 
+      const isEvaluasiAtasan = tabelTerpilih === 'perizinan' && isEdit 
         && ['root', 'owner', 'supervisor'].includes(roleUser) 
         && statusSaatIni === 'menunggu_persetujuan';
 
@@ -4490,8 +4534,10 @@ const Dashboard = () => {
         });
       } else {
         url = isEdit 
-          ? `http://localhost:8080/api/manajemen/ubah/perizinan/${dataForm.id}` 
-          : `http://localhost:8080/api/perizinan/ajukan`;
+          ? `http://localhost:8080/api/manajemen/ubah/${tabelTerpilih}/${dataForm.id}` 
+          : (tabelTerpilih === 'perizinan' 
+              ? `http://localhost:8080/api/perizinan/ajukan` 
+              : `http://localhost:8080/api/manajemen/tambah/${tabelTerpilih}`);
         method = 'POST';
         const formData = new FormData();
         Object.keys(dataForm).forEach(key => {
@@ -5872,7 +5918,19 @@ const Dashboard = () => {
                         <div className="p-3 rounded-3" style={{ backgroundColor: 'var(--bg-halaman)', border: '1px solid var(--warna-border)' }}>
                           <div className="text-muted small fw-semibold">Unit Usaha Aktif</div>
                           <div className="fw-bold text-main fs-5 mt-1 d-flex align-items-center gap-2">
-                            <Briefcase size={20} className="text-muted" />
+                            {(() => {
+                              const activeUsaha = opsiUsaha.find(u => u.id == profile?.usaha_id);
+                              if (activeUsaha?.logo) {
+                                return (
+                                  <img 
+                                    src={`http://localhost:8080/api/ambil-logo/${activeUsaha.logo}`} 
+                                    alt="Logo" 
+                                    style={{ height: '24px', width: '24px', objectFit: 'contain', borderRadius: '4px' }} 
+                                  />
+                                );
+                              }
+                              return <Briefcase size={20} className="text-muted" />;
+                            })()}
                             <span>{profile?.nama_usaha ? profile.nama_usaha : 'Global (Tidak Terikat Usaha)'}</span>
                           </div>
                           {profile?.nama_unit && (

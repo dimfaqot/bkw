@@ -55,7 +55,8 @@ class Manajemen extends ResourceController
                 ],
                 'pendiri' => 'permit_empty|min_length[3]',
                 'butuh_absen' => 'permit_empty|in_list[0,1]',
-                'kode_usaha' => 'permit_empty'
+                'kode_usaha' => 'permit_empty',
+                'logo' => 'permit_empty'
             ];
         } else if ($tabel === 'unit') {
             $aturan = [
@@ -879,6 +880,12 @@ class Manajemen extends ResourceController
                 $input['status'] = 'menunggu_persetujuan';
             }
         }
+        if ($tabel === 'usaha') {
+            $logoFile = $this->prosesUploadLogo();
+            if ($logoFile) {
+                $input['logo'] = $logoFile;
+            }
+        }
         if ($tabel === 'pengeluaran') {
             $input['pencatat_id'] = $penggunaAktif['uid'] ?? null;
             $kategori = $input['kategori'] ?? 'Operasional';
@@ -1436,6 +1443,17 @@ class Manajemen extends ResourceController
 
             }
         }
+        if ($tabel === 'usaha') {
+            $logoFile = $this->prosesUploadLogo();
+            if ($logoFile) {
+                // Hapus berkas logo lama jika ada logo baru diunggah
+                $existingLogo = $existing->logo ?? null;
+                if ($existingLogo && file_exists(WRITEPATH . 'uploads/logos/' . $existingLogo)) {
+                    @unlink(WRITEPATH . 'uploads/logos/' . $existingLogo);
+                }
+                $input['logo'] = $logoFile;
+            }
+        }
         if ($tabel === 'pengeluaran') {
             $fieldJoin = ['nama_unit', 'nama_produk', 'nama_karyawan_gaji', 'nama_pencatat', 'nama_penanggung_jawab'];
             foreach ($fieldJoin as $f) {
@@ -1844,6 +1862,39 @@ class Manajemen extends ResourceController
             return $namaBaru;
         }
         return null;
+     }
+
+    /**
+     * Helper untuk memproses upload logo usaha
+     */
+    private function prosesUploadLogo()
+    {
+        $file = $this->request->getFile('logo');
+        if ($file && $file->isValid() && !$file->hasMoved()) {
+            $namaBaru = $file->getRandomName();
+            $targetDir = WRITEPATH . 'uploads/logos/';
+            
+            if (!is_dir($targetDir)) {
+                mkdir($targetDir, 0777, true);
+            }
+
+            $mime = $file->getMimeType();
+            if (in_array($mime, ['image/jpeg', 'image/png', 'image/webp', 'image/x-icon', 'image/gif'])) {
+                $tempPath = $file->getTempName();
+                try {
+                    \Config\Services::image()
+                        ->withFile($tempPath)
+                        ->resize(300, 300, true, 'auto')
+                        ->save($targetDir . $namaBaru, 85);
+                } catch (\Throwable $e) {
+                    $file->move($targetDir, $namaBaru);
+                }
+            } else {
+                $file->move($targetDir, $namaBaru);
+            }
+            return $namaBaru;
+        }
+        return null;
     }
 
     /**
@@ -1889,6 +1940,26 @@ class Manajemen extends ResourceController
         $filePath = WRITEPATH . 'uploads/perizinan/' . $namaFile;
         if (!file_exists($filePath)) {
             return $this->failNotFound('File fisik tidak ditemukan di server.');
+        }
+
+        $mimeType = mime_content_type($filePath);
+        $fileContent = file_get_contents($filePath);
+
+        return $this->response
+            ->setHeader('Content-Type', $mimeType)
+            ->setHeader('Content-Disposition', 'inline; filename="' . $namaFile . '"')
+            ->setBody($fileContent);
+    }
+
+    /**
+     * GET /api/ambil-logo/{namaFile}
+     * Men-stream berkas logo secara publik (untuk tab icon & PDF).
+     */
+    public function ambilLogoUsaha($namaFile)
+    {
+        $filePath = WRITEPATH . 'uploads/logos/' . $namaFile;
+        if (!file_exists($filePath)) {
+            return $this->response->setStatusCode(404)->setBody('Logo tidak ditemukan.');
         }
 
         $mimeType = mime_content_type($filePath);

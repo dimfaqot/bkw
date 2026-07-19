@@ -15,6 +15,9 @@ $routes->group('api/auth', function($routes) {
     $routes->post('pilih-usaha', '\App\Modules\Auth\Controllers\Auth::pilihUsaha', ['filter' => 'jwt']);
 });
 
+// Public route to retrieve Usaha Logo
+$routes->get('api/ambil-logo/(:any)', '\App\Modules\Manajemen\Controllers\Manajemen::ambilLogoUsaha/$1');
+
 // CRUD Manajemen Rute (Bahasa Indonesia)
 $routes->group('api/manajemen', ['filter' => 'jwt'], function($routes) {
     $routes->get('ambil-bukti/perizinan/(:any)', '\App\Modules\Manajemen\Controllers\Manajemen::ambilBuktiPerizinan/$1');
