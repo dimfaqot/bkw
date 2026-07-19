@@ -2710,6 +2710,9 @@ const Dashboard = () => {
   const [filterTahunAbsensi, setFilterTahunAbsensi] = useState('');
   const [filterBulanIzin, setFilterBulanIzin] = useState('');
   const [filterTahunIzin, setFilterTahunIzin] = useState('');
+  const [filterBulanPengeluaran, setFilterBulanPengeluaran] = useState('');
+  const [filterTahunPengeluaran, setFilterTahunPengeluaran] = useState('');
+  const [filterUnitPengeluaran, setFilterUnitPengeluaran] = useState('');
   const [filterUsahaGlobal, setFilterUsahaGlobal] = useState('');
   const [loadingIzin, setLoadingIzin] = useState(null);
   const [riwayatPerizinan, setRiwayatPerizinan] = useState([]);
@@ -6868,37 +6871,44 @@ const Dashboard = () => {
                           const totalTap = filtered.filter(t => t.status_pembayaran === 'lunas' && t.metode_pembayaran === 'tap').reduce((sum, t) => sum + Number(t.total_harga), 0);
                           const totalHutang = filtered.filter(t => t.status_pembayaran === 'belum_bayar').reduce((sum, t) => sum + Number(t.total_harga), 0);
                           const totalSemua = totalCash + totalQris + totalTap + totalHutang;
+                          const jumlahTransaksi = filtered.length;
 
                           return (
                             <div className="row g-2 mb-4">
-                              <div className="col-6 col-md-2.4" style={{ width: '20%' }}>
+                              <div className="col-6 col-sm-4 col-md-2">
                                 <div className="p-2 rounded-3 text-center" style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                   <div className="text-muted small" style={{ fontSize: '0.65rem' }}>💵 Cash</div>
                                   <div className="fw-bold text-success" style={{ fontSize: '0.8rem' }}>{formatRupiah(totalCash)}</div>
                                 </div>
                               </div>
-                              <div className="col-6 col-md-2.4" style={{ width: '20%' }}>
+                              <div className="col-6 col-sm-4 col-md-2">
                                 <div className="p-2 rounded-3 text-center" style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                   <div className="text-muted small" style={{ fontSize: '0.65rem' }}>📱 QRIS</div>
                                   <div className="fw-bold text-info" style={{ fontSize: '0.8rem' }}>{formatRupiah(totalQris)}</div>
                                 </div>
                               </div>
-                              <div className="col-6 col-md-2.4" style={{ width: '20%' }}>
+                              <div className="col-6 col-sm-4 col-md-2">
                                 <div className="p-2 rounded-3 text-center" style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                   <div className="text-muted small" style={{ fontSize: '0.65rem' }}>🔲 Tap</div>
                                   <div className="fw-bold text-warning" style={{ fontSize: '0.8rem' }}>{formatRupiah(totalTap)}</div>
                                 </div>
                               </div>
-                              <div className="col-6 col-md-2.4" style={{ width: '20%' }}>
+                              <div className="col-6 col-sm-4 col-md-2">
                                 <div className="p-2 rounded-3 text-center" style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                   <div className="text-muted small" style={{ fontSize: '0.65rem' }}>⚠️ Hutang</div>
                                   <div className="fw-bold text-danger" style={{ fontSize: '0.8rem' }}>{formatRupiah(totalHutang)}</div>
                                 </div>
                               </div>
-                              <div className="col-12 col-md-2.4" style={{ width: '20%' }}>
+                              <div className="col-6 col-sm-4 col-md-2">
                                 <div className="p-2 rounded-3 text-center" style={{ backgroundColor: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
                                   <div className="text-muted small" style={{ fontSize: '0.65rem', fontWeight: 600 }}>✅ Total Semua</div>
                                   <div className="fw-bold" style={{ fontSize: '0.8rem', color: 'var(--warna-utama, #6366f1)' }}>{formatRupiah(totalSemua)}</div>
+                                </div>
+                              </div>
+                              <div className="col-6 col-sm-4 col-md-2">
+                                <div className="p-2 rounded-3 text-center" style={{ backgroundColor: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                                  <div className="text-muted small" style={{ fontSize: '0.65rem', fontWeight: 600 }}>📊 Transaksi</div>
+                                  <div className="fw-bold" style={{ fontSize: '0.8rem', color: 'var(--warna-utama, #6366f1)' }}>{jumlahTransaksi} Tx</div>
                                 </div>
                               </div>
                             </div>
@@ -7061,6 +7071,21 @@ const Dashboard = () => {
                     if (filterUsahaGlobal && String(row.usaha_id) !== String(filterUsahaGlobal)) return false;
                   }
 
+                  // Filter Bulan, Tahun & Unit khusus pengeluaran
+                  if (currentMenu.tabel === 'pengeluaran') {
+                    if (row.tanggal) {
+                      const parts = row.tanggal.split('-');
+                      if (parts.length >= 2) {
+                        const y = parts[0];
+                        const m = parts[1];
+                        if (filterBulanPengeluaran && m !== filterBulanPengeluaran) return false;
+                        if (filterTahunPengeluaran && y !== filterTahunPengeluaran) return false;
+                      }
+                    }
+                    if (filterUnitPengeluaran && String(row.unit_id) !== String(filterUnitPengeluaran)) return false;
+                    if (filterUsahaGlobal && String(row.usaha_id) !== String(filterUsahaGlobal)) return false;
+                  }
+
                   if (!kataKunciPencarian) return true;
                   const lowerKeyword = kataKunciPencarian.toLowerCase();
                   
@@ -7069,6 +7094,28 @@ const Dashboard = () => {
                     const matchNama = row.nama && String(row.nama).toLowerCase().includes(lowerKeyword);
                     const matchWa = row.wa && String(row.wa).toLowerCase().includes(lowerKeyword);
                     return matchNama || matchWa;
+                  }
+
+                  // Khusus tabel pengeluaran: cari berdasarkan kategori, nama unit, atau detail keperluan
+                  if (currentMenu.tabel === 'pengeluaran') {
+                    const kategori = row.kategori || '';
+                    const unit = row.nama_unit || '';
+                    const detailKeperluan = (() => {
+                      if (row.kategori === 'Gaji') {
+                        return row.nama_karyawan_gaji || '';
+                      }
+                      if (row.kategori === 'Bahan Baku') {
+                        return row.nama_produk || '';
+                      }
+                      if (row.kategori === 'Inv') {
+                        return row.deskripsi_keperluan || '';
+                      }
+                      return row.deskripsi_keperluan || '';
+                    })();
+                    
+                    return kategori.toLowerCase().includes(lowerKeyword) || 
+                           unit.toLowerCase().includes(lowerKeyword) || 
+                           detailKeperluan.toLowerCase().includes(lowerKeyword);
                   }
                   
                   // Tabel user_role: cari berdasarkan nama user, usaha, atau role
@@ -7692,6 +7739,129 @@ const Dashboard = () => {
                                 Reset Filter
                               </button>
                             )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Filter Bar khusus untuk Pengeluaran */}
+                    {currentMenu.tabel === 'pengeluaran' && (() => {
+                      const namaBulan = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+                      
+                      const tahunSet = new Set();
+                      dataTabel.forEach(row => {
+                        if (row.tanggal) {
+                          const parts = row.tanggal.split('-');
+                          if (parts.length >= 1 && parts[0]) {
+                            tahunSet.add(parts[0]);
+                          }
+                        }
+                      });
+                      const tahunList = Array.from(tahunSet).sort((a, b) => b - a);
+                      if (tahunList.length === 0) {
+                        tahunList.push(new Date().getFullYear().toString());
+                      }
+
+                      const totalPengeluaran = dataTabelFiltered.reduce((acc, r) => acc + (parseFloat(r.nominal_total) || 0), 0);
+
+                      return (
+                        <div className="mb-4 p-3 rounded-3" style={{ background: 'var(--bg-halaman)', border: '1px solid var(--warna-border)' }}>
+                          <div className="d-flex flex-wrap align-items-center gap-3">
+                            <span className="fw-semibold text-main d-flex align-items-center gap-1" style={{ fontSize: '0.75rem' }}>
+                              📅 Filter:
+                            </span>
+                            
+                            {!profile?.usaha_id && (
+                              <div className="d-flex align-items-center gap-2">
+                                <select
+                                  className="form-select form-select-sm input-premium"
+                                  style={{ width: 'auto', fontSize: '0.72rem', padding: '0.2rem 1.8rem 0.2rem 0.5rem' }}
+                                  value={filterUsahaGlobal}
+                                  onChange={e => setFilterUsahaGlobal(e.target.value)}
+                                >
+                                  <option value="">Semua Cabang/Usaha</option>
+                                  {opsiUsaha.map(u => (
+                                    <option key={u.id} value={u.id}>{u.nama_usaha}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
+
+                            <div className="d-flex align-items-center gap-2">
+                              <select
+                                className="form-select form-select-sm input-premium"
+                                style={{ width: 'auto', fontSize: '0.72rem', padding: '0.2rem 1.8rem 0.2rem 0.5rem' }}
+                                value={filterUnitPengeluaran}
+                                onChange={e => setFilterUnitPengeluaran(e.target.value)}
+                              >
+                                <option value="">Semua Unit</option>
+                                {opsiUnit.map(un => (
+                                  <option key={un.id} value={un.id}>{un.nama_unit}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="d-flex align-items-center gap-2">
+                              <select
+                                className="form-select form-select-sm input-premium"
+                                style={{ width: 'auto', fontSize: '0.72rem', padding: '0.2rem 1.8rem 0.2rem 0.5rem' }}
+                                value={filterBulanPengeluaran}
+                                onChange={e => setFilterBulanPengeluaran(e.target.value)}
+                              >
+                                <option value="">Semua Bulan</option>
+                                {namaBulan.map((b, i) => (
+                                  <option key={i} value={String(i + 1).padStart(2, '0')}>{b}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="d-flex align-items-center gap-2">
+                              <select
+                                className="form-select form-select-sm input-premium"
+                                style={{ width: 'auto', fontSize: '0.72rem', padding: '0.2rem 1.8rem 0.2rem 0.5rem' }}
+                                value={filterTahunPengeluaran}
+                                onChange={e => setFilterTahunPengeluaran(e.target.value)}
+                              >
+                                <option value="">Semua Tahun</option>
+                                {tahunList.map(t => (
+                                  <option key={t} value={String(t)}>{t}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {(filterBulanPengeluaran || filterTahunPengeluaran || filterUnitPengeluaran || filterUsahaGlobal) && (
+                              <button 
+                                onClick={() => {
+                                  setFilterBulanPengeluaran('');
+                                  setFilterTahunPengeluaran('');
+                                  setFilterUnitPengeluaran('');
+                                  setFilterUsahaGlobal('');
+                                }} 
+                                className="tombol-sekunder-premium btn-sm border-0" 
+                                style={{ fontSize: '0.68rem', padding: '0.2rem 0.6rem', borderRadius: '15px' }}
+                              >
+                                Reset Filter
+                              </button>
+                            )}
+
+                            {/* Summary info */}
+                            <div className="ms-sm-auto d-flex flex-wrap gap-2 align-items-center">
+                              <div className="d-flex align-items-center gap-1" style={{ background: 'rgba(99,102,241,0.05)', borderRadius: '12px', padding: '3px 10px', border: '1px solid rgba(99,102,241,0.15)' }}>
+                                <span style={{ fontSize: '0.68rem', color: 'var(--warna-teks-sekunder)' }}>Jumlah Data:</span>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--warna-utama)' }}>
+                                  {dataTabelFiltered.length}
+                                </span>
+                                <span style={{ fontSize: '0.62rem', color: 'var(--warna-teks-sekunder)' }}>item</span>
+                              </div>
+
+                              <div className="d-flex align-items-center gap-1" style={{ background: 'rgba(239,68,68,0.06)', borderRadius: '12px', padding: '3px 10px', border: '1px solid rgba(239,68,68,0.15)' }}>
+                                <span style={{ fontSize: '0.68rem', color: 'var(--warna-teks-sekunder)' }}>Total Pengeluaran:</span>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--warna-bahaya)', fontFamily: 'monospace' }}>
+                                  {formatRupiah(totalPengeluaran)}
+                                </span>
+                              </div>
+                            </div>
+
                           </div>
                         </div>
                       );
