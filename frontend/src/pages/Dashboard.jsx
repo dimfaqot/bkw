@@ -8421,10 +8421,9 @@ const Dashboard = () => {
                           const dStart = new Date(laporanFilter.start_date);
                           const bulanStart = namaBulanId[dStart.getMonth()].toUpperCase();
                           const tahunStart = dStart.getFullYear();
-                          const jenis = isCetakMode === 'singkat' ? 'SINGKAT (REKAP HARIAN)' : 'DETAIL TRANSAKSI';
                           return (
                             <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#111', borderBottom: '1px solid #999', paddingBottom: '4px', marginBottom: '16px', textAlign: 'center' }}>
-                              LAPORAN KEUANGAN {jenis} BULAN {bulanStart} TAHUN {tahunStart}
+                              LAPORAN KEUANGAN BULAN {bulanStart} TAHUN {tahunStart}
                             </div>
                           );
                         })()}
