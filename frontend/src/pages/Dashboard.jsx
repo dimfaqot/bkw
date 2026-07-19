@@ -2332,6 +2332,21 @@ const Dashboard = () => {
     }
   }, []);
 
+  const scrollKeJobBoard = useCallback((delay = 400) => {
+    setTimeout(() => {
+      const element = document.getElementById('job-board-widget');
+      if (element) {
+        const headerOffset = 75; // Offset for mobile fixed navbar
+        const elementPosition = element.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: 'smooth'
+        });
+      }
+    }, delay);
+  }, []);
+
   const handleKlaimJob = async (detailId) => {
     const token = localStorage.getItem('token');
     if (!token) return;
@@ -3031,9 +3046,7 @@ const Dashboard = () => {
         setMenuAktif(targetMenu);
         
         if (shouldScrollJobBoard) {
-          setTimeout(() => {
-            document.getElementById('job-board-widget')?.scrollIntoView({ behavior: 'smooth' });
-          }, 400);
+          scrollKeJobBoard(400);
         }
       }
     } catch (err) {
@@ -3169,9 +3182,7 @@ const Dashboard = () => {
     if (menuParam) {
       if (menuParam === '/dashboard' || menuParam === 'beranda') {
         setMenuAktif('beranda');
-        setTimeout(() => {
-          document.getElementById('job-board-widget')?.scrollIntoView({ behavior: 'smooth' });
-        }, 800);
+        scrollKeJobBoard(800);
       } else {
         setMenuAktif(menuParam);
       }
@@ -3200,9 +3211,7 @@ const Dashboard = () => {
           if (menuParam) {
             if (menuParam === '/dashboard' || menuParam === 'beranda') {
               setMenuAktif('beranda');
-              setTimeout(() => {
-                document.getElementById('job-board-widget')?.scrollIntoView({ behavior: 'smooth' });
-              }, 400);
+              scrollKeJobBoard(400);
             } else {
               setMenuAktif(menuParam);
             }
