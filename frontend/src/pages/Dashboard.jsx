@@ -8224,6 +8224,10 @@ const Dashboard = () => {
                   <div className="fade-in laporan-page">
                     {/* STYLES KHUSUS PRINT PDF & RESPONSIVE FONT */}
                     <style dangerouslySetInnerHTML={{ __html: `
+                      @page {
+                        size: 210mm 330mm;
+                        margin: 15mm 12mm;
+                      }
                       @media print {
                         body {
                           background: white !important;
