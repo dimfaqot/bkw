@@ -3137,12 +3137,16 @@ const Dashboard = () => {
   useEffect(() => {
     if (isCetakMode) {
       const judulAsli = document.title;
+      const urlAsli = window.location.href;
       const timer = setTimeout(() => {
-        document.title = ' '; // Kosongkan judul agar header browser tidak muncul
+        // Kosongkan judul & URL agar header/footer browser tidak muncul di PDF
+        document.title = ' ';
+        window.history.replaceState(null, '', '/');
         window.print();
-        // Kembalikan judul setelah dialog cetak selesai
+        // Kembalikan setelah dialog cetak selesai
         window.onafterprint = () => {
           document.title = judulAsli;
+          window.history.replaceState(null, '', urlAsli);
           window.onafterprint = null;
         };
         setIsCetakMode(null);
@@ -8289,21 +8293,32 @@ const Dashboard = () => {
                     {/* PRINT SHEET WRAPPER (hanya muncul saat mencetak) */}
                     {isCetakMode && (
                       <div className="print-container d-none d-print-block bg-white text-dark">
-                        <div className="d-flex justify-content-between align-items-center mb-4 pb-3" style={{ borderBottom: '2px solid #000' }}>
-                          <div>
-                            <h2 className="fw-bold mb-1">{profile?.nama_usaha || 'Laporan Finansial BKW'}</h2>
-                            <p className="mb-0 text-muted small">
-                              Periode: {formatTanggal(laporanFilter.start_date, 'sedang')} s/d {formatTanggal(laporanFilter.end_date, 'sedang')}
-                              {laporanFilter.unit_id && ` · Cabang: ${opsiUnit.find(u => u.id == laporanFilter.unit_id)?.nama_unit || ''}`}
-                            </p>
+                        {/* KOP SURAT */}
+                        <div className="d-flex justify-content-between align-items-start mb-3 pb-3" style={{ borderBottom: '2px solid #111' }}>
+                          <div className="d-flex align-items-center gap-3">
+                            {profile?.logo_usaha && (
+                              <img
+                                src={`http://localhost:8080/api/ambil-logo/${profile.logo_usaha}`}
+                                alt="Logo"
+                                style={{ height: '60px', width: 'auto', objectFit: 'contain', display: 'block' }}
+                              />
+                            )}
+                            <div>
+                              <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#111', lineHeight: 1.2 }}>
+                                {profile?.nama_usaha || 'Laporan Finansial'}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: '#555', marginTop: '2px' }}>
+                                Periode: {formatTanggal(laporanFilter.start_date, 'sedang')} s/d {formatTanggal(laporanFilter.end_date, 'sedang')}
+                                {laporanFilter.unit_id && (
+                                  <span> &middot; Cabang: {opsiUnit.find(u => u.id == laporanFilter.unit_id)?.nama_unit || ''}</span>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                          {profile?.logo_usaha ? (
-                            <img 
-                              src={`http://localhost:8080/api/ambil-logo/${profile.logo_usaha}`} 
-                              alt="Logo Usaha" 
-                              style={{ height: '50px', objectFit: 'contain' }} 
-                            />
-                          ) : null}
+                          <div style={{ fontSize: '0.7rem', color: '#555', textAlign: 'right', paddingTop: '4px' }}>
+                            <div>Dicetak: {new Date().toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' })}</div>
+                            <div style={{ marginTop: '2px' }}>{new Date().toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' })}</div>
+                          </div>
                         </div>
 
                         <h4 className="text-center fw-bold mb-4">
@@ -8842,7 +8857,7 @@ const Dashboard = () => {
         </main>
 
         {/* Footer (Desktop Only) */}
-        <footer className="text-center text-muted small py-3 mt-auto d-none d-sm-block" style={{ borderTop: '1px solid var(--warna-border)' }}>
+        <footer className="text-center text-muted small py-3 mt-auto d-none d-sm-block noprint" style={{ borderTop: '1px solid var(--warna-border)' }}>
           &copy; 2026 mPOS Pro - Aplikasi ERP & Kasir Multi-Tenant.
         </footer>
       </div>
