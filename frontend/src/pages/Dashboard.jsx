@@ -7310,12 +7310,38 @@ const Dashboard = () => {
                                               </button>
                                               {prod.tipe === 'sewa' && (
                                                 <button
-                                                  onClick={() => {
+                                                  onClick={async () => {
                                                     const dev = billiardDevices.find(d => Number(d.iot_id) === Number(prod.iot_id));
-                                                    if (dev) {
-                                                      bukaModalMulaiBilliard(dev);
-                                                    } else {
+                                                    if (!dev) {
                                                       ui.notif('gagal', 'Belum ada Perangkat IoT terhubung ke produk sewa ini.');
+                                                      return;
+                                                    }
+                                                    try {
+                                                      ui.loading(true, `Memulai Sesi Open ${prod.nama_produk}...`);
+                                                      const token = localStorage.getItem('token');
+                                                      const res = await fetch(`${API_BASE_URL}/transaksi/billiard/mulai`, {
+                                                        method: 'POST',
+                                                        headers: {
+                                                          'Content-Type': 'application/json',
+                                                          'Authorization': `Bearer ${token}`
+                                                        },
+                                                        body: JSON.stringify({
+                                                          iot_alokasi_id: dev.id,
+                                                          produk_id: prod.id,
+                                                          tipe_billing: 'open'
+                                                        })
+                                                      });
+                                                      const json = await res.json();
+                                                      ui.loading(false);
+                                                      if (res.ok && json.status === 'sukses') {
+                                                        ui.notif('sukses', `Sesi Open ${prod.nama_produk} dimulai! Lampu saklar ON.`);
+                                                        fetchBilliardStatus();
+                                                      } else {
+                                                        ui.notif('gagal', json.pesan || 'Gagal memulai Sesi Open.');
+                                                      }
+                                                    } catch {
+                                                      ui.loading(false);
+                                                      ui.notif('gagal', 'Terjadi kesalahan koneksi.');
                                                     }
                                                   }}
                                                   className="tombol-sekunder-premium border-0 py-1 px-2"
