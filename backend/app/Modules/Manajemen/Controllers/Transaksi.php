@@ -639,6 +639,10 @@ class Transaksi extends ResourceController
         $items = $input['items'] ?? [];
         $db->transStart();
         $dateTimeNow = date('Y-m-d H:i:s');
+
+        // Matikan lampu & kalkulasi durasi/biaya sewa billiard secara presisi terlebih dahulu jika ada
+        $this->matikanLampuBilliardJikaLunas($db, $id, $dateTimeNow);
+
         $totalHargaBaru = (float)$transaksi['total_harga'];
 
         if (!empty($items) && is_array($items)) {
@@ -681,7 +685,12 @@ class Transaksi extends ResourceController
                 }
 
                 $isSewa = ($produk->tipe === 'sewa' || !empty($produk->iot_id));
-                if ($qtyBaru < 0 || ($qtyBaru == 0 && !$isSewa)) {
+                if ($isSewa) {
+                    // Produk sewa durasinya sudah dihitung & dikunci oleh matikanLampuBilliardJikaLunas
+                    continue;
+                }
+
+                if ($qtyBaru <= 0) {
                     $db->transRollback();
                     return $this->respond(['status' => 'gagal', 'pesan' => 'Item produk atau kuantitas tidak valid.'], 400);
                 }
@@ -753,8 +762,6 @@ class Transaksi extends ResourceController
                'total_harga'       => $totalHargaBaru,
                'updated_at'        => $dateTimeNow
            ]);
-
-        $this->matikanLampuBilliardJikaLunas($db, $id, $dateTimeNow);
 
         $db->transComplete();
 

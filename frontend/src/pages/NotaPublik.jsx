@@ -117,9 +117,15 @@ const NotaPublik = () => {
                         </span>
                       )}
                     </div>
-                    <div className="text-muted text-xs" style={{ fontSize: '0.72rem' }}>{d.qty} x {formatRupiah(d.harga_satuan)}</div>
+                    <div className="text-muted text-xs" style={{ fontSize: '0.72rem' }}>
+                      {d.tipe === 'sewa' ? (
+                        `${d.qty}m (${(d.qty / 60).toFixed(1)} Jam) x ${formatRupiah(d.harga_satuan)}/jam`
+                      ) : (
+                        `${d.qty} x ${formatRupiah(d.harga_satuan)}`
+                      )}
+                    </div>
                   </div>
-                  <div className="fw-bold">{formatRupiah(d.harga_satuan * d.qty)}</div>
+                  <div className="fw-bold">{formatRupiah(d.subtotal ? d.subtotal : d.harga_satuan * d.qty)}</div>
                 </div>
               );
             })}

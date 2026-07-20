@@ -7816,7 +7816,7 @@ const Dashboard = () => {
                                           <div className="d-flex flex-column gap-1">
                                             {tx.detail?.map(d => (
                                               <span key={d.id} className="small text-muted" style={{ fontSize: '0.68rem' }}>
-                                                • {d.nama_produk} ({d.qty} x {formatRupiah(d.harga_satuan)})
+                                                • {d.nama_produk} {d.tipe === 'sewa' ? `(${d.qty}m / ${(d.qty / 60).toFixed(1)} Jam)` : `(${d.qty} x ${formatRupiah(d.harga_satuan)})`}
                                               </span>
                                             ))}
                                           </div>
