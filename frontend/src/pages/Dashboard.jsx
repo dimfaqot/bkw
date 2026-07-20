@@ -4529,12 +4529,21 @@ const Dashboard = () => {
       ui.loading(false);
       if (response.ok && res.status === 'sukses') {
         ui.notif('sukses', res.pesan || 'Tambahan pesanan berhasil disimpan!');
-        setShowDetailNotaModal(false);
-        setSelectedTransaksi(null);
         setPilihanProdukHutang('');
         setPilihanQtyHutang(1);
         fetchPosProducts();
         fetchRiwayatTransaksi(filterTanggalPos);
+
+        // Refetch & recalculate transaction details live without closing modal
+        try {
+          const detailRes = await fetch(`${API_BASE_URL}/transaksi-publik/detail/${selectedTransaksi.id}`);
+          const detailJson = await detailRes.json();
+          if (detailRes.ok && detailJson.status === 'sukses') {
+            setSelectedTransaksi(detailJson.data);
+          }
+        } catch (err) {
+          console.error("Gagal refresh detail nota:", err);
+        }
       } else {
         ui.notif('gagal', res.pesan || 'Gagal menyimpan tambahan pesanan.');
       }
