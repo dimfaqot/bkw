@@ -10233,31 +10233,79 @@ const Dashboard = () => {
               </div>
 
               {/* Items List */}
-              <div className="mt-3">
-                <div className="fw-bold text-main mb-2" style={{ borderBottom: '1px dashed var(--warna-border)', paddingBottom: '4px' }}>Daftar Belanja:</div>
-                <div className="d-flex flex-column gap-2">
-                  {selectedTransaksi.detail?.map(d => (
-                    <div key={d.id} className="pb-1 mb-1" style={{ borderBottom: '1px dashed rgba(255,255,255,0.05)' }}>
-                      <div className="d-flex justify-content-between align-items-center">
-                        <div className="text-main">• {d.nama_produk} (x{d.qty})</div>
-                        <div className="fw-bold text-main">{formatRupiah(d.harga_satuan * d.qty)}</div>
-                      </div>
-                      {d.nama_petugas && (
-                        <div className="d-flex justify-content-between align-items-center text-muted ps-3 mt-0.5" style={{ fontSize: '0.68rem' }}>
-                          <span>✂️ Stylist: <strong>{d.nama_petugas}</strong></span>
-                          {Number(d.komisi_petugas) > 0 && (
-                            <span>Komisi: <strong className="text-success">{formatRupiah(d.komisi_petugas)}</strong></span>
+              {(() => {
+                let calculatedTotalTagihan = 0;
+                const processedDetail = selectedTransaksi.detail?.map(d => {
+                  const activeDev = billiardDevices.find(dev => Number(dev.transaksi_aktif_id) === Number(selectedTransaksi.id) || (Number(dev.iot_id) === Number(d.iot_id) && dev.status_penggunaan === 'dipakai'));
+                  const isOpenSewa = (d.qty == 0 || d.tipe === 'sewa') && activeDev && activeDev.status_penggunaan === 'dipakai';
+
+                  if (isOpenSewa && activeDev) {
+                    const liveMinutes = Math.max(1, Number(activeDev.durasi_berjalan_menit || Math.ceil((activeDev.durasi_berjalan_detik || 0) / 60)));
+                    const liveJamDesimal = (liveMinutes / 60).toFixed(1);
+                    const rawCost = liveMinutes * (Number(d.harga_satuan) / 60);
+                    const liveSubtotal = Math.ceil(rawCost / 500) * 500;
+                    calculatedTotalTagihan += liveSubtotal;
+
+                    return {
+                      ...d,
+                      is_live_open: true,
+                      live_minutes: liveMinutes,
+                      live_jam_desimal: liveJamDesimal,
+                      live_subtotal: liveSubtotal
+                    };
+                  } else {
+                    const itemSubtotal = (d.subtotal && Number(d.subtotal) > 0) ? Number(d.subtotal) : Number(d.harga_satuan) * Number(d.qty);
+                    calculatedTotalTagihan += itemSubtotal;
+                    return {
+                      ...d,
+                      is_live_open: false,
+                      item_subtotal: itemSubtotal
+                    };
+                  }
+                });
+
+                const hasLiveOpen = processedDetail?.some(x => x.is_live_open);
+
+                return (
+                  <div className="mt-3">
+                    <div className="fw-bold text-main mb-2" style={{ borderBottom: '1px dashed var(--warna-border)', paddingBottom: '4px' }}>Daftar Belanja:</div>
+                    <div className="d-flex flex-column gap-2">
+                      {processedDetail?.map(d => (
+                        <div key={d.id} className="pb-1 mb-1" style={{ borderBottom: '1px dashed rgba(255,255,255,0.05)' }}>
+                          <div className="d-flex justify-content-between align-items-center">
+                            <div className="text-main">
+                              • {d.nama_produk} {d.is_live_open ? (
+                                <span className="badge bg-danger ms-1" style={{ fontSize: '0.6rem' }}>
+                                  🔴 Sesi Open: ⏱️ {d.live_minutes}m ({d.live_jam_desimal} Jam)
+                                </span>
+                              ) : (
+                                `(x${d.qty})`
+                              )}
+                            </div>
+                            <div className={`fw-bold ${d.is_live_open ? 'text-warning' : 'text-main'}`}>
+                              {formatRupiah(d.is_live_open ? d.live_subtotal : d.item_subtotal)}
+                            </div>
+                          </div>
+                          {d.nama_petugas && (
+                            <div className="d-flex justify-content-between align-items-center text-muted ps-3 mt-0.5" style={{ fontSize: '0.68rem' }}>
+                              <span>✂️ Stylist: <strong>{d.nama_petugas}</strong></span>
+                              {Number(d.komisi_petugas) > 0 && (
+                                <span>Komisi: <strong className="text-success">{formatRupiah(d.komisi_petugas)}</strong></span>
+                              )}
+                            </div>
                           )}
                         </div>
-                      )}
+                      ))}
                     </div>
-                  ))}
-                </div>
-                <div className="d-flex justify-content-between align-items-center mt-3 pt-2 fw-bold text-main" style={{ borderTop: '1px solid var(--warna-border)' }}>
-                  <span>Total Tagihan:</span>
-                  <span className="fs-6" style={{ color: 'var(--warna-utama)' }}>{formatRupiah(selectedTransaksi.total_harga)}</span>
-                </div>
-              </div>
+                    <div className="d-flex justify-content-between align-items-center mt-3 pt-2 fw-bold text-main" style={{ borderTop: '1px solid var(--warna-border)' }}>
+                      <span>Total Tagihan {hasLiveOpen ? '(Real-Time Open)' : ''}:</span>
+                      <span className="fs-6" style={{ color: hasLiveOpen ? 'var(--bs-warning)' : 'var(--warna-utama)' }}>
+                        {formatRupiah(calculatedTotalTagihan > 0 ? calculatedTotalTagihan : selectedTransaksi.total_harga)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* ACTION PANEL BERDASARKAN STATUS */}
