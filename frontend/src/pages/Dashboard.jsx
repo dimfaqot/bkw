@@ -4242,13 +4242,14 @@ const Dashboard = () => {
 
   const tambahKeKeranjang = (prod) => {
     setCart(prev => {
-      const existing = prev.find(item => item.id === prod.id);
+      const currentCart = Array.isArray(prev) ? prev : [];
+      const existing = currentCart.find(item => item.id === prod.id);
       if (existing) {
         if (prod.tipe === 'barang' && prod.is_stok_dikelola == 1 && existing.qty >= prod.stok) {
           ui.notif('gagal', `Stok '${prod.nama_produk}' tidak mencukupi untuk ditambah lagi.`);
-          return prev;
+          return currentCart;
         }
-        return prev.map(item => {
+        return currentCart.map(item => {
           if (item.id === prod.id) {
             const newQty = item.qty + 1;
             let komisi = item.komisi_petugas;
@@ -4265,11 +4266,12 @@ const Dashboard = () => {
           }
           return item;
         });
+      } else {
         if (prod.tipe === 'barang' && prod.is_stok_dikelola == 1 && prod.stok <= 0) {
           ui.notif('gagal', `Stok '${prod.nama_produk}' sedang habis.`);
-          return prev;
+          return currentCart;
         }
-        return [...prev, { ...prod, qty: 1, petugas_id: '', komisi_petugas: '' }];
+        return [...currentCart, { ...prod, qty: 1, petugas_id: '', komisi_petugas: '' }];
       }
     });
   };
@@ -7072,7 +7074,7 @@ const Dashboard = () => {
                 });
 
                 // Hitung total belanjaan di keranjang
-                const totalBelanja = cart.reduce((total, item) => {
+                const totalBelanja = (Array.isArray(cart) ? cart : []).reduce((total, item) => {
                   if (item.tipe === 'sewa') {
                     const rawCost = item.qty * (item.harga_jual / 60);
                     return total + (Math.ceil(rawCost / 500) * 500);
