@@ -7281,11 +7281,22 @@ const Dashboard = () => {
                                             </div>
                                           ) : isOpen ? (
                                             <button
-                                              onClick={() => handleStopBilliard(iotDev)}
+                                              onClick={async () => {
+                                                if (!iotDev?.transaksi_aktif_id) {
+                                                  ui.notif('gagal', 'Transaksi aktif tidak ditemukan.');
+                                                  return;
+                                                }
+                                                const detailRes = await fetch(`${API_BASE_URL}/transaksi-publik/detail/${iotDev.transaksi_aktif_id}`);
+                                                const detailJson = await detailRes.json();
+                                                if (detailRes.ok && detailJson.status === 'sukses') {
+                                                  setSelectedTransaksi(detailJson.data);
+                                                  setShowDetailNotaModal(true);
+                                                }
+                                              }}
                                               className="tombol-premium border-0 w-100 py-1"
-                                              style={{ fontSize: '0.72rem', backgroundColor: 'var(--bs-danger)', borderColor: 'var(--bs-danger)' }}
+                                              style={{ fontSize: '0.72rem', backgroundColor: 'var(--bs-success)', borderColor: 'var(--bs-success)' }}
                                             >
-                                              🛑 Stop Sewa & Hitung Tagihan
+                                              💳 Bayar / Pelunasan Nota (#{iotDev.transaksi_aktif_id})
                                             </button>
                                           ) : isWaitingPayment ? (
                                             <button

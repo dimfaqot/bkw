@@ -1573,10 +1573,43 @@ class Transaksi extends ResourceController
     {
         $alokasi = $db->table('iot_alokasi')
                       ->where('transaksi_aktif_id', $transaksiId)
-                      ->where('status_penggunaan', 'selesai_menunggu_pembayaran')
+                      ->whereIn('status_penggunaan', ['dipakai', 'selesai_menunggu_pembayaran'])
                       ->get()->getRow();
 
         if ($alokasi) {
+            if ($alokasi->waktu_mulai) {
+                $startTime = strtotime($alokasi->waktu_mulai);
+                $elapsedMinutes = (int)ceil((time() - $startTime) / 60);
+                if ($elapsedMinutes < 1) $elapsedMinutes = 1;
+
+                if ($alokasi->prepaid_durasi_menit > 0 && $elapsedMinutes > $alokasi->prepaid_durasi_menit) {
+                    $elapsedMinutes = (int)$alokasi->prepaid_durasi_menit;
+                }
+
+                $detail = $db->table('transaksi_detail')->where('transaksi_id', $transaksiId)->get()->getRow();
+                if ($detail) {
+                    $hargaPerJam = (float)$detail->harga_satuan;
+                    if ($alokasi->prepaid_durasi_menit > 0) {
+                        $subtotal = round(($elapsedMinutes / 60) * $hargaPerJam);
+                    } else {
+                        $hargaMentah = $elapsedMinutes * ($hargaPerJam / 60);
+                        $subtotal = ceil($hargaMentah / 500) * 500;
+                    }
+
+                    $db->table('transaksi_detail')->where('id', $detail->id)->update([
+                        'qty'          => $elapsedMinutes,
+                        'durasi_menit' => $elapsedMinutes,
+                        'subtotal'     => $subtotal,
+                        'updated_at'   => $now
+                    ]);
+
+                    $db->table('transaksi')->where('id', $transaksiId)->update([
+                        'total_harga' => $subtotal,
+                        'updated_at'  => $now
+                    ]);
+                }
+            }
+
             $db->table('iot_alokasi')->where('id', $alokasi->id)->update([
                 'status_relay'         => 0,
                 'status_penggunaan'    => 'tersedia',
