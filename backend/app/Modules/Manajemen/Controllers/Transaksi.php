@@ -1395,9 +1395,10 @@ class Transaksi extends ResourceController
                 $subtotalBaru = $qtyBaru * (float)$detail->harga_satuan;
 
                 $db->table('transaksi_detail')->where('id', $detail->id)->update([
-                    'qty'        => $qtyBaru,
-                    'subtotal'   => $subtotalBaru,
-                    'updated_at' => $now
+                    'qty'          => $qtyBaru,
+                    'durasi_menit' => $durasiBaru,
+                    'subtotal'     => $subtotalBaru,
+                    'updated_at'   => $now
                 ]);
 
                 $db->table('transaksi')->where('id', $alokasi->transaksi_aktif_id)->update([

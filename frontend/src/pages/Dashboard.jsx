@@ -10329,9 +10329,13 @@ const Dashboard = () => {
                                 <span className="badge bg-danger ms-1" style={{ fontSize: '0.6rem' }}>
                                   🔴 Sesi Open: ⏱️ {d.live_minutes}m ({d.live_jam_desimal} Jam)
                                 </span>
-                              ) : d.tipe === 'sewa' ? (
-                                Number(d.qty) >= 60 ? `(${d.qty}m / ${(d.qty / 60).toFixed(1)} Jam)` : `(${d.qty} Jam)`
-                              ) : (
+                              ) : d.tipe === 'sewa' ? (() => {
+                                const mnt = Number(d.durasi_menit || (Number(d.qty) >= 10 ? d.qty : Math.round(Number(d.qty) * 60)) || 0);
+                                if (mnt <= 0) return `(${d.qty} Jam)`;
+                                const jamDecimal = (mnt / 60).toFixed(1);
+                                if (mnt % 60 === 0) return `(${mnt / 60} Jam)`;
+                                return `(${mnt}m / ${jamDecimal} Jam)`;
+                              })() : (
                                 `(x${d.qty})`
                               )}
                             </div>

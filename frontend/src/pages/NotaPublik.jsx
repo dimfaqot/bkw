@@ -118,9 +118,12 @@ const NotaPublik = () => {
                       )}
                     </div>
                     <div className="text-muted text-xs" style={{ fontSize: '0.72rem' }}>
-                      {d.tipe === 'sewa' ? (
-                        `${d.qty}m (${(d.qty / 60).toFixed(1)} Jam) x ${formatRupiah(d.harga_satuan)}/jam`
-                      ) : (
+                      {d.tipe === 'sewa' ? (() => {
+                        const mnt = Number(d.durasi_menit || (Number(d.qty) >= 10 ? d.qty : Math.round(Number(d.qty) * 60)) || 0);
+                        const jamDec = (mnt / 60).toFixed(1);
+                        if (mnt % 60 === 0) return `${mnt / 60} Jam x ${formatRupiah(d.harga_satuan)}/jam`;
+                        return `${mnt}m (${jamDec} Jam) x ${formatRupiah(d.harga_satuan)}/jam`;
+                      })() : (
                         `${d.qty} x ${formatRupiah(d.harga_satuan)}`
                       )}
                     </div>
