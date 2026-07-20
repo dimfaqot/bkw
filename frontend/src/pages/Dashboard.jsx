@@ -7195,56 +7195,52 @@ const Dashboard = () => {
                                           transition: 'all 0.2s'
                                         }}
                                         onClick={() => {
-                                          if (isRegular && iotDev) {
+                                          if (isRegular && iotDev?.status_pembayaran === 'belum_bayar') {
                                             bukaModalTambahDurasi(iotDev);
                                           }
                                         }}
-                                        title={isRegular ? "Klik kartu untuk menambah durasi main" : ""}
                                       >
                                         <div>
-                                          <div className="d-flex justify-content-between align-items-start gap-2 mb-1">
-                                            <span className="fw-bold text-main" style={{ fontSize: '0.82rem' }}>{prod.nama_produk}</span>
-                                            <div className="d-flex align-items-center gap-1">
-                                              {isUsed && (
-                                                <span className="badge bg-danger" style={{ fontSize: '0.58rem' }}>
-                                                  🔴 {isRegular ? 'Sesi Regular' : 'Sesi Open'}
-                                                </span>
-                                              )}
-                                              {isWaitingPayment && (
-                                                <span className="badge bg-warning text-dark" style={{ fontSize: '0.58rem' }}>
-                                                  🟡 Belum Bayar
-                                                </span>
-                                              )}
-                                              <span className="badge bg-light text-dark" style={{ fontSize: '0.6rem' }}>{prod.nama_unit || 'Global'}</span>
-                                            </div>
-                                          </div>
-                                          
-                                          <div className="d-flex align-items-center justify-content-between mt-1 mb-2">
-                                            <span className="text-primary fw-bold" style={{ fontSize: '0.8rem', color: 'var(--warna-utama)' }}>
-                                              {formatRupiah(prod.harga_jual)} <span className="text-muted fw-normal" style={{ fontSize: '0.65rem' }}>/jam</span>
-                                            </span>
-                                            
-                                            {prod.is_stok_dikelola == 1 ? (
-                                              <span className={`badge ${isStokMenipis ? 'bg-danger' : 'bg-secondary'}`} style={{ fontSize: '0.62rem' }}>
-                                                Stok: {prod.stok} {prod.satuan} {isStokMenipis && '⚠️'}
-                                              </span>
+                                          {/* Badge Header Kartu */}
+                                          <div className="d-flex align-items-center justify-content-between mb-2">
+                                            <span className="fw-bold text-main" style={{ fontSize: '0.85rem' }}>{prod.nama_produk}</span>
+                                            {isRegular ? (
+                                              <span className="badge bg-danger text-white pulse-badge" style={{ fontSize: '0.6rem' }}>🔴 Sesi Regular</span>
+                                            ) : isOpen ? (
+                                              <span className="badge bg-danger text-white pulse-badge" style={{ fontSize: '0.6rem' }}>🔴 Sesi Open</span>
+                                            ) : isWaitingPayment ? (
+                                              <span className="badge bg-warning text-dark fw-bold" style={{ fontSize: '0.6rem' }}>🟡 Belum Bayar</span>
                                             ) : (
-                                              <span className="text-muted small" style={{ fontSize: '0.65rem' }}>
-                                                {iotDev ? `🔌 Saklar ON/OFF` : 'Non-Stok'}
-                                              </span>
+                                              <span className="badge bg-secondary text-light" style={{ fontSize: '0.6rem' }}>{prod.nama_unit || 'Kantin'}</span>
                                             )}
                                           </div>
 
-                                          {/* Direct Live Timer Display */}
+                                          <div className="d-flex align-items-center justify-content-between mb-2">
+                                            <div className="text-primary fw-bold" style={{ fontSize: '0.82rem', color: 'var(--warna-utama)' }}>
+                                              {formatRupiah(prod.harga_jual)} <span className="text-muted fw-normal" style={{ fontSize: '0.68rem' }}>/{prod.satuan || 'hrs'}</span>
+                                            </div>
+                                            {prod.is_stok_dikelola == 1 && (
+                                              <span className={`badge ${prod.stok <= 0 ? 'bg-danger' : 'bg-secondary'}`} style={{ fontSize: '0.6rem' }}>
+                                                Stok: {prod.stok} {prod.satuan || 'pcs'} {prod.stok <= 0 && '⚠️'}
+                                              </span>
+                                            )}
+                                            {prod.is_stok_dikelola == 0 && (
+                                              <span className="badge bg-secondary" style={{ fontSize: '0.6rem' }}>Non-Stok</span>
+                                            )}
+                                          </div>
+
+                                          {/* Tampilan Status IoT / Billiard jika sedang terpakai */}
                                           {isRegular && (
                                             <div className="bg-dark bg-opacity-50 p-2 rounded text-center my-2 border border-danger border-opacity-25">
                                               <div className="text-muted" style={{ fontSize: '0.62rem' }}>Sisa Waktu Main (Regular):</div>
                                               <div className="fw-bold text-warning" style={{ fontSize: '0.9rem', fontFamily: 'monospace' }}>
                                                 ⏱️ {formatJamMenit(iotDev.sisa_detik)}
                                               </div>
-                                              <div className="text-info mt-0.5" style={{ fontSize: '0.58rem' }}>
-                                                💡 Klik kartu ini untuk tambah durasi
-                                              </div>
+                                              {iotDev?.status_pembayaran === 'belum_bayar' && (
+                                                <div className="text-info mt-0.5" style={{ fontSize: '0.58rem' }}>
+                                                  💡 Klik kartu ini untuk tambah durasi
+                                                </div>
+                                              )}
                                             </div>
                                           )}
 
@@ -7285,16 +7281,18 @@ const Dashboard = () => {
                                         <div className="mt-2" onClick={e => e.stopPropagation()}>
                                           {isRegular ? (
                                             <div className="d-flex gap-1">
-                                              <button
-                                                onClick={() => bukaModalTambahDurasi(iotDev)}
-                                                className="tombol-sekunder-premium border-0 flex-fill py-1 px-2"
-                                                style={{ fontSize: '0.68rem', borderRadius: '8px' }}
-                                              >
-                                                ➕ Waktu
-                                              </button>
+                                              {iotDev?.status_pembayaran === 'belum_bayar' && (
+                                                <button
+                                                  onClick={() => bukaModalTambahDurasi(iotDev)}
+                                                  className="tombol-sekunder-premium border-0 flex-fill py-1 px-2"
+                                                  style={{ fontSize: '0.68rem', borderRadius: '8px' }}
+                                                >
+                                                  ➕ Waktu
+                                                </button>
+                                              )}
                                               <button
                                                 onClick={() => handleStopBilliard(iotDev)}
-                                                className="tombol-premium border-0 py-1 px-2"
+                                                className="tombol-premium border-0 flex-fill py-1 px-2"
                                                 style={{ fontSize: '0.68rem', backgroundColor: 'var(--bs-danger)', borderColor: 'var(--bs-danger)' }}
                                               >
                                                 🛑 Stop

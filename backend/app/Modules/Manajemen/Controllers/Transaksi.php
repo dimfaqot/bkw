@@ -1174,6 +1174,14 @@ class Transaksi extends ResourceController
             $device['sisa_detik'] = 0;
             $device['durasi_berjalan_detik'] = 0;
             $device['akumulasi_biaya'] = 0;
+            $device['status_pembayaran'] = 'lunas';
+
+            if ($al['transaksi_aktif_id']) {
+                $txObj = $db->table('transaksi')->select('status_pembayaran')->where('id', $al['transaksi_aktif_id'])->get()->getRow();
+                if ($txObj) {
+                    $device['status_pembayaran'] = $txObj->status_pembayaran;
+                }
+            }
 
             if ($al['status_penggunaan'] === 'dipakai' && $al['waktu_mulai']) {
                 $startTime = strtotime($al['waktu_mulai']);
