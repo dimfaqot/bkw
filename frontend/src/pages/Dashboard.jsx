@@ -7108,155 +7108,6 @@ const Dashboard = () => {
                           </div>
                         </div>
 
-                        {(() => {
-                          return billiardDevices.length > 0 ? (
-                            <div className="mb-4 p-3 rounded-4" style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--warna-border)' }}>
-                              <h6 className="fw-bold mb-3 d-flex align-items-center" style={{ fontSize: '0.85rem' }}>
-                                <span className="me-2">🎱</span> Status Meja & Billing Perangkat IoT
-                              </h6>
-                              <div className="row g-2">
-                                {billiardDevices.map(dev => {
-                                  const isUsed = dev.status_penggunaan === 'dipakai';
-                                  const isWaitingPayment = dev.status_penggunaan === 'selesai_menunggu_pembayaran';
-                                  
-                                  let bgCardColor = 'rgba(25, 135, 84, 0.08)';
-                                  let borderCardColor = 'rgba(25, 135, 84, 0.3)';
-                                  let statusBadgeColor = 'bg-success';
-                                  let statusText = 'Tersedia';
-
-                                  if (isUsed) {
-                                    bgCardColor = 'rgba(220, 53, 69, 0.08)';
-                                    borderCardColor = 'rgba(220, 53, 69, 0.3)';
-                                    statusBadgeColor = 'bg-danger';
-                                    statusText = dev.prepaid_durasi_menit > 0 ? 'Regular' : 'Open';
-                                  } else if (isWaitingPayment) {
-                                    bgCardColor = 'rgba(255, 193, 7, 0.08)';
-                                    borderCardColor = 'rgba(255, 193, 7, 0.3)';
-                                    statusBadgeColor = 'bg-warning text-dark';
-                                    statusText = 'Menunggu Pembayaran';
-                                  }
-
-                                  const formatTime = (seconds) => {
-                                    if (!seconds || seconds < 0) return '00:00:00';
-                                    const h = Math.floor(seconds / 3600);
-                                    const m = Math.floor((seconds % 3600) / 60);
-                                    const s = Math.floor(seconds % 60);
-                                    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-                                  };
-
-                                  return (
-                                    <div key={dev.id} className="col-12 col-sm-6 col-md-4 col-lg-3">
-                                      <div 
-                                        className="p-2.5 rounded-3 d-flex flex-column justify-content-between h-100 position-relative"
-                                        style={{ backgroundColor: bgCardColor, border: `1px solid ${borderCardColor}`, transition: 'all 0.2s ease' }}
-                                      >
-                                        <div>
-                                          <div className="d-flex justify-content-between align-items-center mb-1">
-                                            <span className="fw-bold text-main" style={{ fontSize: '0.78rem' }}>
-                                              {dev.nama_perangkat}
-                                            </span>
-                                            <span className={`badge ${statusBadgeColor}`} style={{ fontSize: '0.58rem' }}>
-                                              {statusText}
-                                            </span>
-                                          </div>
-                                          <div className="text-muted mb-2" style={{ fontSize: '0.65rem' }}>
-                                            Unit: {dev.nama_unit || 'Global'}
-                                          </div>
-
-                                          {/* Timer / Cost Display */}
-                                          {isUsed ? (
-                                            <div className="bg-dark bg-opacity-50 p-2 rounded text-center my-1">
-                                              {dev.prepaid_durasi_menit > 0 ? (
-                                                <>
-                                                  <div className="text-muted" style={{ fontSize: '0.6rem' }}>Sisa Waktu (Regular):</div>
-                                                  <div className="fw-bold text-warning" style={{ fontSize: '0.85rem', fontFamily: 'monospace' }}>
-                                                    ⏱️ {formatTime(dev.sisa_detik)}
-                                                  </div>
-                                                </>
-                                              ) : (
-                                                <>
-                                                  <div className="text-muted" style={{ fontSize: '0.6rem' }}>Durasi Main (Open):</div>
-                                                  <div className="fw-bold text-info" style={{ fontSize: '0.85rem', fontFamily: 'monospace' }}>
-                                                    ⏱️ {formatTime(dev.durasi_berjalan_detik)}
-                                                  </div>
-                                                  <div className="text-success fw-bold mt-1" style={{ fontSize: '0.7rem' }}>
-                                                    Estimasi: Rp {Number(dev.estimasi_biaya || 0).toLocaleString('id-ID')}
-                                                  </div>
-                                                </>
-                                              )}
-                                            </div>
-                                          ) : isWaitingPayment ? (
-                                            <div className="bg-warning bg-opacity-10 p-2 rounded text-center my-1 border border-warning border-opacity-25">
-                                              <div className="text-warning fw-bold" style={{ fontSize: '0.65rem' }}>
-                                                Sewa Selesai! Mohon Pelunasan Kasir
-                                              </div>
-                                            </div>
-                                          ) : (
-                                            <div className="text-muted py-2" style={{ fontSize: '0.68rem' }}>
-                                              Ready (Lamp OFF)
-                                            </div>
-                                          )}
-                                        </div>
-
-                                        <div className="d-flex flex-wrap gap-1 justify-content-center mt-2">
-                                          {!isUsed && !isWaitingPayment && (
-                                            <button 
-                                              className="tombol-premium w-100 py-1"
-                                              style={{ fontSize: '0.68rem' }}
-                                              onClick={() => bukaModalMulaiBilliard(dev)}
-                                            >
-                                              🚀 Mulai Main (Open/Regular)
-                                            </button>
-                                          )}
-
-                                          {isUsed && (
-                                            <>
-                                              {dev.prepaid_durasi_menit > 0 && (
-                                                <button 
-                                                  className="tombol-sekunder-premium py-1 px-2"
-                                                  style={{ fontSize: '0.62rem' }}
-                                                  onClick={() => bukaModalTambahDurasi(dev)}
-                                                  title="Tambah Durasi"
-                                                >
-                                                  ➕ Waktu
-                                                </button>
-                                              )}
-                                              <button 
-                                                className="tombol-premium py-1 px-2 flex-grow-1"
-                                                style={{ fontSize: '0.62rem', backgroundColor: 'var(--bs-danger)', borderColor: 'var(--bs-danger)' }}
-                                                onClick={() => handleStopBilliard(dev)}
-                                              >
-                                                🛑 Stop
-                                              </button>
-                                            </>
-                                          )}
-
-                                          {isWaitingPayment && (
-                                            <button 
-                                              className="tombol-premium w-100 py-1"
-                                              style={{ fontSize: '0.68rem', backgroundColor: 'var(--bs-warning)', borderColor: 'var(--bs-warning)', color: '#000' }}
-                                              onClick={async () => {
-                                                const detailRes = await fetch(`${API_BASE_URL}/transaksi-publik/detail/${dev.transaksi_aktif_id}`);
-                                                const detailJson = await detailRes.json();
-                                                if (detailRes.ok && detailJson.status === 'sukses') {
-                                                  setSelectedTransaksi(detailJson.data);
-                                                  setShowDetailNotaModal(true);
-                                                }
-                                              }}
-                                            >
-                                              💳 Bayar (Nota #{dev.transaksi_aktif_id})
-                                            </button>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          ) : null;
-                        })()}
-
                         {/* Product Grid */}
                         {posLoading ? (
                           <div className="text-center py-5">
@@ -7274,84 +7125,206 @@ const Dashboard = () => {
                               const isStokMenipis = prod.is_stok_dikelola == 1 && Number(prod.stok) <= Number(prod.stok_minimum);
                               return (
                                 <div key={prod.id} className="col-12 col-sm-6">
-                                  <div 
-                                    className="p-3 rounded-3 d-flex flex-column justify-content-between h-100"
-                                    style={{ 
-                                      backgroundColor: 'var(--bg-kartu)', 
-                                      border: cartItem ? '1.5px solid var(--warna-utama)' : '1px solid var(--warna-border)',
-                                      boxShadow: cartItem ? '0 4px 12px rgba(99, 102, 241, 0.08)' : 'none',
-                                      transition: 'all 0.2s'
-                                    }}
-                                  >
-                                    <div>
-                                      <div className="d-flex justify-content-between align-items-start gap-2 mb-1">
-                                        <span className="fw-bold text-main" style={{ fontSize: '0.82rem' }}>{prod.nama_produk}</span>
-                                        <span className="badge bg-light text-dark" style={{ fontSize: '0.6rem' }}>{prod.nama_unit || 'Global'}</span>
-                                      </div>
-                                      
-                                      <div className="d-flex align-items-center justify-content-between mt-1 mb-2">
-                                        <span className="text-primary fw-bold" style={{ fontSize: '0.8rem', color: 'var(--warna-utama)' }}>{formatRupiah(prod.harga_jual)}</span>
-                                        
-                                        {prod.is_stok_dikelola == 1 ? (
-                                          <span className={`badge ${isStokMenipis ? 'bg-danger' : 'bg-secondary'}`} style={{ fontSize: '0.62rem' }}>
-                                            Stok: {prod.stok} {prod.satuan} {isStokMenipis && '⚠️'}
-                                          </span>
-                                        ) : (
-                                          <span className="text-muted small" style={{ fontSize: '0.65rem' }}>Non-Stok</span>
-                                        )}
-                                      </div>
-                                    </div>
+                                  {(() => {
+                                    const iotDev = billiardDevices.find(d => Number(d.iot_id) === Number(prod.iot_id));
+                                    const isUsed = iotDev?.status_penggunaan === 'dipakai';
+                                    const isWaitingPayment = iotDev?.status_penggunaan === 'selesai_menunggu_pembayaran';
+                                    const isRegular = isUsed && (iotDev?.prepaid_durasi_menit > 0);
+                                    const isOpen = isUsed && !isRegular;
 
-                                    {/* Action Counter */}
-                                    <div className="mt-2">
-                                      {cartItem ? (
-                                        <div className="d-flex align-items-center justify-content-between gap-2">
-                                          <button 
-                                            onClick={() => kurangiDariKeranjang(prod.id)}
-                                            className="btn btn-sm btn-outline-danger py-1 px-2.5 d-flex align-items-center justify-content-center"
-                                            style={{ borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold' }}
-                                          >-</button>
-                                          <span className="fw-bold text-main" style={{ fontSize: '0.85rem' }}>{cartItem.qty} {prod.satuan || 'hrs'}</span>
-                                          <button 
-                                            onClick={() => tambahKeKeranjang(prod)}
-                                            className="btn btn-sm btn-outline-primary py-1 px-2.5 d-flex align-items-center justify-content-center"
-                                            style={{ borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold' }}
-                                            disabled={prod.is_stok_dikelola == 1 && cartItem.qty >= prod.stok}
-                                          >+</button>
-                                        </div>
-                                      ) : (
-                                        <div className="d-flex gap-1">
-                                          <button
-                                            onClick={() => tambahKeKeranjang(prod)}
-                                            className="tombol-premium border-0 flex-fill py-1 px-2 d-flex align-items-center justify-content-center gap-1"
-                                            style={{ fontSize: '0.72rem', borderRadius: '8px' }}
-                                            disabled={prod.is_stok_dikelola == 1 && prod.stok <= 0}
-                                            title="Sewa Regular (Prepaid Jam)"
-                                          >
-                                            <Plus size={12} />
-                                            <span>{prod.tipe === 'sewa' ? '⏱️ Regular' : 'Pilih'}</span>
-                                          </button>
-                                          {prod.tipe === 'sewa' && (
-                                            <button
-                                              onClick={() => {
-                                                const dev = billiardDevices.find(d => Number(d.iot_id) === Number(prod.iot_id));
-                                                if (dev) {
-                                                  bukaModalMulaiBilliard(dev);
-                                                } else {
-                                                  ui.notif('gagal', 'Belum ada Perangkat IoT terhubung ke produk sewa ini.');
-                                                }
-                                              }}
-                                              className="tombol-sekunder-premium border-0 py-1 px-2"
-                                              style={{ fontSize: '0.68rem', borderRadius: '8px' }}
-                                              title="Mulai Sesi Open (Play & Pay)"
-                                            >
-                                              🚀 Open
-                                            </button>
+                                    const formatJamMenit = (seconds) => {
+                                      if (!seconds || seconds <= 0) return '00:00';
+                                      const h = Math.floor(seconds / 3600);
+                                      const m = Math.floor((seconds % 3600) / 60);
+                                      if (h > 0) return `${h}j ${m}m`;
+                                      return `${m} menit`;
+                                    };
+
+                                    return (
+                                      <div 
+                                        className="p-3 rounded-3 d-flex flex-column justify-content-between h-100 position-relative"
+                                        style={{ 
+                                          backgroundColor: isUsed ? 'rgba(220, 53, 69, 0.05)' : isWaitingPayment ? 'rgba(255, 193, 7, 0.05)' : 'var(--bg-kartu)', 
+                                          border: isUsed ? '1.5px solid rgba(220, 53, 69, 0.4)' : isWaitingPayment ? '1.5px solid rgba(255, 193, 7, 0.4)' : cartItem ? '1.5px solid var(--warna-utama)' : '1px solid var(--warna-border)',
+                                          boxShadow: cartItem ? '0 4px 12px rgba(99, 102, 241, 0.08)' : 'none',
+                                          cursor: isRegular ? 'pointer' : 'default',
+                                          transition: 'all 0.2s'
+                                        }}
+                                        onClick={() => {
+                                          if (isRegular && iotDev) {
+                                            bukaModalTambahDurasi(iotDev);
+                                          }
+                                        }}
+                                        title={isRegular ? "Klik kartu untuk menambah durasi main" : ""}
+                                      >
+                                        <div>
+                                          <div className="d-flex justify-content-between align-items-start gap-2 mb-1">
+                                            <span className="fw-bold text-main" style={{ fontSize: '0.82rem' }}>{prod.nama_produk}</span>
+                                            <div className="d-flex align-items-center gap-1">
+                                              {isUsed && (
+                                                <span className="badge bg-danger" style={{ fontSize: '0.58rem' }}>
+                                                  🔴 {isRegular ? 'Sesi Regular' : 'Sesi Open'}
+                                                </span>
+                                              )}
+                                              {isWaitingPayment && (
+                                                <span className="badge bg-warning text-dark" style={{ fontSize: '0.58rem' }}>
+                                                  🟡 Belum Bayar
+                                                </span>
+                                              )}
+                                              <span className="badge bg-light text-dark" style={{ fontSize: '0.6rem' }}>{prod.nama_unit || 'Global'}</span>
+                                            </div>
+                                          </div>
+                                          
+                                          <div className="d-flex align-items-center justify-content-between mt-1 mb-2">
+                                            <span className="text-primary fw-bold" style={{ fontSize: '0.8rem', color: 'var(--warna-utama)' }}>
+                                              {formatRupiah(prod.harga_jual)} <span className="text-muted fw-normal" style={{ fontSize: '0.65rem' }}>/jam</span>
+                                            </span>
+                                            
+                                            {prod.is_stok_dikelola == 1 ? (
+                                              <span className={`badge ${isStokMenipis ? 'bg-danger' : 'bg-secondary'}`} style={{ fontSize: '0.62rem' }}>
+                                                Stok: {prod.stok} {prod.satuan} {isStokMenipis && '⚠️'}
+                                              </span>
+                                            ) : (
+                                              <span className="text-muted small" style={{ fontSize: '0.65rem' }}>
+                                                {iotDev ? `🔌 Saklar ON/OFF` : 'Non-Stok'}
+                                              </span>
+                                            )}
+                                          </div>
+
+                                          {/* Direct Live Timer Display */}
+                                          {isRegular && (
+                                            <div className="bg-dark bg-opacity-50 p-2 rounded text-center my-2 border border-danger border-opacity-25">
+                                              <div className="text-muted" style={{ fontSize: '0.62rem' }}>Sisa Waktu Main (Regular):</div>
+                                              <div className="fw-bold text-warning" style={{ fontSize: '0.9rem', fontFamily: 'monospace' }}>
+                                                ⏱️ {formatJamMenit(iotDev.sisa_detik)}
+                                              </div>
+                                              <div className="text-info mt-0.5" style={{ fontSize: '0.58rem' }}>
+                                                💡 Klik kartu ini untuk tambah durasi
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          {isOpen && (
+                                            <div className="bg-dark bg-opacity-50 p-2 rounded text-center my-2 border border-info border-opacity-25">
+                                              <div className="d-flex justify-content-between align-items-center">
+                                                <div className="text-start">
+                                                  <div className="text-muted" style={{ fontSize: '0.6rem' }}>Lama Bermain (Open):</div>
+                                                  <div className="fw-bold text-info" style={{ fontSize: '0.85rem', fontFamily: 'monospace' }}>
+                                                    ⏱️ {formatJamMenit(iotDev.durasi_berjalan_detik)}
+                                                  </div>
+                                                </div>
+                                                <div className="text-end">
+                                                  <div className="text-muted" style={{ fontSize: '0.6rem' }}>Biaya Saat Ini:</div>
+                                                  <div className="fw-bold text-success" style={{ fontSize: '0.85rem' }}>
+                                                    Rp {Number(iotDev.estimasi_biaya || 0).toLocaleString('id-ID')}
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          {isWaitingPayment && (
+                                            <div className="bg-warning bg-opacity-10 p-2 rounded text-center my-2 border border-warning border-opacity-25">
+                                              <div className="text-muted" style={{ fontSize: '0.6rem' }}>Tagihan Akhir Sewa:</div>
+                                              <div className="fw-bold text-warning" style={{ fontSize: '0.9rem' }}>
+                                                Rp {Number(iotDev.estimasi_biaya || 0).toLocaleString('id-ID')}
+                                              </div>
+                                            </div>
                                           )}
                                         </div>
-                                      )}
-                                    </div>
-                                  </div>
+
+                                        {/* Action Buttons */}
+                                        <div className="mt-2" onClick={e => e.stopPropagation()}>
+                                          {isRegular ? (
+                                            <div className="d-flex gap-1">
+                                              <button
+                                                onClick={() => bukaModalTambahDurasi(iotDev)}
+                                                className="tombol-sekunder-premium border-0 flex-fill py-1 px-2"
+                                                style={{ fontSize: '0.68rem', borderRadius: '8px' }}
+                                              >
+                                                ➕ Waktu
+                                              </button>
+                                              <button
+                                                onClick={() => handleStopBilliard(iotDev)}
+                                                className="tombol-premium border-0 py-1 px-2"
+                                                style={{ fontSize: '0.68rem', backgroundColor: 'var(--bs-danger)', borderColor: 'var(--bs-danger)' }}
+                                              >
+                                                🛑 Stop
+                                              </button>
+                                            </div>
+                                          ) : isOpen ? (
+                                            <button
+                                              onClick={() => handleStopBilliard(iotDev)}
+                                              className="tombol-premium border-0 w-100 py-1"
+                                              style={{ fontSize: '0.72rem', backgroundColor: 'var(--bs-danger)', borderColor: 'var(--bs-danger)' }}
+                                            >
+                                              🛑 Stop Sewa & Hitung Tagihan
+                                            </button>
+                                          ) : isWaitingPayment ? (
+                                            <button
+                                              className="tombol-premium w-100 py-1"
+                                              style={{ fontSize: '0.72rem', backgroundColor: 'var(--bs-warning)', borderColor: 'var(--bs-warning)', color: '#000' }}
+                                              onClick={async () => {
+                                                const detailRes = await fetch(`${API_BASE_URL}/transaksi-publik/detail/${iotDev.transaksi_aktif_id}`);
+                                                const detailJson = await detailRes.json();
+                                                if (detailRes.ok && detailJson.status === 'sukses') {
+                                                  setSelectedTransaksi(detailJson.data);
+                                                  setShowDetailNotaModal(true);
+                                                }
+                                              }}
+                                            >
+                                              💳 Bayar Nota (#{iotDev.transaksi_aktif_id})
+                                            </button>
+                                          ) : cartItem ? (
+                                            <div className="d-flex align-items-center justify-content-between gap-2">
+                                              <button 
+                                                onClick={() => kurangiDariKeranjang(prod.id)}
+                                                className="btn btn-sm btn-outline-danger py-1 px-2.5 d-flex align-items-center justify-content-center"
+                                                style={{ borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold' }}
+                                              >-</button>
+                                              <span className="fw-bold text-main" style={{ fontSize: '0.85rem' }}>{cartItem.qty} {prod.satuan || 'hrs'}</span>
+                                              <button 
+                                                onClick={() => tambahKeKeranjang(prod)}
+                                                className="btn btn-sm btn-outline-primary py-1 px-2.5 d-flex align-items-center justify-content-center"
+                                                style={{ borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold' }}
+                                                disabled={prod.is_stok_dikelola == 1 && cartItem.qty >= prod.stok}
+                                              >+</button>
+                                            </div>
+                                          ) : (
+                                            <div className="d-flex gap-1">
+                                              <button
+                                                onClick={() => tambahKeKeranjang(prod)}
+                                                className="tombol-premium border-0 flex-fill py-1 px-2 d-flex align-items-center justify-content-center gap-1"
+                                                style={{ fontSize: '0.72rem', borderRadius: '8px' }}
+                                                disabled={prod.is_stok_dikelola == 1 && prod.stok <= 0}
+                                                title="Sewa Regular (Prepaid Jam)"
+                                              >
+                                                <Plus size={12} />
+                                                <span>{prod.tipe === 'sewa' ? '⏱️ Regular' : 'Pilih'}</span>
+                                              </button>
+                                              {prod.tipe === 'sewa' && (
+                                                <button
+                                                  onClick={() => {
+                                                    const dev = billiardDevices.find(d => Number(d.iot_id) === Number(prod.iot_id));
+                                                    if (dev) {
+                                                      bukaModalMulaiBilliard(dev);
+                                                    } else {
+                                                      ui.notif('gagal', 'Belum ada Perangkat IoT terhubung ke produk sewa ini.');
+                                                    }
+                                                  }}
+                                                  className="tombol-sekunder-premium border-0 py-1 px-2"
+                                                  style={{ fontSize: '0.68rem', borderRadius: '8px' }}
+                                                  title="Mulai Sesi Open (Play & Pay)"
+                                                >
+                                                  🚀 Open
+                                                </button>
+                                              )}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               );
                             })}
