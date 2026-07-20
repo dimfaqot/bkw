@@ -1474,51 +1474,58 @@ class Transaksi extends ResourceController
         $elapsedMinutes = (int)ceil((time() - $startTime) / 60);
         if ($elapsedMinutes < 1) $elapsedMinutes = 1;
 
-        if ($alokasi->prepaid_durasi_menit > 0 && $elapsedMinutes > $alokasi->prepaid_durasi_menit) {
-            $elapsedMinutes = (int)$alokasi->prepaid_durasi_menit;
-        }
-
         $transaksiId = $alokasi->transaksi_aktif_id;
+        $isLunas = false;
+
         if ($transaksiId) {
-            $detail = $db->table('transaksi_detail')->where('transaksi_id', $transaksiId)->get()->getRow();
-            if ($detail) {
-                $hargaPerJam = (float)$detail->harga_satuan;
-                if ($alokasi->prepaid_durasi_menit > 0) {
-                    $subtotal = round(($elapsedMinutes / 60) * $hargaPerJam);
-                } else {
+            $txObj = $db->table('transaksi')->where('id', $transaksiId)->get()->getRow();
+            $isLunas = ($txObj && $txObj->status_pembayaran === 'lunas');
+
+            // Jika transaksi BELUM LUNAS dan merupakan Sesi Open (prepaid_durasi_menit == 0), kunci durasi & biaya akhirnya
+            if (!$isLunas && Number($alokasi->prepaid_durasi_menit || 0) == 0) {
+                $detail = $db->table('transaksi_detail')->where('transaksi_id', $transaksiId)->get()->getRow();
+                if ($detail) {
+                    $hargaPerJam = (float)$detail->harga_satuan;
+                    if ($hargaPerJam <= 0) {
+                        $p = $db->table('produk_jasa')->where('id', $detail->produk_id)->get()->getRow();
+                        if ($p) $hargaPerJam = (float)$p->harga_jual;
+                    }
+                    if ($hargaPerJam <= 0) $hargaPerJam = 25000;
+
                     $hargaMentah = $elapsedMinutes * ($hargaPerJam / 60);
                     $subtotal = ceil($hargaMentah / 500) * 500;
+
+                    $db->table('transaksi_detail')->where('id', $detail->id)->update([
+                        'qty'          => $elapsedMinutes,
+                        'durasi_menit' => $elapsedMinutes,
+                        'subtotal'     => $subtotal,
+                        'updated_at'   => $now
+                    ]);
+
+                    $db->table('transaksi')->where('id', $transaksiId)->update([
+                        'total_harga' => $subtotal,
+                        'updated_at'  => $now
+                    ]);
                 }
-
-                $db->table('transaksi_detail')->where('id', $detail->id)->update([
-                    'qty'          => $elapsedMinutes,
-                    'durasi_menit' => $elapsedMinutes,
-                    'subtotal'     => $subtotal,
-                    'updated_at'   => $now
-                ]);
-
-                $db->table('transaksi')->where('id', $transaksiId)->update([
-                    'total_harga' => $subtotal,
-                    'updated_at'  => $now
-                ]);
             }
         }
 
-        $isRegular = ($alokasi->prepaid_durasi_menit > 0);
-        $statusRelayBaru = $isRegular ? 0 : 1;
-        $statusPenggunaanBaru = $isRegular ? 'tersedia' : 'selesai_menunggu_pembayaran';
-
+        // Matikan selalu relay lampu secara fisik & di database
         $updateData = [
-            'status_relay'      => $statusRelayBaru,
-            'status_penggunaan' => $statusPenggunaanBaru,
-            'updated_at'        => $now
+            'status_relay' => 0,
+            'updated_at'   => $now
         ];
 
-        if ($isRegular) {
+        if ($isLunas) {
+            // Jika transaksi sudah LUNAS di awal (misal Regular Bayar Langsung), meja langsung KEMBALI TERSEDIA
+            $updateData['status_penggunaan']    = 'tersedia';
             $updateData['transaksi_aktif_id']   = null;
             $updateData['prepaid_durasi_menit'] = null;
             $updateData['waktu_mulai']          = null;
             $updateData['warning_sent']         = 0;
+        } else {
+            // Jika transaksi BELUM LUNAS (Regular Hutang atau Open Sewa), status meja menjadi selesai_menunggu_pembayaran
+            $updateData['status_penggunaan']    = 'selesai_menunggu_pembayaran';
         }
 
         $db->table('iot_alokasi')->where('id', $alokasiId)->update($updateData);
@@ -1529,19 +1536,18 @@ class Transaksi extends ResourceController
             return $this->respond(['status' => 'gagal', 'pesan' => 'Gagal menghentikan sewa.'], 500);
         }
 
-        if ($isRegular) {
-            $device = $db->table('iot')->where('id', $alokasi->iot_id)->get()->getRow();
-            if ($device && $device->ip_address) {
-                $this->kirimSinyalRelay($device->ip_address, 'off');
-            }
+        // Kirim sinyal OFF ke saklar relay IoT fisik
+        $device = $db->table('iot')->where('id', $alokasi->iot_id)->get()->getRow();
+        if ($device && $device->ip_address) {
+            $this->kirimSinyalRelay($device->ip_address, 'off');
         }
 
         return $this->respond([
             'status' => 'sukses',
-            'pesan'  => 'Sesi billing sewa berhasil dihentikan.',
+            'pesan'  => $isLunas ? 'Sewa berhasil dihentikan. Meja kini tersedia kembali.' : 'Sewa dihentikan dan saklar lampu dimatikan. Menunggu pelunasan kasir.',
             'data'   => [
-                'transaksi_id' => $transaksiId,
-                'is_regular'   => $isRegular
+                'transaksi_id'      => $transaksiId,
+                'status_pembayaran' => $isLunas ? 'lunas' : 'belum_bayar'
             ]
         ]);
     }
@@ -1556,40 +1562,30 @@ class Transaksi extends ResourceController
         $now = date('Y-m-d H:i:s');
         $db->transStart();
 
-        $startTime = strtotime($alokasi->waktu_mulai);
-        $elapsedMinutes = ceil((time() - $startTime) / 60);
-        if ($alokasi->prepaid_durasi_menit > 0 && $elapsedMinutes > $alokasi->prepaid_durasi_menit) {
-            $elapsedMinutes = $alokasi->prepaid_durasi_menit;
+        $transaksiId = $alokasi->transaksi_aktif_id;
+        $isLunas = false;
+
+        if ($transaksiId) {
+            $txObj = $db->table('transaksi')->where('id', $transaksiId)->get()->getRow();
+            $isLunas = ($txObj && $txObj->status_pembayaran === 'lunas');
         }
 
-        if ($alokasi->transaksi_aktif_id) {
-            $detail = $db->table('transaksi_detail')->where('transaksi_id', $alokasi->transaksi_aktif_id)->get()->getRow();
-            if ($detail) {
-                $qty = round($elapsedMinutes / 60, 2);
-                $subtotal = $qty * (float)$detail->harga_satuan;
+        $updateData = [
+            'status_relay' => 0,
+            'updated_at'   => $now
+        ];
 
-                $db->table('transaksi_detail')->where('id', $detail->id)->update([
-                    'qty'        => $qty,
-                    'subtotal'   => $subtotal,
-                    'updated_at' => $now
-                ]);
-
-                $db->table('transaksi')->where('id', $alokasi->transaksi_aktif_id)->update([
-                    'total_harga' => $subtotal,
-                    'updated_at'  => $now
-                ]);
-            }
+        if ($isLunas) {
+            $updateData['status_penggunaan']    = 'tersedia';
+            $updateData['transaksi_aktif_id']   = null;
+            $updateData['prepaid_durasi_menit'] = null;
+            $updateData['waktu_mulai']          = null;
+            $updateData['warning_sent']         = 0;
+        } else {
+            $updateData['status_penggunaan']    = 'selesai_menunggu_pembayaran';
         }
 
-        $db->table('iot_alokasi')->where('id', $alokasiId)->update([
-            'status_relay'         => 0,
-            'status_penggunaan'    => 'tersedia',
-            'transaksi_aktif_id'   => null,
-            'prepaid_durasi_menit' => null,
-            'waktu_mulai'          => null,
-            'warning_sent'         => 0,
-            'updated_at'           => $now
-        ]);
+        $db->table('iot_alokasi')->where('id', $alokasiId)->update($updateData);
 
         $db->transComplete();
 
