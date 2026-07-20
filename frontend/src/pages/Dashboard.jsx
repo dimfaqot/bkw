@@ -7115,9 +7115,7 @@ const Dashboard = () => {
                         </div>
 
                         {(() => {
-                          const unitTerpilih = opsiUnit.find(u => String(u.id) === String(filterUnitPos));
-                          const isBilliardUnit = unitTerpilih && (unitTerpilih.kategori === 'billiard' || unitTerpilih.kategori === 'sewa');
-                          return isBilliardUnit && billiardDevices.length > 0 ? (
+                          return billiardDevices.length > 0 ? (
                             <div className="mb-4 p-3 rounded-4" style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--warna-border)' }}>
                               <h6 className="fw-bold mb-3 d-flex align-items-center" style={{ fontSize: '0.85rem' }}>
                                 <span className="me-2">🎱</span> Status Meja & Billing Perangkat IoT
@@ -7148,52 +7146,55 @@ const Dashboard = () => {
                                     if (!seconds || seconds < 0) return '00:00:00';
                                     const h = Math.floor(seconds / 3600);
                                     const m = Math.floor((seconds % 3600) / 60);
-                                    const s = seconds % 60;
-                                    return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
+                                    const s = Math.floor(seconds % 60);
+                                    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
                                   };
 
                                   return (
-                                    <div key={dev.id} className="col-6 col-sm-4 col-md-3">
+                                    <div key={dev.id} className="col-12 col-sm-6 col-md-4 col-lg-3">
                                       <div 
-                                        className="p-2 rounded-3 h-100 d-flex flex-column justify-content-between text-center position-relative"
-                                        style={{ 
-                                          backgroundColor: bgCardColor,
-                                          border: `1.5px solid ${borderCardColor}`,
-                                          boxShadow: isUsed ? '0 0 10px rgba(220, 53, 69, 0.05)' : 'none'
-                                        }}
+                                        className="p-2.5 rounded-3 d-flex flex-column justify-content-between h-100 position-relative"
+                                        style={{ backgroundColor: bgCardColor, border: `1px solid ${borderCardColor}`, transition: 'all 0.2s ease' }}
                                       >
                                         <div>
-                                          <div className="fw-bold mb-1" style={{ fontSize: '0.78rem' }}>{dev.nama_perangkat}</div>
-                                          <span className={`badge ${statusBadgeColor} mb-2`} style={{ fontSize: '0.58rem' }}>
-                                            {statusText}
-                                          </span>
-                                        </div>
+                                          <div className="d-flex justify-content-between align-items-center mb-1">
+                                            <span className="fw-bold text-main" style={{ fontSize: '0.78rem' }}>
+                                              {dev.nama_perangkat}
+                                            </span>
+                                            <span className={`badge ${statusBadgeColor}`} style={{ fontSize: '0.58rem' }}>
+                                              {statusText}
+                                            </span>
+                                          </div>
+                                          <div className="text-muted mb-2" style={{ fontSize: '0.65rem' }}>
+                                            Unit: {dev.nama_unit || 'Global'}
+                                          </div>
 
-                                        <div className="my-2 py-1 bg-dark bg-opacity-25 rounded">
+                                          {/* Timer / Cost Display */}
                                           {isUsed ? (
-                                            dev.prepaid_durasi_menit > 0 ? (
-                                              <div>
-                                                <div className="text-muted" style={{ fontSize: '0.55rem' }}>SISA WAKTU</div>
-                                                <div className="font-monospace fw-bold text-danger" style={{ fontSize: '0.85rem' }}>
-                                                  {formatTime(dev.sisa_detik)}
-                                                </div>
-                                              </div>
-                                            ) : (
-                                              <div>
-                                                <div className="text-muted" style={{ fontSize: '0.55rem' }}>DURASI MAIN</div>
-                                                <div className="font-monospace fw-bold text-warning" style={{ fontSize: '0.85rem' }}>
-                                                  {formatTime(dev.durasi_berjalan_detik)}
-                                                </div>
-                                                <div className="fw-bold text-success mt-1" style={{ fontSize: '0.78rem' }}>
-                                                  Rp {Number(dev.akumulasi_biaya || 0).toLocaleString('id-ID')}
-                                                </div>
-                                              </div>
-                                            )
+                                            <div className="bg-dark bg-opacity-50 p-2 rounded text-center my-1">
+                                              {dev.prepaid_durasi_menit > 0 ? (
+                                                <>
+                                                  <div className="text-muted" style={{ fontSize: '0.6rem' }}>Sisa Waktu (Regular):</div>
+                                                  <div className="fw-bold text-warning" style={{ fontSize: '0.85rem', fontFamily: 'monospace' }}>
+                                                    ⏱️ {formatTime(dev.sisa_detik)}
+                                                  </div>
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <div className="text-muted" style={{ fontSize: '0.6rem' }}>Durasi Main (Open):</div>
+                                                  <div className="fw-bold text-info" style={{ fontSize: '0.85rem', fontFamily: 'monospace' }}>
+                                                    ⏱️ {formatTime(dev.durasi_berjalan_detik)}
+                                                  </div>
+                                                  <div className="text-success fw-bold mt-1" style={{ fontSize: '0.7rem' }}>
+                                                    Estimasi: Rp {Number(dev.estimasi_biaya || 0).toLocaleString('id-ID')}
+                                                  </div>
+                                                </>
+                                              )}
+                                            </div>
                                           ) : isWaitingPayment ? (
-                                            <div>
-                                              <div className="text-muted" style={{ fontSize: '0.55rem' }}>TAGIHAN AKHIR</div>
-                                              <div className="fw-bold text-success" style={{ fontSize: '0.85rem' }}>
-                                                Rp {Number(dev.akumulasi_biaya || 0).toLocaleString('id-ID')}
+                                            <div className="bg-warning bg-opacity-10 p-2 rounded text-center my-1 border border-warning border-opacity-25">
+                                              <div className="text-warning fw-bold" style={{ fontSize: '0.65rem' }}>
+                                                Sewa Selesai! Mohon Pelunasan Kasir
                                               </div>
                                             </div>
                                           ) : (
@@ -7210,7 +7211,7 @@ const Dashboard = () => {
                                               style={{ fontSize: '0.68rem' }}
                                               onClick={() => bukaModalMulaiBilliard(dev)}
                                             >
-                                              🚀 Mulai Main
+                                              🚀 Mulai Main (Open/Regular)
                                             </button>
                                           )}
 
@@ -7246,12 +7247,10 @@ const Dashboard = () => {
                                                 if (detailRes.ok && detailJson.status === 'sukses') {
                                                   setSelectedTransaksi(detailJson.data);
                                                   setShowDetailNotaModal(true);
-                                                } else {
-                                                  ui.notif('gagal', 'Gagal memuat detail transaksi.');
                                                 }
                                               }}
                                             >
-                                              💳 Bayar
+                                              💳 Bayar (Nota #{dev.transaksi_aktif_id})
                                             </button>
                                           )}
                                         </div>

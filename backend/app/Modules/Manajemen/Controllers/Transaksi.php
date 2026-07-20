@@ -209,6 +209,28 @@ class Transaksi extends ResourceController
                     'updated_at'      => $now
                 ]);
             }
+
+            // Otomatis aktifkan IoT relay jika produk sewa terhubung ke perangkat IoT (Sesi Regular)
+            if (!empty($produk->iot_id)) {
+                $iotAlokasi = $db->table('iot_alokasi')->where('iot_id', $produk->iot_id)->get()->getRowArray();
+                if ($iotAlokasi) {
+                    $durasiMenit = (float)$qty * 60;
+                    $db->table('iot_alokasi')->where('id', $iotAlokasi['id'])->update([
+                        'status_relay'         => 1,
+                        'status_penggunaan'    => 'dipakai',
+                        'transaksi_aktif_id'   => $transaksiId,
+                        'prepaid_durasi_menit' => $durasiMenit > 0 ? $durasiMenit : 60,
+                        'waktu_mulai'          => $now,
+                        'warning_sent'         => 0,
+                        'updated_at'           => $now
+                    ]);
+
+                    $iotDev = $db->table('iot')->where('id', $produk->iot_id)->get()->getRowArray();
+                    if ($iotDev && !empty($iotDev['ip_address'])) {
+                        $this->kirimSinyalRelay($iotDev['ip_address'], 'on');
+                    }
+                }
+            }
         }
 
         // Update total_harga
