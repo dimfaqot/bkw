@@ -503,9 +503,9 @@ class Transaksi extends ResourceController
             $produkId = $item['produk_id'] ?? null;
             $qtyBaru = isset($item['qty']) ? (int)$item['qty'] : 0;
 
-            if (!$produkId || $qtyBaru <= 0) {
+            if (!$produkId) {
                 $db->transRollback();
-                return $this->respond(['status' => 'gagal', 'pesan' => 'Item produk atau kuantitas tidak valid.'], 400);
+                return $this->respond(['status' => 'gagal', 'pesan' => 'Item produk tidak valid.'], 400);
             }
 
             $produk = $db->table('produk_jasa')
@@ -516,6 +516,12 @@ class Transaksi extends ResourceController
             if (!$produk) {
                 $db->transRollback();
                 return $this->respond(['status' => 'gagal', 'pesan' => "Produk #{$produkId} tidak ditemukan."], 404);
+            }
+
+            $isSewa = ($produk->tipe === 'sewa' || !empty($produk->iot_id));
+            if ($qtyBaru < 0 || ($qtyBaru == 0 && !$isSewa)) {
+                $db->transRollback();
+                return $this->respond(['status' => 'gagal', 'pesan' => 'Item produk atau kuantitas tidak valid.'], 400);
             }
 
             $hargaSatuan = (float)$produk->harga_jual;
@@ -659,9 +665,9 @@ class Transaksi extends ResourceController
                 $produkId = $item['produk_id'] ?? null;
                 $qtyBaru = isset($item['qty']) ? (int)$item['qty'] : 0;
 
-                if (!$produkId || $qtyBaru <= 0) {
+                if (!$produkId) {
                     $db->transRollback();
-                    return $this->respond(['status' => 'gagal', 'pesan' => 'Item produk atau kuantitas tidak valid.'], 400);
+                    return $this->respond(['status' => 'gagal', 'pesan' => 'Item produk tidak valid.'], 400);
                 }
 
                 $produk = $db->table('produk_jasa')
@@ -672,6 +678,12 @@ class Transaksi extends ResourceController
                 if (!$produk) {
                     $db->transRollback();
                     return $this->respond(['status' => 'gagal', 'pesan' => "Produk #{$produkId} tidak ditemukan."], 404);
+                }
+
+                $isSewa = ($produk->tipe === 'sewa' || !empty($produk->iot_id));
+                if ($qtyBaru < 0 || ($qtyBaru == 0 && !$isSewa)) {
+                    $db->transRollback();
+                    return $this->respond(['status' => 'gagal', 'pesan' => 'Item produk atau kuantitas tidak valid.'], 400);
                 }
 
                 $hargaSatuan = (float)$produk->harga_jual;

@@ -4496,8 +4496,12 @@ const Dashboard = () => {
     try {
       const gabungItems = () => {
         const map = {};
+        const tipeBillingMap = {};
         selectedTransaksi.detail.forEach(d => {
           map[d.produk_id] = (map[d.produk_id] || 0) + Number(d.qty);
+          if (d.tipe === 'sewa' || d.qty == 0) {
+            tipeBillingMap[d.produk_id] = 'open';
+          }
         });
         if (pilihanProdukHutang) {
           const pid = Number(pilihanProdukHutang);
@@ -4505,7 +4509,8 @@ const Dashboard = () => {
         }
         return Object.keys(map).map(pid => ({
           produk_id: Number(pid),
-          qty: map[pid]
+          qty: map[pid],
+          tipe_billing: tipeBillingMap[pid] || 'regular'
         }));
       };
 
