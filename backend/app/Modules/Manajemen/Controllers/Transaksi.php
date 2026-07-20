@@ -1127,19 +1127,22 @@ class Transaksi extends ResourceController
         $usahaId = $penggunaAktif['usaha_id'];
         $unitId = $this->request->getGet('unit_id');
 
-        if (!$unitId) {
-            return $this->respond(['status' => 'gagal', 'pesan' => 'Parameter unit_id wajib.'], 400);
-        }
-
         $db = \Config\Database::connect();
 
-        $alokasi = $db->table('iot_alokasi al')
-                      ->select('al.*, i.nama_perangkat, i.tipe_perangkat, i.ip_address')
+        $builder = $db->table('iot_alokasi al')
+                      ->select('al.*, i.nama_perangkat, i.tipe_perangkat, i.ip_address, u.nama_unit')
                       ->join('iot i', 'i.id = al.iot_id')
-                      ->where('al.unit_id', $unitId)
-                      ->where('al.usaha_id', $usahaId)
-                      ->where('al.is_aktif', 1)
-                      ->get()->getResultArray();
+                      ->join('unit u', 'u.id = al.unit_id', 'left')
+                      ->where('al.is_aktif', 1);
+
+        if (!empty($usahaId)) {
+            $builder->where('al.usaha_id', $usahaId);
+        }
+        if (!empty($unitId)) {
+            $builder->where('al.unit_id', $unitId);
+        }
+
+        $alokasi = $builder->get()->getResultArray();
 
         $now = time();
         $updatedList = [];

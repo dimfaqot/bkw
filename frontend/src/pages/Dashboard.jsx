@@ -3874,10 +3874,10 @@ const Dashboard = () => {
   };
 
   const fetchBilliardStatus = async () => {
-    if (!filterUnitPos) return;
     try {
       const token = localStorage.getItem('token');
-      const r = await fetch(`${API_BASE_URL}/transaksi/billiard/status?unit_id=${filterUnitPos}`, {
+      const paramUnit = filterUnitPos ? `?unit_id=${filterUnitPos}` : '';
+      const r = await fetch(`${API_BASE_URL}/transaksi/billiard/status${paramUnit}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const json = await r.json();
@@ -3890,13 +3890,7 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    if (menuAktif !== 'kasir' || !filterUnitPos) {
-      setBilliardDevices([]);
-      return;
-    }
-
-    const unitObj = opsiUnit.find(u => String(u.id) === String(filterUnitPos));
-    if (!unitObj || (unitObj.kategori !== 'billiard' && unitObj.kategori !== 'sewa')) {
+    if (menuAktif !== 'kasir') {
       setBilliardDevices([]);
       return;
     }
@@ -3906,7 +3900,7 @@ const Dashboard = () => {
     return () => {
       clearInterval(interval);
     };
-  }, [menuAktif, filterUnitPos, opsiUnit]);
+  }, [menuAktif, filterUnitPos]);
 
   const submitMulaiBilliard = async () => {
     if (!selectedBilliardAlokasi || !billiardProdukId) {
@@ -7317,7 +7311,7 @@ const Dashboard = () => {
                                             className="btn btn-sm btn-outline-danger py-1 px-2.5 d-flex align-items-center justify-content-center"
                                             style={{ borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold' }}
                                           >-</button>
-                                          <span className="fw-bold text-main" style={{ fontSize: '0.85rem' }}>{cartItem.qty} {prod.satuan}</span>
+                                          <span className="fw-bold text-main" style={{ fontSize: '0.85rem' }}>{cartItem.qty} {prod.satuan || 'hrs'}</span>
                                           <button 
                                             onClick={() => tambahKeKeranjang(prod)}
                                             className="btn btn-sm btn-outline-primary py-1 px-2.5 d-flex align-items-center justify-content-center"
@@ -7326,15 +7320,35 @@ const Dashboard = () => {
                                           >+</button>
                                         </div>
                                       ) : (
-                                        <button
-                                          onClick={() => tambahKeKeranjang(prod)}
-                                          className="tombol-premium border-0 w-100 py-1 px-3 d-flex align-items-center justify-content-center gap-1"
-                                          style={{ fontSize: '0.72rem', borderRadius: '8px' }}
-                                          disabled={prod.is_stok_dikelola == 1 && prod.stok <= 0}
-                                        >
-                                          <Plus size={12} />
-                                          <span>Pilih</span>
-                                        </button>
+                                        <div className="d-flex gap-1">
+                                          <button
+                                            onClick={() => tambahKeKeranjang(prod)}
+                                            className="tombol-premium border-0 flex-fill py-1 px-2 d-flex align-items-center justify-content-center gap-1"
+                                            style={{ fontSize: '0.72rem', borderRadius: '8px' }}
+                                            disabled={prod.is_stok_dikelola == 1 && prod.stok <= 0}
+                                            title="Sewa Regular (Prepaid Jam)"
+                                          >
+                                            <Plus size={12} />
+                                            <span>{prod.tipe === 'sewa' ? '⏱️ Regular' : 'Pilih'}</span>
+                                          </button>
+                                          {prod.tipe === 'sewa' && (
+                                            <button
+                                              onClick={() => {
+                                                const dev = billiardDevices.find(d => Number(d.iot_id) === Number(prod.iot_id));
+                                                if (dev) {
+                                                  bukaModalMulaiBilliard(dev);
+                                                } else {
+                                                  ui.notif('gagal', 'Belum ada Perangkat IoT terhubung ke produk sewa ini.');
+                                                }
+                                              }}
+                                              className="tombol-sekunder-premium border-0 py-1 px-2"
+                                              style={{ fontSize: '0.68rem', borderRadius: '8px' }}
+                                              title="Mulai Sesi Open (Play & Pay)"
+                                            >
+                                              🚀 Open
+                                            </button>
+                                          )}
+                                        </div>
                                       )}
                                     </div>
                                   </div>
