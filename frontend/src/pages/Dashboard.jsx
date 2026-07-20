@@ -10245,7 +10245,10 @@ const Dashboard = () => {
                 let calculatedTotalTagihan = 0;
                 const processedDetail = selectedTransaksi.detail?.map(d => {
                   const activeDev = billiardDevices.find(dev => Number(dev.transaksi_aktif_id) === Number(selectedTransaksi.id) || (Number(dev.iot_id) === Number(d.iot_id) && dev.status_penggunaan === 'dipakai'));
-                  const isOpenSewa = (d.qty == 0 || d.tipe === 'sewa') && activeDev && activeDev.status_penggunaan === 'dipakai';
+                  const isOpenSewa = selectedTransaksi.status_pembayaran !== 'lunas' && 
+                                     (d.tipe_billing === 'open' || (d.qty == 0 && d.tipe === 'sewa')) && 
+                                     activeDev && activeDev.status_penggunaan === 'dipakai' && 
+                                     Number(activeDev.prepaid_durasi_menit || 0) == 0;
 
                   if (isOpenSewa && activeDev) {
                     const liveMinutes = Math.max(1, Number(activeDev.durasi_berjalan_menit || Math.ceil((activeDev.durasi_berjalan_detik || 0) / 60)));
@@ -10286,6 +10289,8 @@ const Dashboard = () => {
                                 <span className="badge bg-danger ms-1" style={{ fontSize: '0.6rem' }}>
                                   🔴 Sesi Open: ⏱️ {d.live_minutes}m ({d.live_jam_desimal} Jam)
                                 </span>
+                              ) : d.tipe === 'sewa' ? (
+                                Number(d.qty) >= 60 ? `(${d.qty}m / ${(d.qty / 60).toFixed(1)} Jam)` : `(${d.qty} Jam)`
                               ) : (
                                 `(x${d.qty})`
                               )}
