@@ -7243,7 +7243,11 @@ const Dashboard = () => {
                                                 <div className="text-end">
                                                   <div className="text-muted" style={{ fontSize: '0.6rem' }}>Biaya Saat Ini:</div>
                                                   <div className="fw-bold text-success" style={{ fontSize: '0.85rem' }}>
-                                                    Rp {Number(iotDev.estimasi_biaya || 0).toLocaleString('id-ID')}
+                                                    {(() => {
+                                                      const liveMnt = Math.max(1, Number(iotDev.durasi_berjalan_menit || Math.ceil((iotDev.durasi_berjalan_detik || 0) / 60)));
+                                                      const liveCost = Math.ceil((liveMnt * (Number(prod.harga_jual) / 60)) / 500) * 500;
+                                                      return `Rp ${Number(liveCost).toLocaleString('id-ID')}`;
+                                                    })()}
                                                   </div>
                                                 </div>
                                               </div>

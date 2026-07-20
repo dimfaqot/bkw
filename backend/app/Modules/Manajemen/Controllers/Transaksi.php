@@ -1186,11 +1186,14 @@ class Transaksi extends ResourceController
                     $device['durasi_berjalan_menit'] = $totalMenit;
 
                     if ($al['transaksi_aktif_id']) {
-                        $detail = $db->table('transaksi_detail')
-                                    ->where('transaksi_id', $al['transaksi_aktif_id'])
+                        $detail = $db->table('transaksi_detail td')
+                                    ->select('td.*, p.harga_jual as produk_harga_jual')
+                                    ->join('produk_jasa p', 'p.id = td.produk_id', 'left')
+                                    ->where('td.transaksi_id', $al['transaksi_aktif_id'])
                                     ->get()->getRow();
                         if ($detail) {
-                            $hargaSatuan = (float)$detail->harga_satuan;
+                            $hargaSatuan = (float)($detail->harga_satuan > 0 ? $detail->harga_satuan : $detail->produk_harga_jual);
+                            if ($hargaSatuan <= 0) $hargaSatuan = 25000;
                             $hargaMentah = $totalMenit * ($hargaSatuan / 60);
                             $hargaBulat = ceil($hargaMentah / 500) * 500;
                             $device['estimasi_biaya'] = $hargaBulat;
