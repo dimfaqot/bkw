@@ -4265,7 +4265,6 @@ const Dashboard = () => {
           }
           return item;
         });
-      } else {
         if (prod.tipe === 'barang' && prod.is_stok_dikelola == 1 && prod.stok <= 0) {
           ui.notif('gagal', `Stok '${prod.nama_produk}' sedang habis.`);
           return prev;
@@ -4273,6 +4272,24 @@ const Dashboard = () => {
         return [...prev, { ...prod, qty: 1, petugas_id: '', komisi_petugas: '' }];
       }
     });
+  };
+
+  const tambahKeKeranjangOpen = (prod) => {
+    setCart(prev => {
+      const existing = prev.find(item => item.id === prod.id);
+      if (existing) {
+        return prev.map(item => {
+          if (item.id === prod.id) {
+            return { ...item, tipe_billing: 'open', qty: 0 };
+          }
+          return item;
+        });
+      } else {
+        return [...prev, { ...prod, tipe_billing: 'open', qty: 0, petugas_id: '', komisi_petugas: '' }];
+      }
+    });
+    setPembayaranTipePos('belum_bayar');
+    ui.notif('sukses', `'${prod.nama_produk}' (Sesi Open) dimasukkan ke keranjang. Wajib Bayar Nanti.`);
   };
 
   const kurangiDariKeranjang = (prodId) => {
@@ -4379,6 +4396,7 @@ const Dashboard = () => {
           items: cart.map(item => ({
             produk_id: item.id,
             qty: item.qty,
+            tipe_billing: item.tipe_billing || 'regular',
             petugas_id: item.petugas_id ? Number(item.petugas_id) : null,
             komisi_petugas: item.komisi_petugas !== '' && item.komisi_petugas !== undefined && item.komisi_petugas !== null ? Number(item.komisi_petugas) : null
           }))
@@ -4389,6 +4407,7 @@ const Dashboard = () => {
       setTransaksiLoading(false);
       if (response.ok && resData.status === 'sukses') {
         ui.notif('sukses', resData.pesan || 'Transaksi berhasil!');
+        fetchBilliardStatus();
         
         // Membuka modal detail nota secara otomatis setelah checkout berhasil HANYA jika bayar sekarang (lunas)
         const txId = resData.data?.transaksi_id;
@@ -7310,40 +7329,7 @@ const Dashboard = () => {
                                               </button>
                                               {prod.tipe === 'sewa' && (
                                                 <button
-                                                  onClick={async () => {
-                                                    const dev = billiardDevices.find(d => Number(d.iot_id) === Number(prod.iot_id));
-                                                    if (!dev) {
-                                                      ui.notif('gagal', 'Belum ada Perangkat IoT terhubung ke produk sewa ini.');
-                                                      return;
-                                                    }
-                                                    try {
-                                                      ui.loading(true, `Memulai Sesi Open ${prod.nama_produk}...`);
-                                                      const token = localStorage.getItem('token');
-                                                      const res = await fetch(`${API_BASE_URL}/transaksi/billiard/mulai`, {
-                                                        method: 'POST',
-                                                        headers: {
-                                                          'Content-Type': 'application/json',
-                                                          'Authorization': `Bearer ${token}`
-                                                        },
-                                                        body: JSON.stringify({
-                                                          iot_alokasi_id: dev.id,
-                                                          produk_id: prod.id,
-                                                          tipe_billing: 'open'
-                                                        })
-                                                      });
-                                                      const json = await res.json();
-                                                      ui.loading(false);
-                                                      if (res.ok && json.status === 'sukses') {
-                                                        ui.notif('sukses', `Sesi Open ${prod.nama_produk} dimulai! Lampu saklar ON.`);
-                                                        fetchBilliardStatus();
-                                                      } else {
-                                                        ui.notif('gagal', json.pesan || 'Gagal memulai Sesi Open.');
-                                                      }
-                                                    } catch {
-                                                      ui.loading(false);
-                                                      ui.notif('gagal', 'Terjadi kesalahan koneksi.');
-                                                    }
-                                                  }}
+                                                  onClick={() => tambahKeKeranjangOpen(prod)}
                                                   className="tombol-sekunder-premium border-0 py-1 px-2"
                                                   style={{ fontSize: '0.68rem', borderRadius: '8px' }}
                                                   title="Mulai Sesi Open (Play & Pay)"

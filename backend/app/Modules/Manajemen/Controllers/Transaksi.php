@@ -132,8 +132,9 @@ class Transaksi extends ResourceController
         foreach ($items as $item) {
             $produkId = $item['produk_id'] ?? null;
             $qty = isset($item['qty']) ? (int)$item['qty'] : 1;
+            $isBillingOpen = (isset($item['tipe_billing']) && $item['tipe_billing'] === 'open');
 
-            if (!$produkId || $qty <= 0) {
+            if (!$produkId || ($qty < 0) || ($qty == 0 && !$isBillingOpen)) {
                 $db->transRollback();
                 return $this->respond(['status' => 'gagal', 'pesan' => 'Format item produk tidak valid.'], 400);
             }
@@ -210,16 +211,18 @@ class Transaksi extends ResourceController
                 ]);
             }
 
-            // Otomatis aktifkan IoT relay jika produk sewa terhubung ke perangkat IoT (Sesi Regular)
+            // Otomatis aktifkan IoT relay jika produk sewa terhubung ke perangkat IoT (Sesi Regular atau Open)
             if (!empty($produk->iot_id)) {
                 $iotAlokasi = $db->table('iot_alokasi')->where('iot_id', $produk->iot_id)->get()->getRowArray();
                 if ($iotAlokasi) {
-                    $durasiMenit = (float)$qty * 60;
+                    $isBillingOpen = (isset($item['tipe_billing']) && $item['tipe_billing'] === 'open') || ($qty == 0);
+                    $prepaidDurasi = $isBillingOpen ? 0 : ((float)$qty > 0 ? (float)$qty * 60 : 60);
+
                     $db->table('iot_alokasi')->where('id', $iotAlokasi['id'])->update([
                         'status_relay'         => 1,
                         'status_penggunaan'    => 'dipakai',
                         'transaksi_aktif_id'   => $transaksiId,
-                        'prepaid_durasi_menit' => $durasiMenit > 0 ? $durasiMenit : 60,
+                        'prepaid_durasi_menit' => $prepaidDurasi,
                         'waktu_mulai'          => $now,
                         'warning_sent'         => 0,
                         'updated_at'           => $now
