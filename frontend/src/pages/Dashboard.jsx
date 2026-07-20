@@ -7053,7 +7053,13 @@ const Dashboard = () => {
                 });
 
                 // Hitung total belanjaan di keranjang
-                const totalBelanja = cart.reduce((total, item) => total + (item.harga_jual * item.qty), 0);
+                const totalBelanja = cart.reduce((total, item) => {
+                  if (item.tipe === 'sewa') {
+                    const rawCost = item.qty * (item.harga_jual / 60);
+                    return total + (Math.ceil(rawCost / 500) * 500);
+                  }
+                  return total + (item.harga_jual * item.qty);
+                }, 0);
 
                 return (
                   <div className="row g-4 fade-in">
@@ -7352,11 +7358,21 @@ const Dashboard = () => {
                                     <div style={{ maxWidth: '60%' }}>
                                       <div className="fw-bold text-main" style={{ fontSize: '0.78rem' }}>{item.nama_produk}</div>
                                       <div className="text-muted small" style={{ fontSize: '0.68rem' }}>
-                                        {item.qty} x {formatRupiah(item.harga_jual)}
+                                        {item.tipe === 'sewa' ? (
+                                          `${item.qty}m (${(item.qty / 60).toFixed(1)} Jam) x ${formatRupiah(item.harga_jual)}/jam`
+                                        ) : (
+                                          `${item.qty} x ${formatRupiah(item.harga_jual)}`
+                                        )}
                                       </div>
                                     </div>
                                     <div className="d-flex align-items-center gap-2">
-                                      <span className="fw-bold text-main" style={{ fontSize: '0.78rem' }}>{formatRupiah(item.harga_jual * item.qty)}</span>
+                                      <span className="fw-bold text-main" style={{ fontSize: '0.78rem' }}>
+                                        {formatRupiah(
+                                          item.tipe === 'sewa'
+                                            ? Math.ceil((item.qty * (item.harga_jual / 60)) / 500) * 500
+                                            : item.harga_jual * item.qty
+                                        )}
+                                      </span>
                                       <button 
                                         onClick={() => hapusDariKeranjang(item.id)}
                                         className="btn btn-link text-danger p-0 ms-1"

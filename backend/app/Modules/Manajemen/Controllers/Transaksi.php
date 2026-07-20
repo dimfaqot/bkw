@@ -1178,13 +1178,20 @@ class Transaksi extends ResourceController
                     }
                 } else {
                     $device['durasi_berjalan_detik'] = $elapsed;
+                    $totalMenit = (int)ceil($elapsed / 60);
+                    if ($totalMenit < 1) $totalMenit = 1;
+                    $device['durasi_berjalan_menit'] = $totalMenit;
+
                     if ($al['transaksi_aktif_id']) {
                         $detail = $db->table('transaksi_detail')
                                     ->where('transaksi_id', $al['transaksi_aktif_id'])
                                     ->get()->getRow();
                         if ($detail) {
                             $hargaSatuan = (float)$detail->harga_satuan;
-                            $device['akumulasi_biaya'] = round((($elapsed / 60) / 60) * $hargaSatuan);
+                            $hargaMentah = $totalMenit * ($hargaSatuan / 60);
+                            $hargaBulat = ceil($hargaMentah / 500) * 500;
+                            $device['estimasi_biaya'] = $hargaBulat;
+                            $device['akumulasi_biaya'] = $hargaBulat;
                         }
                     }
                 }
@@ -1431,24 +1438,30 @@ class Transaksi extends ResourceController
         $db->transStart();
 
         $startTime = strtotime($alokasi->waktu_mulai);
-        $elapsedMinutes = ceil((time() - $startTime) / 60);
+        $elapsedMinutes = (int)ceil((time() - $startTime) / 60);
         if ($elapsedMinutes < 1) $elapsedMinutes = 1;
 
         if ($alokasi->prepaid_durasi_menit > 0 && $elapsedMinutes > $alokasi->prepaid_durasi_menit) {
-            $elapsedMinutes = $alokasi->prepaid_durasi_menit;
+            $elapsedMinutes = (int)$alokasi->prepaid_durasi_menit;
         }
 
         $transaksiId = $alokasi->transaksi_aktif_id;
         if ($transaksiId) {
             $detail = $db->table('transaksi_detail')->where('transaksi_id', $transaksiId)->get()->getRow();
             if ($detail) {
-                $qty = round($elapsedMinutes / 60, 2);
-                $subtotal = $qty * (float)$detail->harga_satuan;
+                $hargaPerJam = (float)$detail->harga_satuan;
+                if ($alokasi->prepaid_durasi_menit > 0) {
+                    $subtotal = round(($elapsedMinutes / 60) * $hargaPerJam);
+                } else {
+                    $hargaMentah = $elapsedMinutes * ($hargaPerJam / 60);
+                    $subtotal = ceil($hargaMentah / 500) * 500;
+                }
 
                 $db->table('transaksi_detail')->where('id', $detail->id)->update([
-                    'qty'        => $qty,
-                    'subtotal'   => $subtotal,
-                    'updated_at' => $now
+                    'qty'          => $elapsedMinutes,
+                    'durasi_menit' => $elapsedMinutes,
+                    'subtotal'     => $subtotal,
+                    'updated_at'   => $now
                 ]);
 
                 $db->table('transaksi')->where('id', $transaksiId)->update([
