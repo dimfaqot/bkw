@@ -7434,41 +7434,53 @@ const Dashboard = () => {
                             </div>
 
                             {/* Tipe Pembayaran (Lunas vs Hutang) */}
-                            <div className="mb-3">
-                              <label className="text-muted small d-block mb-1">Tipe Transaksi:</label>
-                              <div className="d-flex gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => setPembayaranTipePos('lunas')}
-                                  className={`border-0 flex-fill py-1.5 px-3 small d-flex align-items-center justify-content-center gap-1`}
-                                  style={{
-                                    fontSize: '0.72rem',
-                                    borderRadius: '8px',
-                                    backgroundColor: pembayaranTipePos === 'lunas' ? 'var(--warna-utama, #6366f1)' : 'rgba(255,255,255,0.03)',
-                                    color: pembayaranTipePos === 'lunas' ? '#fff' : 'var(--teks-redup, #94a3b8)',
-                                    fontWeight: 600,
-                                    transition: 'all 0.15s'
-                                  }}
-                                >
-                                  💳 Bayar Sekarang
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setPembayaranTipePos('belum_bayar')}
-                                  className={`border-0 flex-fill py-1.5 px-3 small d-flex align-items-center justify-content-center gap-1`}
-                                  style={{
-                                    fontSize: '0.72rem',
-                                    borderRadius: '8px',
-                                    backgroundColor: pembayaranTipePos === 'belum_bayar' ? 'var(--warna-utama, #6366f1)' : 'rgba(255,255,255,0.03)',
-                                    color: pembayaranTipePos === 'belum_bayar' ? '#fff' : 'var(--teks-redup, #94a3b8)',
-                                    fontWeight: 600,
-                                    transition: 'all 0.15s'
-                                  }}
-                                >
-                                  ⚠️ Bayar Nanti
-                                </button>
-                              </div>
-                            </div>
+                            {(() => {
+                              const containsOpenBilling = cart.some(item => item.tipe_billing === 'open');
+                              return (
+                                <div className="mb-3">
+                                  <label className="text-muted small d-block mb-1">Tipe Transaksi:</label>
+                                  <div className="d-flex gap-2">
+                                    {!containsOpenBilling && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setPembayaranTipePos('lunas')}
+                                        className={`border-0 flex-fill py-1.5 px-3 small d-flex align-items-center justify-content-center gap-1`}
+                                        style={{
+                                          fontSize: '0.72rem',
+                                          borderRadius: '8px',
+                                          backgroundColor: pembayaranTipePos === 'lunas' ? 'var(--warna-utama, #6366f1)' : 'rgba(255,255,255,0.03)',
+                                          color: pembayaranTipePos === 'lunas' ? '#fff' : 'var(--teks-redup, #94a3b8)',
+                                          fontWeight: 600,
+                                          transition: 'all 0.15s'
+                                        }}
+                                      >
+                                        💳 Bayar Sekarang
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => setPembayaranTipePos('belum_bayar')}
+                                      className={`border-0 flex-fill py-1.5 px-3 small d-flex align-items-center justify-content-center gap-1`}
+                                      style={{
+                                        fontSize: '0.72rem',
+                                        borderRadius: '8px',
+                                        backgroundColor: (containsOpenBilling || pembayaranTipePos === 'belum_bayar') ? 'var(--warna-utama, #6366f1)' : 'rgba(255,255,255,0.03)',
+                                        color: (containsOpenBilling || pembayaranTipePos === 'belum_bayar') ? '#fff' : 'var(--teks-redup, #94a3b8)',
+                                        fontWeight: 600,
+                                        transition: 'all 0.15s'
+                                      }}
+                                    >
+                                      ⚠️ Bayar Nanti {containsOpenBilling && '(Wajib)'}
+                                    </button>
+                                  </div>
+                                  {containsOpenBilling && (
+                                    <div className="text-warning small mt-2 p-2 rounded" style={{ backgroundColor: 'rgba(255, 193, 7, 0.08)', border: '1px solid rgba(255, 193, 7, 0.2)', fontSize: '0.65rem' }}>
+                                      🔒 <strong>Sesi Open Billiard Wajib Bayar Nanti</strong>. Opsi "Bayar Sekarang" disembunyikan. Saklar saklar relay & timer waktu akan mulai berjalan setelah transaksi ini disimpan.
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
 
                             {/* Pilihan Pelanggan (Selalu Muncul) */}
                             <div className="mb-3 fade-in" id="searchable-member-wrapper" style={{ position: 'relative', zIndex: showDropdownMember ? 200 : 'auto' }}>
