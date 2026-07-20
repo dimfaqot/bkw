@@ -4150,31 +4150,73 @@ const Dashboard = () => {
 
     const renderKonten = (menit) => (
       <div className="py-2 text-start">
-        <label className="form-label small fw-semibold text-main">Tambahan Waktu Main (Menit)</label>
-        <input 
-          type="number" 
-          className="form-control input-premium" 
-          style={{ fontSize: '0.8rem' }}
-          value={menit}
-          min="1"
-          onChange={(e) => {
-            tambahanMenit = Number(e.target.value);
-            updateModal();
-          }}
-        />
-        <div className="d-flex gap-1 mt-2 flex-wrap">
-          {[15, 30, 45, 60, 120].map(m => (
+        <label className="form-label small fw-semibold text-main d-block mb-2">Tambahan Waktu Main (Menit)</label>
+        
+        {/* Stepper Up & Down Control */}
+        <div className="d-flex align-items-center gap-2 mb-3">
+          <button
+            type="button"
+            className="tombol-sekunder-premium py-2 px-3 fw-bold d-flex align-items-center justify-content-center gap-1 flex-shrink-0"
+            style={{ fontSize: '0.82rem', borderRadius: '10px', minWidth: '85px' }}
+            onClick={() => {
+              tambahanMenit = Math.max(30, Number(tambahanMenit || 30) - 30);
+              updateModal();
+            }}
+            title="Kurangi 30 Menit"
+          >
+            🔻 -30m
+          </button>
+
+          <input 
+            type="number" 
+            className="form-control input-premium text-center fw-bold text-main py-2" 
+            style={{ fontSize: '1.1rem', borderRadius: '10px' }}
+            value={menit}
+            min="30"
+            step="30"
+            onChange={(e) => {
+              tambahanMenit = Number(e.target.value);
+              updateModal();
+            }}
+          />
+
+          <button
+            type="button"
+            className="tombol-premium py-2 px-3 fw-bold d-flex align-items-center justify-content-center gap-1 flex-shrink-0 text-white"
+            style={{ fontSize: '0.82rem', borderRadius: '10px', minWidth: '85px', backgroundColor: 'var(--warna-utama)' }}
+            onClick={() => {
+              tambahanMenit = Number(tambahanMenit || 0) + 30;
+              updateModal();
+            }}
+            title="Tambah 30 Menit"
+          >
+            🔺 +30m
+          </button>
+        </div>
+
+        {/* Live conversion text */}
+        <div className="text-muted small mb-3 text-center" style={{ fontSize: '0.72rem' }}>
+          ⏱️ Tambahan Durasi: <strong className="text-warning">{menit} Menit ({(Number(menit || 0) / 60).toFixed(1)} Jam)</strong>
+        </div>
+
+        {/* Preset Chips */}
+        <label className="text-muted small d-block mb-1.5" style={{ fontSize: '0.68rem' }}>Pilihan Cepat:</label>
+        <div className="d-flex gap-1.5 flex-wrap">
+          {[30, 60, 90, 120, 180].map(m => (
             <button 
               key={m} 
               type="button" 
-              className="tombol-sekunder-premium py-1 px-2.5" 
-              style={{ fontSize: '0.7rem' }}
+              className={`border-0 py-1 px-2.5 rounded-3 small ${menit === m ? 'tombol-premium text-white' : 'tombol-sekunder-premium'}`}
+              style={{ 
+                fontSize: '0.7rem',
+                backgroundColor: menit === m ? 'var(--warna-utama)' : undefined
+              }}
               onClick={() => {
                 tambahanMenit = m;
                 updateModal();
               }}
             >
-              +{m} Menit
+              {m}m ({m / 60} Jm)
             </button>
           ))}
         </div>
