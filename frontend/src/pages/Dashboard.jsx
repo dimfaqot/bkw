@@ -4696,6 +4696,19 @@ const Dashboard = () => {
       ui.notif('gagal', 'Silakan pilih produk yang ingin ditambahkan terlebih dahulu.');
       return;
     }
+
+    const targetProdObj = posProducts.find(p => Number(p.id) === Number(pilihanProdukHutang));
+    const connectedDevice = billiardDevices.find(dev => 
+      (targetProdObj?.iot_id && Number(dev.iot_id) === Number(targetProdObj.iot_id)) ||
+      (dev.nama_perangkat && targetProdObj?.nama_produk && (targetProdObj.nama_produk.toLowerCase().includes(dev.nama_perangkat.toLowerCase()) || dev.nama_perangkat.toLowerCase().includes(targetProdObj.nama_produk.toLowerCase())))
+    );
+    const isOccupiedByOther = connectedDevice && connectedDevice.status_penggunaan === 'dipakai' && Number(connectedDevice.transaksi_aktif_id || 0) !== Number(selectedTransaksi?.id || 0);
+
+    if (isOccupiedByOther) {
+      ui.notif('gagal', `⚠️ Meja '${targetProdObj?.nama_produk || 'Billiard'}' sedang aktif digunakan oleh transaksi/pelanggan lain.`);
+      return;
+    }
+
     ui.loading(true, 'fullscreen', 'Menyimpan tambahan pesanan...');
     try {
       const gabungItems = () => {

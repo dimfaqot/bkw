@@ -519,7 +519,7 @@ class Transaksi extends ResourceController
             return $this->respond(['status' => 'gagal', 'pesan' => 'Daftar item kosong.'], 400);
         }
 
-        $db->transStart();
+        $db->transBegin();
         $dateTimeNow = date('Y-m-d H:i:s');
 
         $detailsLama = $db->table('transaksi_detail')->where('transaksi_id', $id)->get()->getResultArray();
@@ -554,8 +554,10 @@ class Transaksi extends ResourceController
             if (!empty($produk->iot_id)) {
                 $iotAlokasiCek = $db->table('iot_alokasi')->where('iot_id', $produk->iot_id)->get()->getRowArray();
                 if ($iotAlokasiCek && $iotAlokasiCek['status_penggunaan'] === 'dipakai' && (int)$iotAlokasiCek['transaksi_aktif_id'] !== (int)$id) {
+                    $txLain = $db->table('transaksi')->where('id', $iotAlokasiCek['transaksi_aktif_id'])->get()->getRow();
+                    $invLain = $txLain ? $txLain->nomor_invoice : '#'.$iotAlokasiCek['transaksi_aktif_id'];
                     $db->transRollback();
-                    return $this->respond(['status' => 'gagal', 'pesan' => "Perangkat/Meja billiard '{$produk->nama_produk}' sedang aktif digunakan oleh transaksi lain."], 400);
+                    return $this->respond(['status' => 'gagal', 'pesan' => "⚠️ Meja/Sewa '{$produk->nama_produk}' sedang aktif digunakan oleh transaksi lain (Invoice: {$invLain})."], 400);
                 }
             }
 
@@ -646,18 +648,13 @@ class Transaksi extends ResourceController
                'updated_at'  => $dateTimeNow
            ]);
 
-        $db->transComplete();
-
-        if ($db->transStatus() === false) {
-            return $this->respond(['status' => 'gagal', 'pesan' => 'Gagal memperbarui transaksi.'], 500);
-        }
+        $db->transCommit();
 
         return $this->respond([
             'status' => 'sukses',
             'pesan'  => 'Pesanan transaksi berhasil diperbarui!',
             'data'   => [
                 'transaksi_id' => $id,
-                'total_harga'  => $totalHargaBaru
             ]
         ]);
     }
