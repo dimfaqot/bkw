@@ -3184,6 +3184,9 @@ const Dashboard = () => {
   const [waNotaManual, setWaNotaManual] = useState('');
 
   const [pilihanProdukHutang, setPilihanProdukHutang] = useState('');
+  const [searchProdukHutangQuery, setSearchProdukHutangQuery] = useState('');
+  const [showDropdownProdukHutang, setShowDropdownProdukHutang] = useState(false);
+  const [pilihanTipeBillingHutang, setPilihanTipeBillingHutang] = useState('regular');
   const [pilihanQtyHutang, setPilihanQtyHutang] = useState(1);
   const [metodePelunasanHutang, setMetodePelunasanHutang] = useState('cash');
 
@@ -4690,7 +4693,10 @@ const Dashboard = () => {
   };
 
   const simpanTambahanPesananHutang = async () => {
-    if (!selectedTransaksi) return;
+    if (!selectedTransaksi || !pilihanProdukHutang) {
+      ui.notif('gagal', 'Silakan pilih produk yang ingin ditambahkan terlebih dahulu.');
+      return;
+    }
     ui.loading(true, 'fullscreen', 'Menyimpan tambahan pesanan...');
     try {
       const gabungItems = () => {
@@ -4698,13 +4704,18 @@ const Dashboard = () => {
         const tipeBillingMap = {};
         selectedTransaksi.detail.forEach(d => {
           map[d.produk_id] = (map[d.produk_id] || 0) + Number(d.qty);
-          if (d.tipe === 'sewa' || d.qty == 0) {
+          if (d.tipe === 'sewa' || d.qty == 0 || d.tipe_billing === 'open') {
             tipeBillingMap[d.produk_id] = 'open';
           }
         });
         if (pilihanProdukHutang) {
           const pid = Number(pilihanProdukHutang);
-          map[pid] = (map[pid] || 0) + Number(pilihanQtyHutang);
+          const targetProdObj = posProducts.find(p => Number(p.id) === pid);
+          const isSewaProduct = targetProdObj && (targetProdObj.tipe === 'sewa' || targetProdObj.iot_id);
+          const isBillingOpen = isSewaProduct && pilihanTipeBillingHutang === 'open';
+
+          map[pid] = (map[pid] || 0) + (isBillingOpen ? 0 : Number(pilihanQtyHutang));
+          tipeBillingMap[pid] = isBillingOpen ? 'open' : (tipeBillingMap[pid] || 'regular');
         }
         return Object.keys(map).map(pid => ({
           produk_id: Number(pid),
@@ -4729,8 +4740,12 @@ const Dashboard = () => {
       if (response.ok && res.status === 'sukses') {
         ui.notif('sukses', res.pesan || 'Tambahan pesanan berhasil disimpan!');
         setPilihanProdukHutang('');
+        setSearchProdukHutangQuery('');
+        setShowDropdownProdukHutang(false);
         setPilihanQtyHutang(1);
+        setPilihanTipeBillingHutang('regular');
         fetchPosProducts();
+        fetchBilliardStatus();
         fetchRiwayatTransaksi(filterTanggalPos);
 
         // Refetch & recalculate transaction details live without closing modal
@@ -7774,7 +7789,7 @@ const Dashboard = () => {
                                 <input
                                   type="text"
                                   className="form-control input-premium text-main py-1.5 px-3"
-                                  style={{ fontSize: '0.78rem', borderRadius: '8px', paddingRight: pelangganIdPos ? '2.2rem' : undefined }}
+                                  style={{ fontSize: '0.78rem', borderRadius: '8px', paddingRight: (pelangganIdPos || memberSearchQuery) ? '2.2rem' : undefined }}
                                   placeholder="Ketik nama atau wa member..."
                                   value={memberSearchQuery}
                                   onChange={e => {
@@ -7787,17 +7802,25 @@ const Dashboard = () => {
                                   }}
                                   onFocus={() => setShowDropdownMember(true)}
                                   onBlur={() => setTimeout(() => setShowDropdownMember(false), 200)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Escape') {
+                                      setShowDropdownMember(false);
+                                      setPelangganIdPos('');
+                                      setMemberSearchQuery('');
+                                    }
+                                  }}
                                 />
-                                {pelangganIdPos && (
+                                {(pelangganIdPos || memberSearchQuery) && (
                                   <button
                                     type="button"
                                     onClick={() => {
                                       setPelangganIdPos('');
                                       setMemberSearchQuery('');
+                                      setShowDropdownMember(false);
                                     }}
                                     className="position-absolute end-0 top-50 translate-middle-y btn btn-link text-danger p-0 border-0 me-2"
-                                    style={{ fontSize: '0.75rem', textDecoration: 'none', lineHeight: 1 }}
-                                    title="Hapus pilihan"
+                                    style={{ fontSize: '0.78rem', textDecoration: 'none', lineHeight: 1 }}
+                                    title="Bersihkan / Batal Pilih"
                                   >
                                     ✕
                                   </button>
@@ -7818,7 +7841,7 @@ const Dashboard = () => {
                                     style={{
                                       position: 'absolute',
                                       zIndex: 9999,
-                                      maxHeight: '160px',
+                                      maxHeight: '180px',
                                       overflowY: 'auto',
                                       top: '100%',
                                       left: 0,
@@ -7826,6 +7849,19 @@ const Dashboard = () => {
                                       border: '1px solid var(--warna-border)',
                                     }}
                                   >
+                                    {/* Opsi Batal / Kosongkan Pilihan */}
+                                    <div
+                                      onMouseDown={() => {
+                                        setPelangganIdPos('');
+                                        setMemberSearchQuery('');
+                                        setShowDropdownMember(false);
+                                      }}
+                                      className="py-1.5 px-3 rounded-2 text-muted small border-bottom border-secondary border-opacity-25"
+                                      style={{ cursor: 'pointer', fontSize: '0.74rem' }}
+                                    >
+                                      ❌ Batal / Kosongkan Pilihan (Tamu Umum)
+                                    </div>
+
                                     {filteredMembers.length === 0 ? (
                                       <div className="text-muted small py-2 px-3 italic text-white">Tidak ada member cocok.</div>
                                     ) : (
@@ -10964,32 +11000,202 @@ const Dashboard = () => {
                           <>
                             <div className="p-3 mb-3 rounded-3" style={{ border: '1px solid rgba(99,102,241,0.15)', backgroundColor: 'rgba(99,102,241,0.02)' }}>
                               <div className="fw-bold mb-2 text-main" style={{ fontSize: '0.78rem' }}>➕ Tambah Item Pesanan (Siklus Aktif):</div>
-                              <div className="row g-2">
-                                <div className="col-12 col-sm-8">
-                                  <select
-                                    value={pilihanProdukHutang}
-                                    onChange={e => setPilihanProdukHutang(e.target.value)}
-                                    className="form-select input-premium text-main py-1 px-2"
-                                    style={{ fontSize: '0.75rem', borderRadius: '6px' }}
-                                  >
-                                    <option value="">-- Pilih Tambah Produk --</option>
-                                    {posProducts.filter(p => Number(p.harga_jual) > 0).map(p => (
-                                      <option key={p.id} value={p.id}>{p.nama_produk} ({formatRupiah(p.harga_jual)})</option>
-                                    ))}
-                                  </select>
-                                </div>
-                                <div className="col-12 col-sm-4">
+                              
+                              {/* Real-time Product Search Datalist */}
+                              <div className="mb-3 position-relative" id="searchable-produk-hutang-wrapper" style={{ zIndex: showDropdownProdukHutang ? 210 : 'auto' }}>
+                                <label className="text-muted small mb-1 d-block" style={{ fontSize: '0.72rem' }}>
+                                  🔍 Cari Produk / Jasa:
+                                </label>
+                                <div className="position-relative">
                                   <input
-                                    type="number"
-                                    min="1"
-                                    value={pilihanQtyHutang}
-                                    onChange={e => setPilihanQtyHutang(Number(e.target.value))}
-                                    className="form-control input-premium text-main py-1 text-center"
-                                    style={{ fontSize: '0.75rem', borderRadius: '6px' }}
-                                    placeholder="Qty..."
+                                    type="text"
+                                    className="form-control input-premium text-main py-1.5 px-3"
+                                    style={{ fontSize: '0.78rem', borderRadius: '8px', paddingRight: (pilihanProdukHutang || searchProdukHutangQuery) ? '2.2rem' : undefined }}
+                                    placeholder="Ketik nama atau kode produk..."
+                                    value={searchProdukHutangQuery}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      setSearchProdukHutangQuery(val);
+                                      if (!val) setPilihanProdukHutang('');
+                                      setShowDropdownProdukHutang(true);
+                                    }}
+                                    onFocus={() => setShowDropdownProdukHutang(true)}
+                                    onBlur={() => setTimeout(() => setShowDropdownProdukHutang(false), 200)}
+                                    onKeyDown={e => {
+                                      if (e.key === 'Escape') {
+                                        setShowDropdownProdukHutang(false);
+                                        setSearchProdukHutangQuery('');
+                                        setPilihanProdukHutang('');
+                                      }
+                                    }}
                                   />
+
+                                  {/* Tombol Clear / Cancel ✕ */}
+                                  {(pilihanProdukHutang || searchProdukHutangQuery) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setPilihanProdukHutang('');
+                                        setSearchProdukHutangQuery('');
+                                        setShowDropdownProdukHutang(false);
+                                      }}
+                                      className="position-absolute end-0 top-50 translate-middle-y btn btn-link text-danger p-0 border-0 me-2"
+                                      style={{ fontSize: '0.78rem', textDecoration: 'none', lineHeight: 1 }}
+                                      title="Bersihkan / Batal Pilih"
+                                    >
+                                      ✕
+                                    </button>
+                                  )}
                                 </div>
+
+                                {/* Dropdown Datalist Produk */}
+                                {showDropdownProdukHutang && (
+                                  <div
+                                    className="w-100 rounded-3 shadow-lg p-1 mt-1 position-absolute start-0"
+                                    style={{
+                                      zIndex: 9999,
+                                      maxHeight: '180px',
+                                      overflowY: 'auto',
+                                      top: '100%',
+                                      backgroundColor: '#1e293b',
+                                      border: '1px solid var(--warna-border)'
+                                    }}
+                                  >
+                                    {/* Opsi Batal / Kosongkan Pilihan */}
+                                    <div
+                                      onMouseDown={() => {
+                                        setPilihanProdukHutang('');
+                                        setSearchProdukHutangQuery('');
+                                        setShowDropdownProdukHutang(false);
+                                      }}
+                                      className="py-1.5 px-3 rounded-2 text-muted small border-bottom border-secondary border-opacity-25"
+                                      style={{ cursor: 'pointer', fontSize: '0.74rem' }}
+                                    >
+                                      ❌ Batal / Kosongkan Pilihan
+                                    </div>
+
+                                    {(() => {
+                                      const query = searchProdukHutangQuery.toLowerCase();
+                                      const filtered = posProducts
+                                        .filter(p => Number(p.harga_jual) > 0)
+                                        .filter(p => !query || p.nama_produk?.toLowerCase().includes(query) || String(p.kode_produk || '').toLowerCase().includes(query))
+                                        .slice(0, 15);
+
+                                      if (filtered.length === 0) {
+                                        return <div className="text-muted small py-2 px-3 italic text-white">Tidak ada produk yang cocok.</div>;
+                                      }
+
+                                      return filtered.map(p => (
+                                        <div
+                                          key={p.id}
+                                          onMouseDown={() => {
+                                            setPilihanProdukHutang(String(p.id));
+                                            setSearchProdukHutangQuery(`${p.nama_produk} (${formatRupiah(p.harga_jual)})`);
+                                            setShowDropdownProdukHutang(false);
+                                            if (p.tipe === 'sewa' || p.iot_id) {
+                                              setPilihanTipeBillingHutang('regular');
+                                            }
+                                          }}
+                                          className="py-1.5 px-3 rounded-2 text-white small d-flex align-items-center justify-content-between"
+                                          style={{ cursor: 'pointer', fontSize: '0.74rem', borderBottom: '1px solid rgba(255,255,255,0.03)' }}
+                                          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)'}
+                                          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                                        >
+                                          <div>
+                                            <div className="fw-semibold text-main">{p.nama_produk}</div>
+                                            <div className="text-muted" style={{ fontSize: '0.65rem' }}>
+                                              {p.tipe === 'sewa' ? '🎱 Sewa Billiard' : p.tipe === 'jasa' ? '✂️ Jasa' : `📦 Barang`}
+                                            </div>
+                                          </div>
+                                          <div className="fw-bold text-success">
+                                            {formatRupiah(p.harga_jual)}
+                                          </div>
+                                        </div>
+                                      ));
+                                    })()}
+                                  </div>
+                                )}
                               </div>
+
+                              {/* Dynamic Options based on Product Type */}
+                              {(() => {
+                                const selectedProdObj = posProducts.find(p => String(p.id) === String(pilihanProdukHutang));
+                                const isSewaProduct = selectedProdObj && (selectedProdObj.tipe === 'sewa' || selectedProdObj.iot_id);
+
+                                if (isSewaProduct) {
+                                  return (
+                                    <div className="p-2.5 rounded-3 mb-3" style={{ backgroundColor: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                                      <label className="text-muted small mb-1.5 d-block fw-semibold" style={{ fontSize: '0.72rem' }}>
+                                        🎱 Mode Billing Billiard:
+                                      </label>
+                                      <div className="d-flex gap-2 mb-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => setPilihanTipeBillingHutang('regular')}
+                                          className="border-0 flex-fill py-1 px-2 small text-center"
+                                          style={{
+                                            fontSize: '0.72rem',
+                                            borderRadius: '6px',
+                                            backgroundColor: pilihanTipeBillingHutang === 'regular' ? 'var(--warna-utama, #6366f1)' : 'rgba(255,255,255,0.05)',
+                                            color: pilihanTipeBillingHutang === 'regular' ? '#fff' : 'var(--teks-redup, #94a3b8)',
+                                            fontWeight: 600
+                                          }}
+                                        >
+                                          ⏱️ Regular (Jam)
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => setPilihanTipeBillingHutang('open')}
+                                          className="border-0 flex-fill py-1 px-2 small text-center"
+                                          style={{
+                                            fontSize: '0.72rem',
+                                            borderRadius: '6px',
+                                            backgroundColor: pilihanTipeBillingHutang === 'open' ? 'var(--bs-danger)' : 'rgba(255,255,255,0.05)',
+                                            color: pilihanTipeBillingHutang === 'open' ? '#fff' : 'var(--teks-redup, #94a3b8)',
+                                            fontWeight: 600
+                                          }}
+                                        >
+                                          🔴 Open (Bayar Nanti)
+                                        </button>
+                                      </div>
+
+                                      {pilihanTipeBillingHutang === 'regular' ? (
+                                        <div>
+                                          <label className="text-muted small mb-1 d-block" style={{ fontSize: '0.68rem' }}>Durasi (Jam):</label>
+                                          <input
+                                            type="number"
+                                            min="1"
+                                            value={pilihanQtyHutang}
+                                            onChange={e => setPilihanQtyHutang(Number(e.target.value))}
+                                            className="form-control input-premium text-main py-1 text-center"
+                                            style={{ fontSize: '0.75rem', borderRadius: '6px', maxWidth: '120px' }}
+                                            placeholder="Durasi jam..."
+                                          />
+                                        </div>
+                                      ) : (
+                                        <div className="text-warning small" style={{ fontSize: '0.68rem' }}>
+                                          🔒 Sesi Open Billiard akan mencatat timer & biaya sewa secara real-time hingga nota dilunasi.
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                }
+
+                                return (
+                                  <div className="mb-3">
+                                    <label className="text-muted small mb-1 d-block" style={{ fontSize: '0.72rem' }}>Jumlah (Qty):</label>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      value={pilihanQtyHutang}
+                                      onChange={e => setPilihanQtyHutang(Number(e.target.value))}
+                                      className="form-control input-premium text-main py-1 text-center"
+                                      style={{ fontSize: '0.75rem', borderRadius: '6px', maxWidth: '120px' }}
+                                      placeholder="Qty..."
+                                    />
+                                  </div>
+                                );
+                              })()}
 
                               <div className="d-flex gap-2 mt-3">
                                 <button

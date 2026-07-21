@@ -548,7 +548,9 @@ class Transaksi extends ResourceController
             }
 
             $isSewa = ($produk->tipe === 'sewa' || !empty($produk->iot_id));
-            if ($qtyBaru < 0 || ($qtyBaru == 0 && !$isSewa)) {
+            $isBillingOpen = (isset($item['tipe_billing']) && $item['tipe_billing'] === 'open');
+
+            if ($qtyBaru < 0 || ($qtyBaru == 0 && !$isSewa && !$isBillingOpen)) {
                 $db->transRollback();
                 return $this->respond(['status' => 'gagal', 'pesan' => 'Item produk atau kuantitas tidak valid.'], 400);
             }
@@ -559,50 +561,67 @@ class Transaksi extends ResourceController
                 $detailLama = $detailsMap[$produkId];
                 $qtyLama = (int)$detailLama['qty'];
 
-                if ($qtyBaru < $qtyLama) {
+                if ($qtyBaru < $qtyLama && !$isBillingOpen) {
                     $db->transRollback();
                     return $this->respond(['status' => 'gagal', 'pesan' => "Kuantitas produk '{$produk->nama_produk}' tidak boleh dikurangi. Jumlah sebelumnya: $qtyLama, dikirim: $qtyBaru."], 400);
                 }
 
                 $diff = $qtyBaru - $qtyLama;
 
-                if ($diff > 0) {
-                    $err = $this->prosesStokProduk($db, $produk, $diff, $usahaId, $dateTimeNow);
+                if ($diff > 0 || $isBillingOpen) {
+                    $err = $this->prosesStokProduk($db, $produk, max(0, $diff), $usahaId, $dateTimeNow);
                     if ($err) {
                         $db->transRollback();
                         return $this->respond(['status' => 'gagal', 'pesan' => $err], 400);
                     }
 
                     $statusPengerjaan = ($produk->butuh_persiapan == 1) ? 'Menunggu' : 'Selesai';
-                    $subtotalBaru = $hargaSatuan * $qtyBaru;
+                    $subtotalBaru = $isBillingOpen ? 0.00 : ($hargaSatuan * $qtyBaru);
                     $db->table('transaksi_detail')
                        ->where('id', $detailLama['id'])
                        ->update([
                            'qty'               => $qtyBaru,
                            'subtotal'          => $subtotalBaru,
+                           'tipe_billing'      => $isBillingOpen ? 'open' : 'regular',
                            'status_pengerjaan' => $statusPengerjaan,
                            'updated_at'        => $dateTimeNow
                        ]);
                 }
             } else {
-                $err = $this->prosesStokProduk($db, $produk, $qtyBaru, $usahaId, $dateTimeNow);
+                $err = $this->prosesStokProduk($db, $produk, $isBillingOpen ? 0 : $qtyBaru, $usahaId, $dateTimeNow);
                 if ($err) {
                     $db->transRollback();
                     return $this->respond(['status' => 'gagal', 'pesan' => $err], 400);
                 }
 
                 $statusPengerjaan = ($produk->butuh_persiapan == 1) ? 'Menunggu' : 'Selesai';
-                $subtotal = $hargaSatuan * $qtyBaru;
+                $subtotal = $isBillingOpen ? 0.00 : ($hargaSatuan * $qtyBaru);
                 $db->table('transaksi_detail')->insert([
                     'transaksi_id'      => $id,
                     'produk_id'         => $produkId,
-                    'qty'               => $qtyBaru,
+                    'qty'               => $isBillingOpen ? 0 : $qtyBaru,
                     'harga_satuan'      => $hargaSatuan,
                     'subtotal'          => $subtotal,
+                    'tipe_billing'      => $isBillingOpen ? 'open' : 'regular',
                     'status_pengerjaan' => $statusPengerjaan,
                     'created_at'        => $dateTimeNow,
                     'updated_at'        => $dateTimeNow
                 ]);
+
+                // Aktifkan IoT relay jika produk sewa terhubung ke perangkat IoT
+                if (!empty($produk->iot_id)) {
+                    $iotAlokasi = $db->table('iot_alokasi')->where('iot_id', $produk->iot_id)->get()->getRowArray();
+                    if ($iotAlokasi) {
+                        $prepaidDurasi = $isBillingOpen ? 0 : ((float)$qtyBaru > 0 ? (float)$qtyBaru * 60 : 60);
+                        $db->table('iot_alokasi')->where('id', $iotAlokasi['id'])->update([
+                            'status_penggunaan'    => 'dipakai',
+                            'transaksi_aktif_id'   => $id,
+                            'waktu_mulai'          => $dateTimeNow,
+                            'prepaid_durasi_menit' => $prepaidDurasi,
+                            'updated_at'           => $dateTimeNow
+                        ]);
+                    }
+                }
             }
         }
 
