@@ -3782,6 +3782,7 @@ const Dashboard = () => {
     fetchProfile();
     fetchTotalPoin();
     ambilNotifikasi();
+    fetchRiwayatTransaksi();
 
     // Baca parameter menu dari URL (?menu=nama_menu) untuk navigasi otomatis
     const queryParams = new URLSearchParams(window.location.search);
@@ -3891,6 +3892,13 @@ const Dashboard = () => {
       if (!silent) setLoadingTabel(false);
     }
   };
+
+  // Otomatis muat riwayat transaksi & counter hutang begitu profil user siap
+  useEffect(() => {
+    if (profile) {
+      fetchRiwayatTransaksi();
+    }
+  }, [profile]);
 
   // Memuat data tabel dinamis ketika menu berubah
   useEffect(() => {
