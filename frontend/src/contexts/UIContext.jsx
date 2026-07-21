@@ -105,12 +105,12 @@ export const UIProvider = ({ children }) => {
       {/* ================= NOTIFICATION OVERLAYS ================= */}
       {notif.show && (
         <div
-          className="position-fixed bottom-0 start-50 translate-middle-x mb-4"
+          className={notif.tipe === 'konfirmasi' ? "position-fixed top-50 start-50 translate-middle p-2" : "position-fixed bottom-0 start-50 translate-middle-x mb-4"}
           style={{
-            zIndex: 9999,
+            zIndex: 999999,
             width: '90%',
-            maxWidth: '450px',
-            animation: 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+            maxWidth: notif.tipe === 'konfirmasi' ? '480px' : '450px',
+            animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards'
           }}
         >
           <div
