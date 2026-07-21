@@ -4705,11 +4705,10 @@ const Dashboard = () => {
         (targetProdObj?.iot_id && Number(dev.iot_id) === Number(targetProdObj.iot_id)) ||
         (dev.nama_perangkat && targetProdObj?.nama_produk && (targetProdObj.nama_produk.toLowerCase().includes(dev.nama_perangkat.toLowerCase()) || dev.nama_perangkat.toLowerCase().includes(targetProdObj.nama_produk.toLowerCase())))
       );
-      const isOccupiedDevice = connectedDevice && (connectedDevice.status_penggunaan === 'dipakai' || connectedDevice.status_penggunaan === 'selesai_menunggu_pembayaran');
-      const isAlreadyInNotaDetail = selectedTransaksi?.detail?.some(d => Number(d.produk_id) === Number(targetProdObj.id));
+      const isOccupiedByOther = connectedDevice && (connectedDevice.status_penggunaan === 'dipakai' || connectedDevice.status_penggunaan === 'selesai_menunggu_pembayaran') && Number(connectedDevice.transaksi_aktif_id || 0) !== Number(selectedTransaksi?.id || 0);
 
-      if (isOccupiedDevice || isAlreadyInNotaDetail) {
-        ui.notif('gagal', `⛔ Meja '${targetProdObj.nama_produk}' sedang aktif digunakan. Meja yang sedang dimainkan tidak dapat ditambahkan lagi.`);
+      if (isOccupiedByOther) {
+        ui.notif('gagal', `⛔ Meja '${targetProdObj.nama_produk}' sedang aktif digunakan oleh transaksi lain.`);
         return;
       }
     }
@@ -11120,18 +11119,21 @@ const Dashboard = () => {
                                           (dev.nama_perangkat && p.nama_produk && (p.nama_produk.toLowerCase().includes(dev.nama_perangkat.toLowerCase()) || dev.nama_perangkat.toLowerCase().includes(p.nama_produk.toLowerCase())))
                                         );
 
-                                        const isOccupiedDevice = connectedDevice && (connectedDevice.status_penggunaan === 'dipakai' || connectedDevice.status_penggunaan === 'selesai_menunggu_pembayaran');
-                                        const isAlreadyInNotaDetail = selectedTransaksi?.detail?.some(d => Number(d.produk_id) === Number(p.id));
-                                        const isOccupied = (p.tipe === 'sewa' || p.iot_id) && (isOccupiedDevice || isAlreadyInNotaDetail);
+                                        const isOccupiedByOther = connectedDevice && (connectedDevice.status_penggunaan === 'dipakai' || connectedDevice.status_penggunaan === 'selesai_menunggu_pembayaran') && Number(connectedDevice.transaksi_aktif_id || 0) !== Number(selectedTransaksi?.id || 0);
+
+                                        const isAlreadyInNotaDetail = selectedTransaksi?.detail?.some(d => Number(d.produk_id) === Number(p.id)) ||
+                                          (connectedDevice && (connectedDevice.status_penggunaan === 'dipakai' || connectedDevice.status_penggunaan === 'selesai_menunggu_pembayaran') && Number(connectedDevice.transaksi_aktif_id || 0) === Number(selectedTransaksi?.id || 0));
+
                                         const isStokHabis = p.tipe === 'barang' && Number(p.is_stok_dikelola || 0) === 1 && Number(p.stok || 0) <= 0;
-                                        const isDisabled = isOccupied || isStokHabis;
+
+                                        const isDisabled = isOccupiedByOther || isStokHabis;
 
                                         return (
                                           <div
                                             key={p.id}
                                             onMouseDown={() => {
-                                              if (isOccupied) {
-                                                ui.notif('gagal', `⛔ Meja '${p.nama_produk}' sedang aktif digunakan. Meja yang sedang dimainkan tidak dapat ditambahkan lagi.`);
+                                              if (isOccupiedByOther) {
+                                                ui.notif('gagal', `⛔ Meja '${p.nama_produk}' sedang aktif digunakan oleh transaksi lain. Meja tidak dapat ditambahkan.`);
                                                 return;
                                               }
                                               if (isStokHabis) {
@@ -11163,8 +11165,10 @@ const Dashboard = () => {
                                             <div>
                                               <div className="fw-semibold text-main d-flex align-items-center gap-1">
                                                 <span>{p.nama_produk}</span>
-                                                {isOccupied ? (
-                                                  <span className="badge bg-danger opacity-100" style={{ fontSize: '0.58rem' }}>⛔ Meja Sedang Digunakan</span>
+                                                {isOccupiedByOther ? (
+                                                  <span className="badge bg-danger opacity-100" style={{ fontSize: '0.58rem' }}>🔴 Sedang Digunakan (Nota Lain)</span>
+                                                ) : isAlreadyInNotaDetail && (p.tipe === 'sewa' || p.iot_id) ? (
+                                                  <span className="badge bg-info text-dark opacity-100" style={{ fontSize: '0.58rem' }}>🔵 Aktif di Nota Ini</span>
                                                 ) : isStokHabis ? (
                                                   <span className="badge bg-warning text-dark opacity-100" style={{ fontSize: '0.58rem' }}>⚠️ Stok Habis (0)</span>
                                                 ) : (p.tipe === 'sewa' || p.iot_id) ? (
