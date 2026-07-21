@@ -11156,7 +11156,10 @@ const Dashboard = () => {
                     {/* WA Penagihan link */}
                     {selectedTransaksi.wa_pelanggan && (
                       <a
-                        href={`https://wa.me/${selectedTransaksi.wa_pelanggan.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                        href={`https://wa.me/${(() => {
+                          let clean = selectedTransaksi.wa_pelanggan.replace(/[^0-9]/g, '');
+                          return clean.startsWith('0') ? '62' + clean.slice(1) : clean;
+                        })()}?text=${encodeURIComponent(
                           `Halo ${selectedTransaksi.nama_pelanggan},\nKami dari BKW ingin mengingatkan mengenai tagihan belanja Anda sebesar ${formatRupiah(selectedTransaksi.total_harga)} (Nomor Invoice: ${selectedTransaksi.nomor_invoice}) yang saat ini berstatus belum lunas.\n\nAnda dapat melihat detail nota digital Anda melalui tautan berikut:\nhttp://localhost:5173/nota/${selectedTransaksi.id}\n\nTerima kasih atas kerja samanya.`
                         )}`}
                         target="_blank"
@@ -11185,7 +11188,10 @@ const Dashboard = () => {
                 {/* WA Struk link */}
                 {selectedTransaksi.wa_pelanggan ? (
                   <a
-                    href={`https://wa.me/${selectedTransaksi.wa_pelanggan.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                    href={`https://wa.me/${(() => {
+                      let clean = selectedTransaksi.wa_pelanggan.replace(/[^0-9]/g, '');
+                      return clean.startsWith('0') ? '62' + clean.slice(1) : clean;
+                    })()}?text=${encodeURIComponent(
                       `Halo ${selectedTransaksi.nama_pelanggan},\nTerima kasih telah berbelanja di BKW!\n\nBerikut adalah tautan nota digital resmi untuk transaksi belanja Anda (Nomor Invoice: ${selectedTransaksi.nomor_invoice}) sebesar ${formatRupiah(selectedTransaksi.total_harga)}:\nhttp://localhost:5173/nota/${selectedTransaksi.id}\n\nSemoga hari Anda menyenangkan!`
                     )}`}
                     target="_blank"
@@ -11211,7 +11217,10 @@ const Dashboard = () => {
                         type="button"
                         disabled={!waNotaManual}
                         onClick={() => {
-                          const cleanWa = waNotaManual.replace(/[^0-9]/g, '');
+                          let cleanWa = waNotaManual.replace(/[^0-9]/g, '');
+                          if (cleanWa.startsWith('0')) {
+                            cleanWa = '62' + cleanWa.slice(1);
+                          }
                           if (!cleanWa) {
                             ui.notif('gagal', 'Nomor WA tidak valid.');
                             return;
