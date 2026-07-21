@@ -8116,9 +8116,12 @@ const Dashboard = () => {
                         </button>
                         <button
                           type="button"
-                          onClick={() => {
-                            fetchRiwayatTransaksi();
-                            fetchBilliardStatus();
+                          onClick={async () => {
+                            ui.loading(true, 'fullscreen', 'Memperbarui data hutang...');
+                            await fetchRiwayatTransaksi(filterTanggalPos, filterUsahaHutang);
+                            await fetchBilliardStatus();
+                            ui.loading(false);
+                            ui.notif('sukses', 'Data hutang & piutang berhasil diperbarui!');
                           }}
                           className="tombol-premium py-1.5 px-3 small d-flex align-items-center gap-1 text-white"
                           style={{ borderRadius: '8px', fontSize: '0.78rem', backgroundColor: 'var(--warna-utama)' }}
@@ -8204,7 +8207,7 @@ const Dashboard = () => {
                     ) : (
                       <div className="d-flex flex-column gap-3">
                         {filteredUserGroups.map(userGroup => {
-                          const isExpanded = expandedHutangUsers[userGroup.key] ?? true;
+                          const isExpanded = expandedHutangUsers[userGroup.key] ?? false;
 
                           return (
                             <div key={userGroup.key} className="kartu-premium p-3 p-sm-4 rounded-3" style={{ border: '1px solid var(--warna-border)' }}>
