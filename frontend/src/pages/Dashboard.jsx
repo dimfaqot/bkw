@@ -3556,7 +3556,36 @@ const Dashboard = () => {
   const prosesBayarMassal = async () => {
     if (!bayarMassalTarget) return;
 
-    const konf = await ui.notif('konfirmasi', `Apakah Anda yakin ingin melunasi seluruh ${bayarMassalTarget.transaksiList.length} transaksi hutang untuk ${bayarMassalTarget.nama} dengan total ${formatRupiah(bayarMassalTarget.totalHutang)}?`);
+    // Filter hanya transaksi yang kadaluarsa di kasir (di luar siklus)
+    const transaksiKadaluarsa = bayarMassalTarget.transaksiList.filter(tx => {
+      const shiftPertama = opsiShift[0];
+      const txDate = new Date(String(tx.created_at).replace(' ', 'T'));
+      const nowDate = new Date();
+      if (shiftPertama) {
+        const dapatkanSiklus = (dt) => {
+          const jamMulai = shiftPertama.jam_mulai;
+          const toleransi = Number(shiftPertama.toleransi_sebelum);
+          const [h, m, s] = jamMulai.split(':');
+          const cycleStart = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), Number(h), Number(m), Number(s) || 0).getTime() - (toleransi * 60 * 1000) + (15 * 60 * 1000);
+          const dateStr = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+          return dt.getTime() >= cycleStart ? dateStr : `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()-1).padStart(2,'0')}`;
+        };
+        return dapatkanSiklus(nowDate) !== dapatkanSiklus(txDate);
+      }
+      return txDate.toDateString() !== nowDate.toDateString();
+    });
+
+    if (transaksiKadaluarsa.length === 0) {
+      ui.notif('perhatian', 'Seluruh transaksi hutang pelanggan ini masih berada dalam siklus aktif. Silakan lakukan pelunasan di menu Kasir POS.');
+      setShowBayarMassalModal(false);
+      setBayarMassalTarget(null);
+      setMenuAktif('kasir');
+      return;
+    }
+
+    const totalNominalKadaluarsa = transaksiKadaluarsa.reduce((acc, t) => acc + Number(t.total_harga), 0);
+
+    const konf = await ui.notif('konfirmasi', `Apakah Anda yakin ingin melunasi ${transaksiKadaluarsa.length} transaksi hutang kadaluarsa untuk ${bayarMassalTarget.nama} dengan total ${formatRupiah(totalNominalKadaluarsa)}?`);
     if (!konf) return;
 
     ui.loading(true, 'fullscreen', 'Memproses pelunasan massal...');
@@ -3570,7 +3599,7 @@ const Dashboard = () => {
         },
         body: JSON.stringify({
           pelanggan_id: bayarMassalTarget.pelanggan_id,
-          transaksi_ids: bayarMassalTarget.transaksiList.map(t => t.id),
+          transaksi_ids: transaksiKadaluarsa.map(t => t.id),
           metode_pembayaran: metodeBayarMassal
         })
       });
@@ -3578,7 +3607,7 @@ const Dashboard = () => {
       ui.loading(false);
       if (res.ok && json.status === 'sukses') {
         ui.notif('sukses', json.pesan || 'Pelunasan massal berhasil diproses!');
-        const targetId = bayarMassalTarget.transaksiList[0]?.id;
+        const targetId = transaksiKadaluarsa[0]?.id;
         setShowBayarMassalModal(false);
         setBayarMassalTarget(null);
         fetchRiwayatTransaksi(filterTanggalPos, filterUsahaHutang);
@@ -8369,17 +8398,33 @@ const Dashboard = () => {
                                                 </span>
                                               </div>
 
-                                              <button
-                                                type="button"
-                                                onClick={() => {
-                                                  setSelectedTransaksi(tx);
-                                                  setShowDetailNotaModal(true);
-                                                }}
-                                                className="tombol-sekunder-premium py-1 px-2.5 small border-0 text-main"
-                                                style={{ fontSize: '0.72rem', borderRadius: '6px' }}
-                                              >
-                                                💳 Pelunasan Nota Ini
-                                              </button>
+                                              {isKadaluarsaKasir ? (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    setSelectedTransaksi(tx);
+                                                    setShowDetailNotaModal(true);
+                                                  }}
+                                                  className="tombol-premium py-1 px-2.5 small border-0 text-white"
+                                                  style={{ fontSize: '0.72rem', borderRadius: '6px', backgroundColor: 'var(--bs-success)' }}
+                                                >
+                                                  💳 Pelunasan Nota Ini
+                                                </button>
+                                              ) : (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    setSelectedTransaksi(tx);
+                                                    setMenuAktif('kasir');
+                                                    setShowDetailNotaModal(true);
+                                                  }}
+                                                  className="tombol-sekunder-premium py-1 px-2.5 small border-0 text-main d-flex align-items-center gap-1"
+                                                  style={{ fontSize: '0.72rem', borderRadius: '6px' }}
+                                                  title="Transaksi dalam siklus aktif, pelunasan dilakukan di Kasir POS"
+                                                >
+                                                  🛒 Pelunasan di Kasir POS
+                                                </button>
+                                              )}
                                             </div>
                                           </div>
                                         </div>
@@ -10914,113 +10959,199 @@ const Dashboard = () => {
                 return (
                   <div>
                     {isBisaEdit ? (
-                      <div className="p-3 mb-3 rounded-3" style={{ border: '1px solid rgba(99,102,241,0.15)', backgroundColor: 'rgba(99,102,241,0.02)' }}>
-                        <div className="fw-bold mb-2 text-main" style={{ fontSize: '0.78rem' }}>➕ Tambah Item Pesanan (Siklus Aktif):</div>
-                        <div className="row g-2">
-                          <div className="col-12 col-sm-8">
-                            <select
-                              value={pilihanProdukHutang}
-                              onChange={e => setPilihanProdukHutang(e.target.value)}
-                              className="form-select input-premium text-main py-1 px-2"
-                              style={{ fontSize: '0.75rem', borderRadius: '6px' }}
-                            >
-                              <option value="">-- Pilih Tambah Produk --</option>
-                              {posProducts.filter(p => Number(p.harga_jual) > 0).map(p => (
-                                <option key={p.id} value={p.id}>{p.nama_produk} ({formatRupiah(p.harga_jual)})</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="col-12 col-sm-4">
-                            <input
-                              type="number"
-                              min="1"
-                              value={pilihanQtyHutang}
-                              onChange={e => setPilihanQtyHutang(Number(e.target.value))}
-                              className="form-control input-premium text-main py-1 text-center"
-                              style={{ fontSize: '0.75rem', borderRadius: '6px' }}
-                              placeholder="Qty..."
-                            />
-                          </div>
-                        </div>
+                      <div>
+                        {menuAktif === 'kasir' ? (
+                          <>
+                            <div className="p-3 mb-3 rounded-3" style={{ border: '1px solid rgba(99,102,241,0.15)', backgroundColor: 'rgba(99,102,241,0.02)' }}>
+                              <div className="fw-bold mb-2 text-main" style={{ fontSize: '0.78rem' }}>➕ Tambah Item Pesanan (Siklus Aktif):</div>
+                              <div className="row g-2">
+                                <div className="col-12 col-sm-8">
+                                  <select
+                                    value={pilihanProdukHutang}
+                                    onChange={e => setPilihanProdukHutang(e.target.value)}
+                                    className="form-select input-premium text-main py-1 px-2"
+                                    style={{ fontSize: '0.75rem', borderRadius: '6px' }}
+                                  >
+                                    <option value="">-- Pilih Tambah Produk --</option>
+                                    {posProducts.filter(p => Number(p.harga_jual) > 0).map(p => (
+                                      <option key={p.id} value={p.id}>{p.nama_produk} ({formatRupiah(p.harga_jual)})</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div className="col-12 col-sm-4">
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={pilihanQtyHutang}
+                                    onChange={e => setPilihanQtyHutang(Number(e.target.value))}
+                                    className="form-control input-premium text-main py-1 text-center"
+                                    style={{ fontSize: '0.75rem', borderRadius: '6px' }}
+                                    placeholder="Qty..."
+                                  />
+                                </div>
+                              </div>
 
-                        <div className="d-flex gap-2 mt-3">
-                          <button
-                            type="button"
-                            onClick={simpanTambahanPesananHutang}
-                            className="tombol-sekunder-premium border-0 flex-fill py-1.5 px-3 small"
-                            style={{ fontSize: '0.75rem', borderRadius: '8px' }}
-                          >
-                            💾 Simpan Tambahan Pesanan
-                          </button>
-                        </div>
+                              <div className="d-flex gap-2 mt-3">
+                                <button
+                                  type="button"
+                                  onClick={simpanTambahanPesananHutang}
+                                  className="tombol-sekunder-premium border-0 flex-fill py-1.5 px-3 small"
+                                  style={{ fontSize: '0.75rem', borderRadius: '8px' }}
+                                >
+                                  💾 Simpan Tambahan Pesanan
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Pelunasan Kasir POS */}
+                            <div className="p-3 mb-4 rounded-3" style={{ border: '1px solid var(--warna-border)', backgroundColor: 'rgba(255,255,255,0.02)' }}>
+                              <label className="text-muted small mb-2 d-block fw-semibold" style={{ fontSize: '0.78rem' }}>Pilih Metode Pelunasan (Kasir POS):</label>
+                              <div className="d-flex flex-column gap-2">
+                                <div className="d-flex gap-1.5 p-1 rounded-3" style={{ backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid var(--warna-border)' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setMetodePelunasanHutang('cash')}
+                                    className="border-0 flex-fill py-1.5 px-2 small text-center"
+                                    style={{
+                                      fontSize: '0.74rem',
+                                      borderRadius: '6px',
+                                      backgroundColor: metodePelunasanHutang === 'cash' ? 'var(--warna-utama, #6366f1)' : 'transparent',
+                                      color: metodePelunasanHutang === 'cash' ? '#fff' : 'var(--teks-redup, #94a3b8)',
+                                      fontWeight: 600,
+                                      transition: 'all 0.2s'
+                                    }}
+                                  >
+                                    💵 Cash
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setMetodePelunasanHutang('qris')}
+                                    className="border-0 flex-fill py-1.5 px-2 small text-center"
+                                    style={{
+                                      fontSize: '0.74rem',
+                                      borderRadius: '6px',
+                                      backgroundColor: metodePelunasanHutang === 'qris' ? 'var(--warna-utama, #6366f1)' : 'transparent',
+                                      color: metodePelunasanHutang === 'qris' ? '#fff' : 'var(--teks-redup, #94a3b8)',
+                                      fontWeight: 600,
+                                      transition: 'all 0.2s'
+                                    }}
+                                  >
+                                    📱 QRIS
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setMetodePelunasanHutang('tap')}
+                                    className="border-0 flex-fill py-1.5 px-2 small text-center"
+                                    style={{
+                                      fontSize: '0.74rem',
+                                      borderRadius: '6px',
+                                      backgroundColor: metodePelunasanHutang === 'tap' ? 'var(--warna-utama, #6366f1)' : 'transparent',
+                                      color: metodePelunasanHutang === 'tap' ? '#fff' : 'var(--teks-redup, #94a3b8)',
+                                      fontWeight: 600,
+                                      transition: 'all 0.2s'
+                                    }}
+                                  >
+                                    🔲 Tap
+                                  </button>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={bayarLunasHutang}
+                                  className="tombol-premium border-0 w-100 py-2 small text-center mt-1 text-white"
+                                  style={{ fontSize: '0.78rem', borderRadius: '8px', backgroundColor: 'var(--bs-success)' }}
+                                >
+                                  💰 Bayar Lunas Sekarang ({formatRupiah(selectedTransaksi.total_harga)})
+                                </button>
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="p-3 mb-4 rounded-3 text-center" style={{ border: '1px solid rgba(99,102,241,0.2)', backgroundColor: 'rgba(99,102,241,0.04)' }}>
+                            <div className="alert alert-info py-2 px-3 small mb-3 border-0" style={{ borderRadius: '8px', color: '#60a5fa', backgroundColor: 'rgba(96,165,250,0.08)' }}>
+                              ⏱️ Transaksi ini berada dalam <strong>Siklus Aktif Kasir</strong>. Pelunasan dan penambahan pesanan dilakukan melalui menu <strong>Kasir POS</strong>.
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMenuAktif('kasir');
+                              }}
+                              className="tombol-premium border-0 w-100 py-2 small text-center text-white"
+                              style={{ fontSize: '0.78rem', borderRadius: '8px', backgroundColor: 'var(--warna-utama)' }}
+                            >
+                              🛒 Buka di Kasir POS untuk Pelunasan
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ) : (
-                      <div className="alert alert-warning py-2 px-3 small mb-3 border-0" style={{ borderRadius: '8px', color: '#fbbf24', backgroundColor: 'rgba(251,191,36,0.06)' }}>
-                        ⚠️ Transaksi ini berada di luar siklus berjalan dan telah bersifat <strong>FINAL</strong> sebagai hutang. Item pesanan tidak dapat diubah kembali, namun pelunasan tagihan dapat dilakukan di bawah ini.
-                      </div>
-                    )}
-
-                    {/* Pelunasan Panel (SELALU DITAMPILKAN UNTUK SEMUA TRANSAKSI BELUM BAYAR) */}
-                    <div className="p-3 mb-4 rounded-3" style={{ border: '1px solid var(--warna-border)', backgroundColor: 'rgba(255,255,255,0.02)' }}>
-                      <label className="text-muted small mb-2 d-block fw-semibold" style={{ fontSize: '0.78rem' }}>Pilih Metode Pelunasan Tagihan:</label>
-                      <div className="d-flex flex-column gap-2">
-                        <div className="d-flex gap-1.5 p-1 rounded-3" style={{ backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid var(--warna-border)' }}>
-                          <button
-                            type="button"
-                            onClick={() => setMetodePelunasanHutang('cash')}
-                            className="border-0 flex-fill py-1.5 px-2 small text-center"
-                            style={{
-                              fontSize: '0.74rem',
-                              borderRadius: '6px',
-                              backgroundColor: metodePelunasanHutang === 'cash' ? 'var(--warna-utama, #6366f1)' : 'transparent',
-                              color: metodePelunasanHutang === 'cash' ? '#fff' : 'var(--teks-redup, #94a3b8)',
-                              fontWeight: 600,
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            💵 Cash
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setMetodePelunasanHutang('qris')}
-                            className="border-0 flex-fill py-1.5 px-2 small text-center"
-                            style={{
-                              fontSize: '0.74rem',
-                              borderRadius: '6px',
-                              backgroundColor: metodePelunasanHutang === 'qris' ? 'var(--warna-utama, #6366f1)' : 'transparent',
-                              color: metodePelunasanHutang === 'qris' ? '#fff' : 'var(--teks-redup, #94a3b8)',
-                              fontWeight: 600,
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            📱 QRIS
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setMetodePelunasanHutang('tap')}
-                            className="border-0 flex-fill py-1.5 px-2 small text-center"
-                            style={{
-                              fontSize: '0.74rem',
-                              borderRadius: '6px',
-                              backgroundColor: metodePelunasanHutang === 'tap' ? 'var(--warna-utama, #6366f1)' : 'transparent',
-                              color: metodePelunasanHutang === 'tap' ? '#fff' : 'var(--teks-redup, #94a3b8)',
-                              fontWeight: 600,
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            🔲 Tap
-                          </button>
+                      <>
+                        <div className="alert alert-warning py-2 px-3 small mb-3 border-0" style={{ borderRadius: '8px', color: '#fbbf24', backgroundColor: 'rgba(251,191,36,0.06)' }}>
+                          ⚠️ Transaksi ini berada di luar siklus berjalan dan telah bersifat <strong>FINAL</strong> sebagai hutang. Item pesanan tidak dapat diubah kembali, namun pelunasan tagihan dapat dilakukan di bawah ini.
                         </div>
-                        <button
-                          type="button"
-                          onClick={bayarLunasHutang}
-                          className="tombol-premium border-0 w-100 py-2 small text-center mt-1 text-white"
-                          style={{ fontSize: '0.78rem', borderRadius: '8px', backgroundColor: 'var(--bs-success)' }}
-                        >
-                          💰 Bayar Lunas Sekarang ({formatRupiah(selectedTransaksi.total_harga)})
-                        </button>
-                      </div>
-                    </div>
+
+                        {/* Pelunasan Panel Khusus Transaksi Kadaluarsa di Hutang */}
+                        <div className="p-3 mb-4 rounded-3" style={{ border: '1px solid var(--warna-border)', backgroundColor: 'rgba(255,255,255,0.02)' }}>
+                          <label className="text-muted small mb-2 d-block fw-semibold" style={{ fontSize: '0.78rem' }}>Pilih Metode Pelunasan Tagihan Kadaluarsa:</label>
+                          <div className="d-flex flex-column gap-2">
+                            <div className="d-flex gap-1.5 p-1 rounded-3" style={{ backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid var(--warna-border)' }}>
+                              <button
+                                type="button"
+                                onClick={() => setMetodePelunasanHutang('cash')}
+                                className="border-0 flex-fill py-1.5 px-2 small text-center"
+                                style={{
+                                  fontSize: '0.74rem',
+                                  borderRadius: '6px',
+                                  backgroundColor: metodePelunasanHutang === 'cash' ? 'var(--warna-utama, #6366f1)' : 'transparent',
+                                  color: metodePelunasanHutang === 'cash' ? '#fff' : 'var(--teks-redup, #94a3b8)',
+                                  fontWeight: 600,
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                💵 Cash
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setMetodePelunasanHutang('qris')}
+                                className="border-0 flex-fill py-1.5 px-2 small text-center"
+                                style={{
+                                  fontSize: '0.74rem',
+                                  borderRadius: '6px',
+                                  backgroundColor: metodePelunasanHutang === 'qris' ? 'var(--warna-utama, #6366f1)' : 'transparent',
+                                  color: metodePelunasanHutang === 'qris' ? '#fff' : 'var(--teks-redup, #94a3b8)',
+                                  fontWeight: 600,
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                📱 QRIS
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setMetodePelunasanHutang('tap')}
+                                className="border-0 flex-fill py-1.5 px-2 small text-center"
+                                style={{
+                                  fontSize: '0.74rem',
+                                  borderRadius: '6px',
+                                  backgroundColor: metodePelunasanHutang === 'tap' ? 'var(--warna-utama, #6366f1)' : 'transparent',
+                                  color: metodePelunasanHutang === 'tap' ? '#fff' : 'var(--teks-redup, #94a3b8)',
+                                  fontWeight: 600,
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                🔲 Tap
+                              </button>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={bayarLunasHutang}
+                              className="tombol-premium border-0 w-100 py-2 small text-center mt-1 text-white"
+                              style={{ fontSize: '0.78rem', borderRadius: '8px', backgroundColor: 'var(--bs-success)' }}
+                            >
+                              💰 Pelunasan Hutang Kadaluarsa ({formatRupiah(selectedTransaksi.total_harga)})
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    )}
 
                     {/* WA Penagihan link */}
                     {selectedTransaksi.wa_pelanggan && (
