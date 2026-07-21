@@ -11109,27 +11109,37 @@ const Dashboard = () => {
                                     </div>
 
                                     {(() => {
-                                      const query = searchProdukHutangQuery.toLowerCase();
-                                      const filtered = posProducts
-                                        .filter(p => Number(p.harga_jual) > 0)
-                                        .filter(p => !query || p.nama_produk?.toLowerCase().includes(query) || String(p.kode_produk || '').toLowerCase().includes(query))
+                                      const query = (searchProdukHutangQuery || '').toLowerCase();
+                                      const productsList = Array.isArray(posProducts) ? posProducts : [];
+                                      const filtered = productsList
+                                        .filter(p => p && Number(p.harga_jual || 0) > 0)
+                                        .filter(p => !query || (p.nama_produk || '').toLowerCase().includes(query) || String(p.kode_produk || '').toLowerCase().includes(query))
                                         .slice(0, 15);
 
                                       if (filtered.length === 0) {
                                         return <div className="text-muted small py-2 px-3 italic text-white">Tidak ada produk yang cocok.</div>;
                                       }
 
+                                      const devicesList = Array.isArray(billiardDevices) ? billiardDevices : [];
+                                      const currentNotaDetails = Array.isArray(selectedTransaksi?.detail) ? selectedTransaksi.detail : [];
+
                                       return filtered.map(p => {
-                                        const connectedDevice = billiardDevices.find(dev => 
+                                        if (!p) return null;
+
+                                        const connectedDevice = devicesList.find(dev => dev && (
                                           (p.iot_id && Number(dev.iot_id) === Number(p.iot_id)) ||
-                                          (dev.nama_perangkat && p.nama_produk && (p.nama_produk.toLowerCase().includes(dev.nama_perangkat.toLowerCase()) || dev.nama_perangkat.toLowerCase().includes(p.nama_produk.toLowerCase())))
-                                        );
+                                          (dev.nama_perangkat && p.nama_produk && (
+                                            p.nama_produk.toLowerCase().includes(dev.nama_perangkat.toLowerCase()) || 
+                                            dev.nama_perangkat.toLowerCase().includes(p.nama_produk.toLowerCase())
+                                          ))
+                                        ));
 
                                         const isOccupiedByOther = connectedDevice && (connectedDevice.status_penggunaan === 'dipakai' || connectedDevice.status_penggunaan === 'selesai_menunggu_pembayaran') && Number(connectedDevice.transaksi_aktif_id || 0) !== Number(selectedTransaksi?.id || 0);
 
-                                        const isAlreadyInNotaDetail = selectedTransaksi?.detail?.some(d => Number(d.produk_id) === Number(p.id)) ||
+                                        const isAlreadyInNotaDetail = currentNotaDetails.some(d => Number(d.produk_id) === Number(p.id)) ||
                                           (connectedDevice && (connectedDevice.status_penggunaan === 'dipakai' || connectedDevice.status_penggunaan === 'selesai_menunggu_pembayaran') && Number(connectedDevice.transaksi_aktif_id || 0) === Number(selectedTransaksi?.id || 0));
 
+                                        const isStokHabis = p.tipe === 'barang' && Number(p.is_stok_dikelola || 0) === 1 && Number(p.stok || 0) <= 0;
                                         const isSewaOrIot = (p.tipe === 'sewa' || p.iot_id);
                                         const isDisabled = (isSewaOrIot && (isOccupiedByOther || isAlreadyInNotaDetail)) || isStokHabis;
 
