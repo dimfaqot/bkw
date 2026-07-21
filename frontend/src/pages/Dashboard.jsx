@@ -11085,33 +11085,57 @@ const Dashboard = () => {
                                         return <div className="text-muted small py-2 px-3 italic text-white">Tidak ada produk yang cocok.</div>;
                                       }
 
-                                      return filtered.map(p => (
-                                        <div
-                                          key={p.id}
-                                          onMouseDown={() => {
-                                            setPilihanProdukHutang(String(p.id));
-                                            setSearchProdukHutangQuery(`${p.nama_produk} (${formatRupiah(p.harga_jual)})`);
-                                            setShowDropdownProdukHutang(false);
-                                            if (p.tipe === 'sewa' || p.iot_id) {
-                                              setPilihanTipeBillingHutang('regular');
-                                            }
-                                          }}
-                                          className="py-1.5 px-3 rounded-2 text-white small d-flex align-items-center justify-content-between"
-                                          style={{ cursor: 'pointer', fontSize: '0.74rem', borderBottom: '1px solid rgba(255,255,255,0.03)' }}
-                                          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)'}
-                                          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-                                        >
-                                          <div>
-                                            <div className="fw-semibold text-main">{p.nama_produk}</div>
-                                            <div className="text-muted" style={{ fontSize: '0.65rem' }}>
-                                              {p.tipe === 'sewa' ? '🎱 Sewa Billiard' : p.tipe === 'jasa' ? '✂️ Jasa' : `📦 Barang`}
+                                      return filtered.map(p => {
+                                        const connectedDevice = billiardDevices.find(dev => Number(dev.iot_id) === Number(p.iot_id));
+                                        const isOccupiedByOther = connectedDevice && connectedDevice.status_penggunaan === 'dipakai' && Number(connectedDevice.transaksi_aktif_id || 0) !== Number(selectedTransaksi?.id || 0);
+
+                                        return (
+                                          <div
+                                            key={p.id}
+                                            onMouseDown={() => {
+                                              if (isOccupiedByOther) {
+                                                ui.notif('gagal', `Meja '${p.nama_produk}' sedang aktif digunakan oleh transaksi lain.`);
+                                                return;
+                                              }
+                                              setPilihanProdukHutang(String(p.id));
+                                              setSearchProdukHutangQuery(`${p.nama_produk} (${formatRupiah(p.harga_jual)})`);
+                                              setShowDropdownProdukHutang(false);
+                                              if (p.tipe === 'sewa' || p.iot_id) {
+                                                setPilihanTipeBillingHutang('regular');
+                                              }
+                                            }}
+                                            className="py-1.5 px-3 rounded-2 text-white small d-flex align-items-center justify-content-between"
+                                            style={{
+                                              cursor: isOccupiedByOther ? 'not-allowed' : 'pointer',
+                                              opacity: isOccupiedByOther ? 0.55 : 1,
+                                              fontSize: '0.74rem',
+                                              borderBottom: '1px solid rgba(255,255,255,0.03)',
+                                              backgroundColor: isOccupiedByOther ? 'rgba(239,68,68,0.05)' : 'transparent'
+                                            }}
+                                            onMouseEnter={e => {
+                                              if (!isOccupiedByOther) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)';
+                                            }}
+                                            onMouseLeave={e => {
+                                              if (!isOccupiedByOther) e.currentTarget.style.backgroundColor = 'transparent';
+                                            }}
+                                          >
+                                            <div>
+                                              <div className="fw-semibold text-main d-flex align-items-center gap-1">
+                                                <span>{p.nama_produk}</span>
+                                                {isOccupiedByOther && (
+                                                  <span className="badge bg-danger opacity-100" style={{ fontSize: '0.58rem' }}>🔴 Sedang Digunakan</span>
+                                                )}
+                                              </div>
+                                              <div className="text-muted" style={{ fontSize: '0.65rem' }}>
+                                                {p.tipe === 'sewa' ? '🎱 Sewa Billiard' : p.tipe === 'jasa' ? '✂️ Jasa' : `📦 Barang`}
+                                              </div>
+                                            </div>
+                                            <div className="fw-bold text-success">
+                                              {formatRupiah(p.harga_jual)}
                                             </div>
                                           </div>
-                                          <div className="fw-bold text-success">
-                                            {formatRupiah(p.harga_jual)}
-                                          </div>
-                                        </div>
-                                      ));
+                                        );
+                                      });
                                     })()}
                                   </div>
                                 )}

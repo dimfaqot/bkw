@@ -550,6 +550,15 @@ class Transaksi extends ResourceController
             $isSewa = ($produk->tipe === 'sewa' || !empty($produk->iot_id));
             $isBillingOpen = (isset($item['tipe_billing']) && $item['tipe_billing'] === 'open');
 
+            // Cek ketersediaan meja/perangkat IoT (jika terhubung ke IoT)
+            if (!empty($produk->iot_id)) {
+                $iotAlokasiCek = $db->table('iot_alokasi')->where('iot_id', $produk->iot_id)->get()->getRowArray();
+                if ($iotAlokasiCek && $iotAlokasiCek['status_penggunaan'] === 'dipakai' && (int)$iotAlokasiCek['transaksi_aktif_id'] !== (int)$id) {
+                    $db->transRollback();
+                    return $this->respond(['status' => 'gagal', 'pesan' => "Perangkat/Meja billiard '{$produk->nama_produk}' sedang aktif digunakan oleh transaksi lain."], 400);
+                }
+            }
+
             if ($qtyBaru < 0 || ($qtyBaru == 0 && !$isSewa && !$isBillingOpen)) {
                 $db->transRollback();
                 return $this->respond(['status' => 'gagal', 'pesan' => 'Item produk atau kuantitas tidak valid.'], 400);
