@@ -111,17 +111,19 @@ class Transaksi extends ResourceController
 
         $now = date('Y-m-d H:i:s');
         $transaksiData = [
-            'usaha_id'          => $usahaId,
-            'unit_id'           => $unitId,
-            'nomor_invoice'     => $nomorInvoice,
-            'kasir_id'          => $kasirId,
-            'pelanggan_id'      => $pelangganId,
-            'total_harga'       => 0.00, // dihitung ulang
-            'uang_jaminan'      => $uangJaminan,
-            'status_pembayaran' => $statusPembayaran,
-            'metode_pembayaran' => $metodePembayaran,
-            'created_at'        => $now,
-            'updated_at'        => $now
+            'usaha_id'           => $usahaId,
+            'unit_id'            => $unitId,
+            'nomor_invoice'      => $nomorInvoice,
+            'kasir_id'           => $kasirId,
+            'pelanggan_id'       => $pelangganId,
+            'total_harga'        => 0.00, // dihitung ulang
+            'uang_jaminan'       => $uangJaminan,
+            'status_pembayaran'  => $statusPembayaran,
+            'metode_pembayaran'  => $metodePembayaran,
+            'tgl_lunas'          => ($statusPembayaran === 'lunas') ? $now : null,
+            'kasir_pelunasan_id' => ($statusPembayaran === 'lunas') ? $kasirId : null,
+            'created_at'         => $now,
+            'updated_at'         => $now
         ];
 
         $db->table('transaksi')->insert($transaksiData);
@@ -348,6 +350,10 @@ class Transaksi extends ResourceController
                         ->orGroupStart()
                             ->where('t.created_at >=', $A)
                             ->where('t.created_at <=', $akhir)
+                        ->groupEnd()
+                        ->orGroupStart()
+                            ->where('t.tgl_lunas >=', $A)
+                            ->where('t.tgl_lunas <=', $akhir)
                         ->groupEnd()
                     ->groupEnd();
         }
@@ -780,10 +786,12 @@ class Transaksi extends ResourceController
         $db->table('transaksi')
            ->where('id', $id)
            ->update([
-               'status_pembayaran' => 'lunas',
-               'metode_pembayaran' => $metodePembayaran,
-               'total_harga'       => $totalHargaBaru,
-               'updated_at'        => $dateTimeNow
+               'status_pembayaran'  => 'lunas',
+               'metode_pembayaran'  => $metodePembayaran,
+               'total_harga'        => $totalHargaBaru,
+               'tgl_lunas'          => $dateTimeNow,
+               'kasir_pelunasan_id' => $penggunaAktif['id'] ?? null,
+               'updated_at'         => $dateTimeNow
            ]);
 
         $db->transComplete();
@@ -858,10 +866,12 @@ class Transaksi extends ResourceController
             $subtotalNominal = (float)($detailSum->subtotal ?? $tx['total_harga']);
 
             $db->table('transaksi')->where('id', $tx['id'])->update([
-                'status_pembayaran' => 'lunas',
-                'metode_pembayaran' => $metodePembayaran,
-                'total_harga'       => $subtotalNominal,
-                'updated_at'        => $dateTimeNow
+                'status_pembayaran'  => 'lunas',
+                'metode_pembayaran'  => $metodePembayaran,
+                'total_harga'        => $subtotalNominal,
+                'tgl_lunas'          => $dateTimeNow,
+                'kasir_pelunasan_id' => $penggunaAktif['id'] ?? null,
+                'updated_at'         => $dateTimeNow
             ]);
 
             $totalNominalMassal += $subtotalNominal;
