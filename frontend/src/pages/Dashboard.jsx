@@ -4048,8 +4048,7 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    if (menuAktif !== 'kasir') {
-      setBilliardDevices([]);
+    if (menuAktif !== 'kasir' && !showDetailNotaModal) {
       return;
     }
 
@@ -4058,7 +4057,7 @@ const Dashboard = () => {
     return () => {
       clearInterval(interval);
     };
-  }, [menuAktif, filterUnitPos]);
+  }, [menuAktif, showDetailNotaModal, filterUnitPos]);
 
   const submitMulaiBilliard = async () => {
     if (!selectedBilliardAlokasi || !billiardProdukId) {
@@ -11086,8 +11085,15 @@ const Dashboard = () => {
                                       }
 
                                       return filtered.map(p => {
-                                        const connectedDevice = billiardDevices.find(dev => Number(dev.iot_id) === Number(p.iot_id));
+                                        const connectedDevice = billiardDevices.find(dev => 
+                                          (p.iot_id && Number(dev.iot_id) === Number(p.iot_id)) ||
+                                          (dev.nama_perangkat && p.nama_produk && (p.nama_produk.toLowerCase().includes(dev.nama_perangkat.toLowerCase()) || dev.nama_perangkat.toLowerCase().includes(p.nama_produk.toLowerCase())))
+                                        );
+
                                         const isOccupiedByOther = connectedDevice && connectedDevice.status_penggunaan === 'dipakai' && Number(connectedDevice.transaksi_aktif_id || 0) !== Number(selectedTransaksi?.id || 0);
+
+                                        const isAlreadyInThisNota = selectedTransaksi?.detail?.some(d => Number(d.produk_id) === Number(p.id)) ||
+                                          (connectedDevice && connectedDevice.status_penggunaan === 'dipakai' && Number(connectedDevice.transaksi_aktif_id || 0) === Number(selectedTransaksi?.id || 0));
 
                                         return (
                                           <div
@@ -11122,9 +11128,13 @@ const Dashboard = () => {
                                             <div>
                                               <div className="fw-semibold text-main d-flex align-items-center gap-1">
                                                 <span>{p.nama_produk}</span>
-                                                {isOccupiedByOther && (
-                                                  <span className="badge bg-danger opacity-100" style={{ fontSize: '0.58rem' }}>🔴 Sedang Digunakan</span>
-                                                )}
+                                                {isOccupiedByOther ? (
+                                                  <span className="badge bg-danger opacity-100" style={{ fontSize: '0.58rem' }}>🔴 Sedang Digunakan (Nota Lain)</span>
+                                                ) : isAlreadyInThisNota && (p.tipe === 'sewa' || p.iot_id) ? (
+                                                  <span className="badge bg-info text-dark opacity-100" style={{ fontSize: '0.58rem' }}>🔵 Aktif di Nota Ini</span>
+                                                ) : (p.tipe === 'sewa' || p.iot_id) ? (
+                                                  <span className="badge bg-success opacity-100" style={{ fontSize: '0.58rem' }}>🟢 Meja Tersedia</span>
+                                                ) : null}
                                               </div>
                                               <div className="text-muted" style={{ fontSize: '0.65rem' }}>
                                                 {p.tipe === 'sewa' ? '🎱 Sewa Billiard' : p.tipe === 'jasa' ? '✂️ Jasa' : `📦 Barang`}
