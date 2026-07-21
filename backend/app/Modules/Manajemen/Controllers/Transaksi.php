@@ -1612,73 +1612,72 @@ class Transaksi extends ResourceController
         }
 
         $now = date('Y-m-d H:i:s');
-        $db->transStart();
 
-        $startTime = strtotime($alokasi->waktu_mulai);
+        $startTime   = strtotime($alokasi->waktu_mulai);
         $elapsedMinutes = (int)ceil((time() - $startTime) / 60);
         if ($elapsedMinutes < 1) $elapsedMinutes = 1;
 
-        $transaksiId = $alokasi->transaksi_aktif_id;
-        $isLunas = false;
+        $transaksiId  = $alokasi->transaksi_aktif_id;
+        $isOpenBilling = (int)($alokasi->prepaid_durasi_menit ?? 0) === 0;
 
-        if ($transaksiId) {
-            $txObj = $db->table('transaksi')->where('id', $transaksiId)->get()->getRow();
-            $isLunas = ($txObj && $txObj->status_pembayaran === 'lunas');
+        $db->transBegin();
 
-            // Jika transaksi BELUM LUNAS dan merupakan Sesi Open (prepaid_durasi_menit == 0), kunci durasi & biaya akhirnya
-            if (!$isLunas && Number($alokasi->prepaid_durasi_menit || 0) == 0) {
-                $detail = $db->table('transaksi_detail')->where('transaksi_id', $transaksiId)->get()->getRow();
-                if ($detail) {
-                    $hargaPerJam = (float)$detail->harga_satuan;
-                    if ($hargaPerJam <= 0) {
-                        $p = $db->table('produk_jasa')->where('id', $detail->produk_id)->get()->getRow();
-                        if ($p) $hargaPerJam = (float)$p->harga_jual;
-                    }
-                    if ($hargaPerJam <= 0) $hargaPerJam = 25000;
+        if ($transaksiId && $isOpenBilling) {
+            // Skenario 1: Open Billing + Pelanggan Kabur
+            // Hitung biaya aktual dari waktu_mulai sampai sekarang, catat sebagai hutang
+            $detail = $db->table('transaksi_detail td')
+                         ->select('td.*')
+                         ->join('produk_jasa p', 'p.id = td.produk_id')
+                         ->where('td.transaksi_id', $transaksiId)
+                         ->where('p.iot_id', $alokasi->iot_id)
+                         ->get()->getRow();
 
-                    $hargaMentah = $elapsedMinutes * ($hargaPerJam / 60);
-                    $subtotal = ceil($hargaMentah / 500) * 500;
-
-                    $db->table('transaksi_detail')->where('id', $detail->id)->update([
-                        'qty'          => $elapsedMinutes,
-                        'durasi_menit' => $elapsedMinutes,
-                        'subtotal'     => $subtotal,
-                        'updated_at'   => $now
-                    ]);
-
-                    $db->table('transaksi')->where('id', $transaksiId)->update([
-                        'total_harga' => $subtotal,
-                        'updated_at'  => $now
-                    ]);
+            if ($detail) {
+                $hargaPerJam = (float)$detail->harga_satuan;
+                if ($hargaPerJam <= 0) {
+                    $p = $db->table('produk_jasa')->where('id', $detail->produk_id)->get()->getRow();
+                    if ($p) $hargaPerJam = (float)$p->harga_jual;
                 }
+                if ($hargaPerJam <= 0) $hargaPerJam = 25000;
+
+                $hargaMentah = $elapsedMinutes * ($hargaPerJam / 60);
+                $subtotal    = ceil($hargaMentah / 500) * 500;
+
+                $db->table('transaksi_detail')->where('id', $detail->id)->update([
+                    'qty'          => $elapsedMinutes,
+                    'durasi_menit' => $elapsedMinutes,
+                    'subtotal'     => $subtotal,
+                    'updated_at'   => $now
+                ]);
+
+                // Hitung ulang total harga dari seluruh item nota
+                $totalHargaBaru = $db->table('transaksi_detail')
+                                     ->selectSum('subtotal')
+                                     ->where('transaksi_id', $transaksiId)
+                                     ->get()->getRow()->subtotal ?? 0.00;
+
+                $db->table('transaksi')->where('id', $transaksiId)->update([
+                    'total_harga' => $totalHargaBaru,
+                    'updated_at'  => $now
+                ]);
             }
         }
+        // Skenario 2: Regular Billing + Bayar Nanti + Kabur
+        // Tidak ada recalculation — tagihan tetap seperti saat transaksi dibuat
 
-        // Matikan selalu relay lampu secara fisik & di database
-        $updateData = [
-            'status_relay' => 0,
-            'updated_at'   => $now
-        ];
+        // Selalu bebaskan meja setelah Stop agar bisa digunakan pelanggan lain
+        // Transaksi tetap hutang, hanya meja yang dibebaskan
+        $db->table('iot_alokasi')->where('id', $alokasiId)->update([
+            'status_relay'         => 0,
+            'status_penggunaan'    => 'tersedia',
+            'transaksi_aktif_id'   => null,
+            'prepaid_durasi_menit' => null,
+            'waktu_mulai'          => null,
+            'warning_sent'         => 0,
+            'updated_at'           => $now
+        ]);
 
-        if ($isLunas) {
-            // Jika transaksi sudah LUNAS di awal (misal Regular Bayar Langsung), meja langsung KEMBALI TERSEDIA
-            $updateData['status_penggunaan']    = 'tersedia';
-            $updateData['transaksi_aktif_id']   = null;
-            $updateData['prepaid_durasi_menit'] = null;
-            $updateData['waktu_mulai']          = null;
-            $updateData['warning_sent']         = 0;
-        } else {
-            // Jika transaksi BELUM LUNAS (Regular Hutang atau Open Sewa), status meja menjadi selesai_menunggu_pembayaran
-            $updateData['status_penggunaan']    = 'selesai_menunggu_pembayaran';
-        }
-
-        $db->table('iot_alokasi')->where('id', $alokasiId)->update($updateData);
-
-        $db->transComplete();
-
-        if ($db->transStatus() === false) {
-            return $this->respond(['status' => 'gagal', 'pesan' => 'Gagal menghentikan sewa.'], 500);
-        }
+        $db->transCommit();
 
         // Kirim sinyal OFF ke saklar relay IoT fisik
         $device = $db->table('iot')->where('id', $alokasi->iot_id)->get()->getRow();
@@ -1686,12 +1685,16 @@ class Transaksi extends ResourceController
             $this->kirimSinyalRelay($device->ip_address, 'off');
         }
 
+        $pesanStop = $isOpenBilling
+            ? 'Sesi Open Billing dihentikan. Biaya dicatat sebagai hutang, meja kini tersedia.'
+            : 'Sesi dihentikan. Meja kini tersedia. Tagihan tetap sesuai yang tercatat.';
+
         return $this->respond([
             'status' => 'sukses',
-            'pesan'  => $isLunas ? 'Sewa berhasil dihentikan. Meja kini tersedia kembali.' : 'Sewa dihentikan dan saklar lampu dimatikan. Menunggu pelunasan kasir.',
+            'pesan'  => $pesanStop,
             'data'   => [
                 'transaksi_id'      => $transaksiId,
-                'status_pembayaran' => $isLunas ? 'lunas' : 'belum_bayar'
+                'status_pembayaran' => 'belum_bayar'
             ]
         ]);
     }

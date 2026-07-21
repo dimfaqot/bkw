@@ -4132,10 +4132,10 @@ const Dashboard = () => {
   };
 
   const handleStopBilliard = async (alokasi) => {
-    const konf = await ui.notif('konfirmasi', `Apakah Anda yakin ingin menghentikan timer untuk ${alokasi.nama_perangkat}?`);
+    const konf = await ui.notif('konfirmasi', `Apakah Anda yakin ingin menghentikan sesi untuk ${alokasi.nama_perangkat}? Tindakan ini tidak bisa dibatalkan.`);
     if (!konf) return;
 
-    ui.loading(true, 'fullscreen', 'Menghentikan timer...');
+    ui.loading(true, 'fullscreen', 'Menghentikan sesi...');
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(`${API_BASE_URL}/transaksi/billiard/stop`, {
@@ -4151,20 +4151,11 @@ const Dashboard = () => {
       const json = await res.json();
       ui.loading(false);
       if (res.ok && json.status === 'sukses') {
-        ui.notif('sukses', json.pesan || 'Timer berhasil dihentikan!');
+        ui.notif('sukses', json.pesan || 'Sesi berhasil dihentikan. Meja kini tersedia.');
         fetchBilliardStatus();
         fetchRiwayatTransaksi();
-
-        if (json.data && json.data.transaksi_id) {
-          const detailRes = await fetch(`${API_BASE_URL}/transaksi-publik/detail/${json.data.transaksi_id}`);
-          const detailJson = await detailRes.json();
-          if (detailRes.ok && detailJson.status === 'sukses') {
-            setSelectedTransaksi(detailJson.data);
-            setShowDetailNotaModal(true);
-          }
-        }
       } else {
-        ui.notif('gagal', json.pesan || 'Gagal menghentikan timer.');
+        ui.notif('gagal', json.pesan || 'Gagal menghentikan sesi.');
       }
     } catch {
       ui.loading(false);
