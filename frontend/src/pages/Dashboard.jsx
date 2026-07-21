@@ -8132,11 +8132,31 @@ const Dashboard = () => {
                                         <td className="fw-bold text-main" style={{ fontSize: '0.78rem' }}>{formatRupiah(tx.total_harga)}</td>
                                         <td>
                                           <div className="d-flex flex-column gap-1">
-                                            {tx.detail?.map(d => (
-                                              <span key={d.id} className="small text-muted" style={{ fontSize: '0.68rem' }}>
-                                                • {d.nama_produk} {d.tipe === 'sewa' ? `(${d.qty}m / ${(d.qty / 60).toFixed(1)} Jam)` : `(${d.qty} x ${formatRupiah(d.harga_satuan)})`}
-                                              </span>
-                                            ))}
+                                            {tx.detail?.map(d => {
+                                              const isOpenAktif = d.tipe === 'sewa' && d.iot_id && Number(d.qty) === 0;
+                                              let label = '';
+                                              if (d.tipe === 'sewa') {
+                                                if (isOpenAktif) {
+                                                  label = '(⏱ Open — Berjalan)';
+                                                } else {
+                                                  const mnt = Number(d.durasi_menit || d.qty || 0);
+                                                  if (mnt % 60 === 0 && mnt > 0) {
+                                                    label = `(${mnt / 60} Jam)`;
+                                                  } else if (mnt > 0) {
+                                                    label = `(${mnt}m / ${(mnt / 60).toFixed(1)} Jam)`;
+                                                  } else {
+                                                    label = `(${d.qty} Jam)`;
+                                                  }
+                                                }
+                                              } else {
+                                                label = `(${d.qty} x ${formatRupiah(d.harga_satuan)})`;
+                                              }
+                                              return (
+                                                <span key={d.id} className="small text-muted" style={{ fontSize: '0.68rem', color: isOpenAktif ? '#fbbf24' : undefined }}>
+                                                  • {d.nama_produk} {label}
+                                                </span>
+                                              );
+                                            })}
                                           </div>
                                         </td>
                                         <td>

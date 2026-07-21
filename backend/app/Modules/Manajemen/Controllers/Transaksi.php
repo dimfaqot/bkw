@@ -364,7 +364,7 @@ class Transaksi extends ResourceController
         // Ambil detail masing-masing transaksi
         foreach ($riwayat as &$r) {
             $r['detail'] = $db->table('transaksi_detail td')
-                              ->select('td.*, p.nama_produk, p.satuan, p.tipe, u.nama as nama_petugas')
+                              ->select('td.*, p.nama_produk, p.satuan, p.tipe, p.iot_id, u.nama as nama_petugas')
                               ->join('produk_jasa p', 'p.id = td.produk_id', 'left')
                               ->join('users u', 'u.id = td.petugas_id', 'left')
                               ->where('td.transaksi_id', $r['id'])
@@ -463,7 +463,7 @@ class Transaksi extends ResourceController
         }
 
         $tx['detail'] = $db->table('transaksi_detail td')
-                           ->select('td.*, p.nama_produk, p.satuan, p.tipe, u.nama as nama_petugas')
+                           ->select('td.*, p.nama_produk, p.satuan, p.tipe, p.iot_id, u.nama as nama_petugas')
                            ->join('produk_jasa p', 'p.id = td.produk_id', 'left')
                            ->join('users u', 'u.id = td.petugas_id', 'left')
                            ->where('td.transaksi_id', $id)
