@@ -4714,6 +4714,18 @@ const Dashboard = () => {
       }
     }
 
+    if (targetProdObj && targetProdObj.tipe === 'barang' && Number(targetProdObj.is_stok_dikelola || 0) === 1) {
+      const currentStok = Number(targetProdObj.stok || 0);
+      if (currentStok <= 0) {
+        ui.notif('gagal', `⚠️ Produk '${targetProdObj.nama_produk}' stok habis (Stok: 0). Produk tidak dapat ditambahkan.`);
+        return;
+      }
+      if (Number(pilihanQtyHutang) > currentStok) {
+        ui.notif('gagal', `⚠️ Stok '${targetProdObj.nama_produk}' tidak mencukupi (Tersedia: ${currentStok}, Diminta: ${pilihanQtyHutang}).`);
+        return;
+      }
+    }
+
     ui.loading(true, 'fullscreen', 'Menyimpan tambahan pesanan...');
     try {
       const gabungItems = () => {
@@ -11111,6 +11123,8 @@ const Dashboard = () => {
                                         const isOccupiedDevice = connectedDevice && (connectedDevice.status_penggunaan === 'dipakai' || connectedDevice.status_penggunaan === 'selesai_menunggu_pembayaran');
                                         const isAlreadyInNotaDetail = selectedTransaksi?.detail?.some(d => Number(d.produk_id) === Number(p.id));
                                         const isOccupied = (p.tipe === 'sewa' || p.iot_id) && (isOccupiedDevice || isAlreadyInNotaDetail);
+                                        const isStokHabis = p.tipe === 'barang' && Number(p.is_stok_dikelola || 0) === 1 && Number(p.stok || 0) <= 0;
+                                        const isDisabled = isOccupied || isStokHabis;
 
                                         return (
                                           <div
@@ -11118,6 +11132,10 @@ const Dashboard = () => {
                                             onMouseDown={() => {
                                               if (isOccupied) {
                                                 ui.notif('gagal', `⛔ Meja '${p.nama_produk}' sedang aktif digunakan. Meja yang sedang dimainkan tidak dapat ditambahkan lagi.`);
+                                                return;
+                                              }
+                                              if (isStokHabis) {
+                                                ui.notif('gagal', `⚠️ Produk '${p.nama_produk}' stok habis (Stok: 0). Produk tidak dapat ditambahkan.`);
                                                 return;
                                               }
                                               setPilihanProdukHutang(String(p.id));
@@ -11129,17 +11147,17 @@ const Dashboard = () => {
                                             }}
                                             className="py-1.5 px-3 rounded-2 text-white small d-flex align-items-center justify-content-between"
                                             style={{
-                                              cursor: isOccupied ? 'not-allowed' : 'pointer',
-                                              opacity: isOccupied ? 0.5 : 1,
+                                              cursor: isDisabled ? 'not-allowed' : 'pointer',
+                                              opacity: isDisabled ? 0.5 : 1,
                                               fontSize: '0.74rem',
                                               borderBottom: '1px solid rgba(255,255,255,0.03)',
-                                              backgroundColor: isOccupied ? 'rgba(239,68,68,0.08)' : 'transparent'
+                                              backgroundColor: isDisabled ? 'rgba(239,68,68,0.08)' : 'transparent'
                                             }}
                                             onMouseEnter={e => {
-                                              if (!isOccupied) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)';
+                                              if (!isDisabled) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)';
                                             }}
                                             onMouseLeave={e => {
-                                              if (!isOccupied) e.currentTarget.style.backgroundColor = 'transparent';
+                                              if (!isDisabled) e.currentTarget.style.backgroundColor = 'transparent';
                                             }}
                                           >
                                             <div>
@@ -11147,8 +11165,12 @@ const Dashboard = () => {
                                                 <span>{p.nama_produk}</span>
                                                 {isOccupied ? (
                                                   <span className="badge bg-danger opacity-100" style={{ fontSize: '0.58rem' }}>⛔ Meja Sedang Digunakan</span>
+                                                ) : isStokHabis ? (
+                                                  <span className="badge bg-warning text-dark opacity-100" style={{ fontSize: '0.58rem' }}>⚠️ Stok Habis (0)</span>
                                                 ) : (p.tipe === 'sewa' || p.iot_id) ? (
                                                   <span className="badge bg-success opacity-100" style={{ fontSize: '0.58rem' }}>🟢 Meja Tersedia</span>
+                                                ) : (p.tipe === 'barang' && Number(p.is_stok_dikelola || 0) === 1) ? (
+                                                  <span className="badge bg-secondary opacity-100" style={{ fontSize: '0.58rem' }}>📦 Stok: {p.stok}</span>
                                                 ) : null}
                                               </div>
                                               <div className="text-muted" style={{ fontSize: '0.65rem' }}>
