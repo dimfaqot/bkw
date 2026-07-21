@@ -7340,7 +7340,15 @@ const Dashboard = () => {
                                                 🛑 Stop
                                               </button>
                                             </div>
-                                          ) : isOpen ? null : isWaitingPayment ? (
+                                          ) : isOpen ? (
+                                            <button
+                                              onClick={() => handleStopBilliard(iotDev)}
+                                              className="tombol-premium w-100 py-1 text-white"
+                                              style={{ fontSize: '0.68rem', backgroundColor: 'var(--bs-danger)', borderColor: 'var(--bs-danger)' }}
+                                            >
+                                              🛑 Stop
+                                            </button>
+                                          ) : isWaitingPayment ? (
                                             <button
                                               className="tombol-premium w-100 py-1"
                                               style={{ fontSize: '0.72rem', backgroundColor: 'var(--bs-warning)', borderColor: 'var(--bs-warning)', color: '#000' }}
