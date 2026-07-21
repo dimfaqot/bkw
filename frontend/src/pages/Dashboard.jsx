@@ -4729,9 +4729,8 @@ const Dashboard = () => {
         const tipeBillingMap = {};
         selectedTransaksi.detail.forEach(d => {
           map[d.produk_id] = (map[d.produk_id] || 0) + Number(d.qty);
-          if (d.tipe === 'sewa' || d.qty == 0 || d.tipe_billing === 'open') {
-            tipeBillingMap[d.produk_id] = 'open';
-          }
+          // Preserve existing tipe_billing from database — do NOT override Regular items as Open
+          tipeBillingMap[d.produk_id] = d.tipe_billing || 'regular';
         });
         if (pilihanProdukHutang) {
           const pid = Number(pilihanProdukHutang);
