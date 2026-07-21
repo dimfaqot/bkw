@@ -1741,59 +1741,74 @@ class Transaksi extends ResourceController
 
     private function matikanLampuBilliardJikaLunas($db, $transaksiId, $now)
     {
-        $alokasi = $db->table('iot_alokasi')
-                      ->where('transaksi_aktif_id', $transaksiId)
-                      ->whereIn('status_penggunaan', ['dipakai', 'selesai_menunggu_pembayaran'])
-                      ->get()->getRow();
+        $alokasiList = $db->table('iot_alokasi')
+                          ->where('transaksi_aktif_id', $transaksiId)
+                          ->whereIn('status_penggunaan', ['dipakai', 'selesai_menunggu_pembayaran'])
+                          ->get()->getResultArray();
 
-        if ($alokasi) {
-            if ($alokasi->waktu_mulai) {
-                $startTime = strtotime($alokasi->waktu_mulai);
-                $elapsedMinutes = (int)ceil((time() - $startTime) / 60);
-                if ($elapsedMinutes < 1) $elapsedMinutes = 1;
+        if (!empty($alokasiList)) {
+            foreach ($alokasiList as $alokasi) {
+                if ($alokasi['waktu_mulai']) {
+                    $startTime = strtotime($alokasi['waktu_mulai']);
+                    $elapsedMinutes = (int)ceil((time() - $startTime) / 60);
+                    if ($elapsedMinutes < 1) $elapsedMinutes = 1;
 
-                if ($alokasi->prepaid_durasi_menit > 0 && $elapsedMinutes > $alokasi->prepaid_durasi_menit) {
-                    $elapsedMinutes = (int)$alokasi->prepaid_durasi_menit;
-                }
-
-                $detail = $db->table('transaksi_detail')->where('transaksi_id', $transaksiId)->get()->getRow();
-                if ($detail) {
-                    $hargaPerJam = (float)$detail->harga_satuan;
-                    if ($alokasi->prepaid_durasi_menit > 0) {
-                        $subtotal = round(($elapsedMinutes / 60) * $hargaPerJam);
-                    } else {
-                        $hargaMentah = $elapsedMinutes * ($hargaPerJam / 60);
-                        $subtotal = ceil($hargaMentah / 500) * 500;
+                    if ($alokasi['prepaid_durasi_menit'] > 0 && $elapsedMinutes > $alokasi['prepaid_durasi_menit']) {
+                        $elapsedMinutes = (int)$alokasi['prepaid_durasi_menit'];
                     }
 
-                    $db->table('transaksi_detail')->where('id', $detail->id)->update([
-                        'qty'          => $elapsedMinutes,
-                        'durasi_menit' => $elapsedMinutes,
-                        'subtotal'     => $subtotal,
-                        'updated_at'   => $now
-                    ]);
+                    // Cari baris detail transaksi yang sesuai untuk meja billiard ini
+                    $detail = $db->table('transaksi_detail td')
+                                 ->select('td.*')
+                                 ->join('produk_jasa p', 'p.id = td.produk_id')
+                                 ->where('td.transaksi_id', $transaksiId)
+                                 ->where('p.iot_id', $alokasi['iot_id'])
+                                 ->get()->getRow();
 
-                    $db->table('transaksi')->where('id', $transaksiId)->update([
-                        'total_harga' => $subtotal,
-                        'updated_at'  => $now
-                    ]);
+                    if ($detail) {
+                        $hargaPerJam = (float)$detail->harga_satuan;
+                        if ($alokasi['prepaid_durasi_menit'] > 0) {
+                            $subtotal = round(($elapsedMinutes / 60) * $hargaPerJam);
+                        } else {
+                            $hargaMentah = $elapsedMinutes * ($hargaPerJam / 60);
+                            $subtotal = ceil($hargaMentah / 500) * 500;
+                        }
+
+                        $db->table('transaksi_detail')->where('id', $detail->id)->update([
+                            'qty'          => $elapsedMinutes,
+                            'durasi_menit' => $elapsedMinutes,
+                            'subtotal'     => $subtotal,
+                            'updated_at'   => $now
+                        ]);
+                    }
+                }
+
+                $db->table('iot_alokasi')->where('id', $alokasi['id'])->update([
+                    'status_relay'         => 0,
+                    'status_penggunaan'    => 'tersedia',
+                    'transaksi_aktif_id'   => null,
+                    'prepaid_durasi_menit' => null,
+                    'waktu_mulai'          => null,
+                    'warning_sent'         => 0,
+                    'updated_at'           => $now
+                ]);
+
+                $device = $db->table('iot')->where('id', $alokasi['iot_id'])->get()->getRow();
+                if ($device && $device->ip_address) {
+                    $this->kirimSinyalRelay($device->ip_address, 'off');
                 }
             }
 
-            $db->table('iot_alokasi')->where('id', $alokasi->id)->update([
-                'status_relay'         => 0,
-                'status_penggunaan'    => 'tersedia',
-                'transaksi_aktif_id'   => null,
-                'prepaid_durasi_menit' => null,
-                'waktu_mulai'          => null,
-                'warning_sent'         => 0,
-                'updated_at'           => $now
-            ]);
+            // Hitung ulang total harga final transaksi dari semua detail belanjaannya
+            $totalHargaBaru = $db->table('transaksi_detail')
+                                 ->selectSum('subtotal')
+                                 ->where('transaksi_id', $transaksiId)
+                                 ->get()->getRow()->subtotal ?? 0.00;
 
-            $device = $db->table('iot')->where('id', $alokasi->iot_id)->get()->getRow();
-            if ($device && $device->ip_address) {
-                $this->kirimSinyalRelay($device->ip_address, 'off');
-            }
+            $db->table('transaksi')->where('id', $transaksiId)->update([
+                'total_harga' => $totalHargaBaru,
+                'updated_at'  => $now
+            ]);
         }
     }
 
