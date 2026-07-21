@@ -572,6 +572,11 @@ class Transaksi extends ResourceController
                 $detailLama = $detailsMap[$produkId];
                 $qtyLama = (int)$detailLama['qty'];
 
+                if ($isSewa && $qtyBaru > $qtyLama) {
+                    $db->transRollback();
+                    return $this->respond(['status' => 'gagal', 'pesan' => "ℹ️ Meja '{$produk->nama_produk}' sudah terdaftar pada nota ini. Gunakan fitur 'Tambah Durasi' pada kartu billiard jika ingin memperpanjang jam."], 400);
+                }
+
                 if ($qtyBaru < $qtyLama && !$isBillingOpen) {
                     $db->transRollback();
                     return $this->respond(['status' => 'gagal', 'pesan' => "Kuantitas produk '{$produk->nama_produk}' tidak boleh dikurangi. Jumlah sebelumnya: $qtyLama, dikirim: $qtyBaru."], 400);

@@ -4706,9 +4706,15 @@ const Dashboard = () => {
         (dev.nama_perangkat && targetProdObj?.nama_produk && (targetProdObj.nama_produk.toLowerCase().includes(dev.nama_perangkat.toLowerCase()) || dev.nama_perangkat.toLowerCase().includes(targetProdObj.nama_produk.toLowerCase())))
       );
       const isOccupiedByOther = connectedDevice && (connectedDevice.status_penggunaan === 'dipakai' || connectedDevice.status_penggunaan === 'selesai_menunggu_pembayaran') && Number(connectedDevice.transaksi_aktif_id || 0) !== Number(selectedTransaksi?.id || 0);
+      const isAlreadyInNotaDetail = selectedTransaksi?.detail?.some(d => Number(d.produk_id) === Number(targetProdObj.id)) ||
+        (connectedDevice && (connectedDevice.status_penggunaan === 'dipakai' || connectedDevice.status_penggunaan === 'selesai_menunggu_pembayaran') && Number(connectedDevice.transaksi_aktif_id || 0) === Number(selectedTransaksi?.id || 0));
 
       if (isOccupiedByOther) {
         ui.notif('gagal', `⛔ Meja '${targetProdObj.nama_produk}' sedang aktif digunakan oleh transaksi lain.`);
+        return;
+      }
+      if (isAlreadyInNotaDetail) {
+        ui.notif('gagal', `ℹ️ Meja '${targetProdObj.nama_produk}' sudah terdaftar pada nota ini. Gunakan fitur 'Tambah Durasi' pada kartu billiard jika ingin memperpanjang jam.`);
         return;
       }
     }
@@ -11124,9 +11130,8 @@ const Dashboard = () => {
                                         const isAlreadyInNotaDetail = selectedTransaksi?.detail?.some(d => Number(d.produk_id) === Number(p.id)) ||
                                           (connectedDevice && (connectedDevice.status_penggunaan === 'dipakai' || connectedDevice.status_penggunaan === 'selesai_menunggu_pembayaran') && Number(connectedDevice.transaksi_aktif_id || 0) === Number(selectedTransaksi?.id || 0));
 
-                                        const isStokHabis = p.tipe === 'barang' && Number(p.is_stok_dikelola || 0) === 1 && Number(p.stok || 0) <= 0;
-
-                                        const isDisabled = isOccupiedByOther || isStokHabis;
+                                        const isSewaOrIot = (p.tipe === 'sewa' || p.iot_id);
+                                        const isDisabled = (isSewaOrIot && (isOccupiedByOther || isAlreadyInNotaDetail)) || isStokHabis;
 
                                         return (
                                           <div
@@ -11134,6 +11139,10 @@ const Dashboard = () => {
                                             onMouseDown={() => {
                                               if (isOccupiedByOther) {
                                                 ui.notif('gagal', `⛔ Meja '${p.nama_produk}' sedang aktif digunakan oleh transaksi lain. Meja tidak dapat ditambahkan.`);
+                                                return;
+                                              }
+                                              if (isAlreadyInNotaDetail && isSewaOrIot) {
+                                                ui.notif('gagal', `ℹ️ Meja '${p.nama_produk}' sudah terdaftar pada nota ini. Gunakan fitur 'Tambah Durasi' pada kartu billiard jika ingin memperpanjang jam.`);
                                                 return;
                                               }
                                               if (isStokHabis) {
