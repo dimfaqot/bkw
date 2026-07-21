@@ -553,11 +553,11 @@ class Transaksi extends ResourceController
             // Cek ketersediaan meja/perangkat IoT (jika terhubung ke IoT)
             if (!empty($produk->iot_id)) {
                 $iotAlokasiCek = $db->table('iot_alokasi')->where('iot_id', $produk->iot_id)->get()->getRowArray();
-                if ($iotAlokasiCek && $iotAlokasiCek['status_penggunaan'] === 'dipakai' && (int)$iotAlokasiCek['transaksi_aktif_id'] !== (int)$id) {
+                if ($iotAlokasiCek && in_array($iotAlokasiCek['status_penggunaan'], ['dipakai', 'selesai_menunggu_pembayaran'])) {
                     $txLain = $db->table('transaksi')->where('id', $iotAlokasiCek['transaksi_aktif_id'])->get()->getRow();
                     $invLain = $txLain ? $txLain->nomor_invoice : '#'.$iotAlokasiCek['transaksi_aktif_id'];
                     $db->transRollback();
-                    return $this->respond(['status' => 'gagal', 'pesan' => "⚠️ Meja/Sewa '{$produk->nama_produk}' sedang aktif digunakan oleh transaksi lain (Invoice: {$invLain})."], 400);
+                    return $this->respond(['status' => 'gagal', 'pesan' => "⛔ Meja/Sewa '{$produk->nama_produk}' sedang aktif digunakan (Status: ".strtoupper($iotAlokasiCek['status_penggunaan']).", Invoice: {$invLain}). Meja tidak dapat ditambahkan."], 400);
                 }
             }
 

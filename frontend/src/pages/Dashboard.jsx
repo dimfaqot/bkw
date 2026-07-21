@@ -4698,15 +4698,20 @@ const Dashboard = () => {
     }
 
     const targetProdObj = posProducts.find(p => Number(p.id) === Number(pilihanProdukHutang));
-    const connectedDevice = billiardDevices.find(dev => 
-      (targetProdObj?.iot_id && Number(dev.iot_id) === Number(targetProdObj.iot_id)) ||
-      (dev.nama_perangkat && targetProdObj?.nama_produk && (targetProdObj.nama_produk.toLowerCase().includes(dev.nama_perangkat.toLowerCase()) || dev.nama_perangkat.toLowerCase().includes(targetProdObj.nama_produk.toLowerCase())))
-    );
-    const isOccupiedByOther = connectedDevice && connectedDevice.status_penggunaan === 'dipakai' && Number(connectedDevice.transaksi_aktif_id || 0) !== Number(selectedTransaksi?.id || 0);
+    const isSewaProduct = targetProdObj && (targetProdObj.tipe === 'sewa' || targetProdObj.iot_id);
 
-    if (isOccupiedByOther) {
-      ui.notif('gagal', `⚠️ Meja '${targetProdObj?.nama_produk || 'Billiard'}' sedang aktif digunakan oleh transaksi/pelanggan lain.`);
-      return;
+    if (isSewaProduct) {
+      const connectedDevice = billiardDevices.find(dev => 
+        (targetProdObj?.iot_id && Number(dev.iot_id) === Number(targetProdObj.iot_id)) ||
+        (dev.nama_perangkat && targetProdObj?.nama_produk && (targetProdObj.nama_produk.toLowerCase().includes(dev.nama_perangkat.toLowerCase()) || dev.nama_perangkat.toLowerCase().includes(targetProdObj.nama_produk.toLowerCase())))
+      );
+      const isOccupiedDevice = connectedDevice && (connectedDevice.status_penggunaan === 'dipakai' || connectedDevice.status_penggunaan === 'selesai_menunggu_pembayaran');
+      const isAlreadyInNotaDetail = selectedTransaksi?.detail?.some(d => Number(d.produk_id) === Number(targetProdObj.id));
+
+      if (isOccupiedDevice || isAlreadyInNotaDetail) {
+        ui.notif('gagal', `⛔ Meja '${targetProdObj.nama_produk}' sedang aktif digunakan. Meja yang sedang dimainkan tidak dapat ditambahkan lagi.`);
+        return;
+      }
     }
 
     ui.loading(true, 'fullscreen', 'Menyimpan tambahan pesanan...');
@@ -11103,17 +11108,16 @@ const Dashboard = () => {
                                           (dev.nama_perangkat && p.nama_produk && (p.nama_produk.toLowerCase().includes(dev.nama_perangkat.toLowerCase()) || dev.nama_perangkat.toLowerCase().includes(p.nama_produk.toLowerCase())))
                                         );
 
-                                        const isOccupiedByOther = connectedDevice && connectedDevice.status_penggunaan === 'dipakai' && Number(connectedDevice.transaksi_aktif_id || 0) !== Number(selectedTransaksi?.id || 0);
-
-                                        const isAlreadyInThisNota = selectedTransaksi?.detail?.some(d => Number(d.produk_id) === Number(p.id)) ||
-                                          (connectedDevice && connectedDevice.status_penggunaan === 'dipakai' && Number(connectedDevice.transaksi_aktif_id || 0) === Number(selectedTransaksi?.id || 0));
+                                        const isOccupiedDevice = connectedDevice && (connectedDevice.status_penggunaan === 'dipakai' || connectedDevice.status_penggunaan === 'selesai_menunggu_pembayaran');
+                                        const isAlreadyInNotaDetail = selectedTransaksi?.detail?.some(d => Number(d.produk_id) === Number(p.id));
+                                        const isOccupied = (p.tipe === 'sewa' || p.iot_id) && (isOccupiedDevice || isAlreadyInNotaDetail);
 
                                         return (
                                           <div
                                             key={p.id}
                                             onMouseDown={() => {
-                                              if (isOccupiedByOther) {
-                                                ui.notif('gagal', `Meja '${p.nama_produk}' sedang aktif digunakan oleh transaksi lain.`);
+                                              if (isOccupied) {
+                                                ui.notif('gagal', `⛔ Meja '${p.nama_produk}' sedang aktif digunakan. Meja yang sedang dimainkan tidak dapat ditambahkan lagi.`);
                                                 return;
                                               }
                                               setPilihanProdukHutang(String(p.id));
@@ -11125,26 +11129,24 @@ const Dashboard = () => {
                                             }}
                                             className="py-1.5 px-3 rounded-2 text-white small d-flex align-items-center justify-content-between"
                                             style={{
-                                              cursor: isOccupiedByOther ? 'not-allowed' : 'pointer',
-                                              opacity: isOccupiedByOther ? 0.55 : 1,
+                                              cursor: isOccupied ? 'not-allowed' : 'pointer',
+                                              opacity: isOccupied ? 0.5 : 1,
                                               fontSize: '0.74rem',
                                               borderBottom: '1px solid rgba(255,255,255,0.03)',
-                                              backgroundColor: isOccupiedByOther ? 'rgba(239,68,68,0.05)' : 'transparent'
+                                              backgroundColor: isOccupied ? 'rgba(239,68,68,0.08)' : 'transparent'
                                             }}
                                             onMouseEnter={e => {
-                                              if (!isOccupiedByOther) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)';
+                                              if (!isOccupied) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)';
                                             }}
                                             onMouseLeave={e => {
-                                              if (!isOccupiedByOther) e.currentTarget.style.backgroundColor = 'transparent';
+                                              if (!isOccupied) e.currentTarget.style.backgroundColor = 'transparent';
                                             }}
                                           >
                                             <div>
                                               <div className="fw-semibold text-main d-flex align-items-center gap-1">
                                                 <span>{p.nama_produk}</span>
-                                                {isOccupiedByOther ? (
-                                                  <span className="badge bg-danger opacity-100" style={{ fontSize: '0.58rem' }}>🔴 Sedang Digunakan (Nota Lain)</span>
-                                                ) : isAlreadyInThisNota && (p.tipe === 'sewa' || p.iot_id) ? (
-                                                  <span className="badge bg-info text-dark opacity-100" style={{ fontSize: '0.58rem' }}>🔵 Aktif di Nota Ini</span>
+                                                {isOccupied ? (
+                                                  <span className="badge bg-danger opacity-100" style={{ fontSize: '0.58rem' }}>⛔ Meja Sedang Digunakan</span>
                                                 ) : (p.tipe === 'sewa' || p.iot_id) ? (
                                                   <span className="badge bg-success opacity-100" style={{ fontSize: '0.58rem' }}>🟢 Meja Tersedia</span>
                                                 ) : null}
