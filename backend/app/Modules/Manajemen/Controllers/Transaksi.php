@@ -781,6 +781,86 @@ class Transaksi extends ResourceController
         ]);
     }
 
+    // POST /api/transaksi/lunasi-hutang-massal
+    public function lunasiHutangMassal()
+    {
+        $penggunaAktif = \App\Modules\Auth\Filters\JWTFilter::getPenggunaAktif();
+        if (!$penggunaAktif) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Token tidak valid.'], 401);
+        }
+
+        $usahaId = $penggunaAktif['usaha_id'] ?? null;
+        if (!$usahaId) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Konteks usaha tidak ditemukan.'], 400);
+        }
+
+        $input = $this->request->getJSON(true) ?: $this->request->getPost();
+        $metodePembayaran = $input['metode_pembayaran'] ?? null;
+        $pelangganId = $input['pelanggan_id'] ?? null;
+        $transaksiIds = $input['transaksi_ids'] ?? [];
+
+        if (!$metodePembayaran || !in_array($metodePembayaran, ['cash', 'qris', 'tap'])) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Wajib memilih metode pembayaran.'], 400);
+        }
+
+        $db = \Config\Database::connect();
+        $builder = $db->table('transaksi')
+                      ->where('usaha_id', $usahaId)
+                      ->where('status_pembayaran', 'belum_bayar');
+
+        if (!empty($transaksiIds) && is_array($transaksiIds)) {
+            $builder->whereIn('id', $transaksiIds);
+        } else if ($pelangganId) {
+            $builder->where('pelanggan_id', $pelangganId);
+        } else {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Parameter pelanggan_id atau transaksi_ids wajib.'], 400);
+        }
+
+        $daftarTransaksi = $builder->get()->getResultArray();
+        if (empty($daftarTransaksi)) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Tidak ditemukan transaksi hutang untuk dilunasi.'], 404);
+        }
+
+        $dateTimeNow = date('Y-m-d H:i:s');
+        $db->transStart();
+        $totalNominalMassal = 0;
+        $countSukses = 0;
+
+        foreach ($daftarTransaksi as $tx) {
+            // Matikan lampu jika ada sesi sewa
+            $this->matikanLampuBilliardJikaLunas($db, $tx['id'], $dateTimeNow);
+
+            // Re-fetch total harga terkini
+            $detailSum = $db->table('transaksi_detail')->where('transaksi_id', $tx['id'])->selectSum('subtotal')->get()->getRow();
+            $subtotalNominal = (float)($detailSum->subtotal ?? $tx['total_harga']);
+
+            $db->table('transaksi')->where('id', $tx['id'])->update([
+                'status_pembayaran' => 'lunas',
+                'metode_pembayaran' => $metodePembayaran,
+                'total_harga'       => $subtotalNominal,
+                'updated_at'        => $dateTimeNow
+            ]);
+
+            $totalNominalMassal += $subtotalNominal;
+            $countSukses++;
+        }
+
+        $db->transComplete();
+
+        if ($db->transStatus() === false) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Gagal memproses pelunasan massal.'], 500);
+        }
+
+        return $this->respond([
+            'status' => 'sukses',
+            'pesan'  => "Berhasil melunasi $countSukses transaksi hutang dengan total " . number_format($totalNominalMassal, 0, ',', '.'),
+            'data'   => [
+                'total_transaksi' => $countSukses,
+                'total_nominal'   => $totalNominalMassal
+            ]
+        ]);
+    }
+
     // Helper Private Methods
     private function dapatkanShortCode($nama)
     {

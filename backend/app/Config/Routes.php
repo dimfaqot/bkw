@@ -84,6 +84,7 @@ $routes->group('api/transaksi', ['filter' => 'jwt'], function($routes) {
     $routes->post('tambah-member', '\App\Modules\Manajemen\Controllers\Transaksi::tambahMember');
     $routes->put('update-hutang/(:num)', '\App\Modules\Manajemen\Controllers\Transaksi::updateHutang/$1');
     $routes->put('lunasi-hutang/(:num)', '\App\Modules\Manajemen\Controllers\Transaksi::lunasiHutang/$1');
+    $routes->post('lunasi-hutang-massal', '\App\Modules\Manajemen\Controllers\Transaksi::lunasiHutangMassal');
     $routes->get('job-board', '\App\Modules\Manajemen\Controllers\Transaksi::jobBoard');
     $routes->post('job-board/klaim/(:num)', '\App\Modules\Manajemen\Controllers\Transaksi::klaimJob/$1');
     $routes->post('job-board/selesai/(:num)', '\App\Modules\Manajemen\Controllers\Transaksi::selesaiJob/$1');

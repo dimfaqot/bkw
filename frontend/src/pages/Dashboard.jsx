@@ -5,7 +5,7 @@ import { useUI, LazyLoading } from '../contexts/UIContext.jsx';
 import { 
   LogOut, User, Users, Shield, Briefcase, Phone, Mail, Sun, Moon, Edit3, HelpCircle, 
   Layers, Menu, Home, ShoppingCart, BarChart2, Settings, Database, Trash2, Plus, Calendar, MapPin, RefreshCw, UserCheck, Clock,
-  ChevronDown, ChevronRight, Folder, Grid, Box, FileText, Monitor, CheckSquare, Search, GripVertical, Bell
+  ChevronDown, ChevronRight, Folder, Grid, Box, FileText, Monitor, CheckSquare, Search, GripVertical, Bell, CreditCard, AlertCircle
 } from 'lucide-react';
 import { MapContainer, TileLayer, Circle, Marker, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -3489,6 +3489,107 @@ const Dashboard = () => {
   const [filterPoin, setFilterPoin] = useState({ mode: 'bulan', bulan: nowDate.getMonth() + 1, tahun: nowDate.getFullYear() });
   const [showFilterPoin, setShowFilterPoin] = useState(false); // dropdown filter topbar
 
+  // ===== STATE MANAJEMEN HUTANG =====
+  const [searchHutangUserQuery, setSearchHutangUserQuery] = useState('');
+  const [expandedHutangUsers, setExpandedHutangUsers] = useState({});
+  const [showBayarMassalModal, setShowBayarMassalModal] = useState(false);
+  const [bayarMassalTarget, setBayarMassalTarget] = useState(null);
+  const [metodeBayarMassal, setMetodeBayarMassal] = useState('cash');
+
+  const toggleAccordionUser = (userKey) => {
+    setExpandedHutangUsers(prev => ({
+      ...prev,
+      [userKey]: prev[userKey] === undefined ? false : !prev[userKey]
+    }));
+  };
+
+  const handleKirimWAUser = (userGroup) => {
+    if (!userGroup.wa) {
+      ui.notif('gagal', 'Nomor WhatsApp pelanggan tidak tersedia.');
+      return;
+    }
+
+    const namaPelanggan = userGroup.nama || 'Pelanggan';
+    const activeUsaha = opsiUsaha.find(u => u.id == profile?.usaha_id);
+    const namaUsaha = activeUsaha?.nama_usaha || 'Sport Center';
+
+    let rincianTeks = `Halo Kak *${namaPelanggan}*,\nBerikut adalah rincian tagihan hutang Anda di *${namaUsaha}*:\n\n`;
+
+    userGroup.transaksiList.forEach((tx) => {
+      const tgl = formatTanggal(tx.created_at, 'singkat');
+      rincianTeks += `📌 *Nota #${tx.nomor_invoice}* (${tgl}):\n`;
+      tx.detail?.forEach(d => {
+        let itemLabel = d.nama_produk;
+        if (d.tipe === 'sewa') {
+          const mnt = Number(d.durasi_menit || (Number(d.qty) >= 10 ? d.qty : Math.round(Number(d.qty) * 60)) || 0);
+          const jamDec = (mnt / 60).toFixed(1);
+          itemLabel += mnt % 60 === 0 ? ` (${mnt / 60} Jam)` : ` (${mnt}m / ${jamDec} Jam)`;
+        } else {
+          itemLabel += ` (x${d.qty})`;
+        }
+        const itemPrice = formatRupiah(d.subtotal || d.harga_satuan * d.qty);
+        rincianTeks += `  • ${itemLabel}: ${itemPrice}\n`;
+      });
+      rincianTeks += `  *Subtotal: ${formatRupiah(tx.total_harga)}*\n\n`;
+    });
+
+    rincianTeks += `==================================\n`;
+    rincianTeks += `💰 *TOTAL TAGIHAN HUTANG: ${formatRupiah(userGroup.totalHutang)}*\n\n`;
+    rincianTeks += `Mohon konfirmasi pelunasannya ya Kak. Terima kasih! 🙏`;
+
+    let cleanWa = userGroup.wa.replace(/[^0-9]/g, '');
+    if (cleanWa.startsWith('0')) {
+      cleanWa = '62' + cleanWa.slice(1);
+    }
+
+    const encodedMsg = encodeURIComponent(rincianTeks);
+    window.open(`https://wa.me/${cleanWa}?text=${encodedMsg}`, '_blank');
+  };
+
+  const bukaModalBayarMassal = (userGroup) => {
+    setBayarMassalTarget(userGroup);
+    setMetodeBayarMassal('cash');
+    setShowBayarMassalModal(true);
+  };
+
+  const prosesBayarMassal = async () => {
+    if (!bayarMassalTarget) return;
+
+    const konf = await ui.notif('konfirmasi', `Apakah Anda yakin ingin melunasi seluruh ${bayarMassalTarget.transaksiList.length} transaksi hutang untuk ${bayarMassalTarget.nama} dengan total ${formatRupiah(bayarMassalTarget.totalHutang)}?`);
+    if (!konf) return;
+
+    ui.loading(true, 'fullscreen', 'Memproses pelunasan massal...');
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE_URL}/transaksi/lunasi-hutang-massal`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          pelanggan_id: bayarMassalTarget.pelanggan_id,
+          transaksi_ids: bayarMassalTarget.transaksiList.map(t => t.id),
+          metode_pembayaran: metodeBayarMassal
+        })
+      });
+      const json = await res.json();
+      ui.loading(false);
+      if (res.ok && json.status === 'sukses') {
+        ui.notif('sukses', json.pesan || 'Pelunasan massal berhasil diproses!');
+        setShowBayarMassalModal(false);
+        setBayarMassalTarget(null);
+        fetchRiwayatTransaksi();
+        fetchBilliardStatus();
+      } else {
+        ui.notif('gagal', json.pesan || 'Gagal memproses pelunasan massal.');
+      }
+    } catch {
+      ui.loading(false);
+      ui.notif('gagal', 'Kesalahan koneksi internet.');
+    }
+  };
+
   // ===== STATE NOTIFIKASI (BELL CENTER) =====
   const [daftarNotifikasi, setDaftarNotifikasi] = useState([]);
   const [showNotifikasiDropdown, setShowNotifikasiDropdown] = useState(false);
@@ -6445,6 +6546,7 @@ const Dashboard = () => {
         <div className="flex-grow-1" style={{ overflowY: 'auto', overflowX: 'hidden' }}>
           {/* Beranda */}
           <button 
+            type="button"
             onClick={() => { setMenuAktif('beranda'); setOpenAccordion(null); }} 
             className={`menu-item-premium ${menuAktif === 'beranda' ? 'aktif' : ''}`}
           >
@@ -6452,6 +6554,24 @@ const Dashboard = () => {
             <span>Beranda</span>
           </button>
           
+          {/* Menu Hutang Pelanggan */}
+          <button 
+            type="button" 
+            onClick={() => { setMenuAktif('hutang'); setOpenAccordion(null); }} 
+            className={`menu-item-premium w-100 mb-1 ${menuAktif === 'hutang' ? 'aktif' : ''}`}
+            style={{ fontSize: '0.8rem' }}
+          >
+            <CreditCard size={18} />
+            <div className="d-flex align-items-center justify-content-between w-100 me-1">
+              <span>Hutang</span>
+              {riwayatTransaksi.filter(t => t.status_pembayaran === 'belum_bayar').length > 0 && (
+                <span className="badge bg-danger rounded-pill" style={{ fontSize: '0.6rem' }}>
+                  {riwayatTransaksi.filter(t => t.status_pembayaran === 'belum_bayar').length}
+                </span>
+              )}
+            </div>
+          </button>
+
           {menuGroups.map(grup => {
             const validMenus = grup.menus.filter(m => m.url !== 'beranda');
             if (validMenus.length === 0) return null;
@@ -7153,6 +7273,30 @@ const Dashboard = () => {
                               <span>Katalog Kasir POS</span>
                             </h4>
                             <div className="text-muted small">Pilih menu produk kantin atau jasa layanan untuk ditransaksikan.</div>
+                          </div>
+                          <div className="d-flex align-items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setMenuAktif('kasir')}
+                              className="tombol-premium border-0 py-1.5 px-3 small text-white"
+                              style={{ fontSize: '0.75rem', borderRadius: '8px', backgroundColor: 'var(--warna-utama)' }}
+                            >
+                              🛒 Katalog Kasir
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setMenuAktif('hutang')}
+                              className="tombol-sekunder-premium border-0 py-1.5 px-3 small text-main d-flex align-items-center gap-1"
+                              style={{ fontSize: '0.75rem', borderRadius: '8px' }}
+                            >
+                              <CreditCard size={14} />
+                              <span>Daftar Hutang</span>
+                              {riwayatTransaksi.filter(t => t.status_pembayaran === 'belum_bayar').length > 0 && (
+                                <span className="badge bg-danger ms-1" style={{ fontSize: '0.6rem' }}>
+                                  {riwayatTransaksi.filter(t => t.status_pembayaran === 'belum_bayar').length}
+                                </span>
+                              )}
+                            </button>
                           </div>
                         </div>
 
@@ -7908,6 +8052,260 @@ const Dashboard = () => {
                         )}
                       </div>
                     </div>
+                  </div>
+                );
+              })()}
+
+              {/* MODUL MANAJEMEN HUTANG PELANGGAN */}
+              {menuAktif === 'hutang' && (() => {
+                const transaksiHutang = (riwayatTransaksi || []).filter(t => t.status_pembayaran === 'belum_bayar');
+
+                const groupedUsersMap = {};
+                transaksiHutang.forEach(tx => {
+                  const key = tx.pelanggan_id ? `id_${tx.pelanggan_id}` : `wa_${tx.wa_pelanggan || tx.nama_pelanggan || 'umum'}`;
+                  if (!groupedUsersMap[key]) {
+                    groupedUsersMap[key] = {
+                      key,
+                      pelanggan_id: tx.pelanggan_id,
+                      nama: tx.nama_pelanggan || 'Pelanggan Umum',
+                      wa: tx.wa_pelanggan || '',
+                      transaksiList: [],
+                      totalHutang: 0
+                    };
+                  }
+                  groupedUsersMap[key].transaksiList.push(tx);
+                  groupedUsersMap[key].totalHutang += Number(tx.total_harga || 0);
+                });
+
+                const userGroupsList = Object.values(groupedUsersMap);
+
+                const grandTotalHutang = userGroupsList.reduce((acc, u) => acc + u.totalHutang, 0);
+                const grandTotalTransaksi = transaksiHutang.length;
+                const grandTotalPelanggan = userGroupsList.length;
+
+                const query = searchHutangUserQuery.toLowerCase();
+                const filteredUserGroups = userGroupsList.filter(u => {
+                  if (!query) return true;
+                  return u.nama.toLowerCase().includes(query) || u.wa.toLowerCase().includes(query);
+                });
+
+                return (
+                  <div className="fade-in">
+                    {/* Header Top Navigation */}
+                    <div className="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3 mb-4">
+                      <div>
+                        <h3 className="fw-bold mb-1 d-flex align-items-center gap-2 text-main">
+                          <CreditCard size={22} className="text-primary" style={{ color: 'var(--warna-utama)' }} />
+                          <span>Manajemen Hutang & Piutang Pelanggan</span>
+                        </h3>
+                        <p className="text-muted small mb-0">Daftar transaksi belum lunas yang dikelompokkan per pelanggan.</p>
+                      </div>
+                      <div className="d-flex align-items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setMenuAktif('kasir')}
+                          className="tombol-sekunder-premium py-1.5 px-3 small d-flex align-items-center gap-1 text-main"
+                          style={{ borderRadius: '8px', fontSize: '0.78rem' }}
+                        >
+                          🛒 Kembali ke Kasir POS
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            fetchRiwayatTransaksi();
+                            fetchBilliardStatus();
+                          }}
+                          className="tombol-premium py-1.5 px-3 small d-flex align-items-center gap-1 text-white"
+                          style={{ borderRadius: '8px', fontSize: '0.78rem', backgroundColor: 'var(--warna-utama)' }}
+                        >
+                          <RefreshCw size={14} /> Refresh Data
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Global Summary Stat Cards */}
+                    <div className="row g-3 mb-4">
+                      <div className="col-12 col-sm-4">
+                        <div className="kartu-premium p-3 rounded-3 border-danger border-opacity-25" style={{ backgroundColor: 'rgba(239, 68, 68, 0.04)' }}>
+                          <div className="text-muted small mb-1" style={{ fontSize: '0.7rem' }}>💰 Total Hutang Seluruhnya:</div>
+                          <div className="fw-bold text-danger fs-4">{formatRupiah(grandTotalHutang)}</div>
+                          <div className="text-muted mt-1" style={{ fontSize: '0.65rem' }}>Akumulasi tagihan belum lunas</div>
+                        </div>
+                      </div>
+                      <div className="col-12 col-sm-4">
+                        <div className="kartu-premium p-3 rounded-3 border-primary border-opacity-25" style={{ backgroundColor: 'rgba(99, 102, 241, 0.04)' }}>
+                          <div className="text-muted small mb-1" style={{ fontSize: '0.7rem' }}>📄 Total Transaksi Belum Lunas:</div>
+                          <div className="fw-bold text-primary fs-4" style={{ color: 'var(--warna-utama)' }}>{grandTotalTransaksi} Transaksi</div>
+                          <div className="text-muted mt-1" style={{ fontSize: '0.65rem' }}>Jumlah nota pending</div>
+                        </div>
+                      </div>
+                      <div className="col-12 col-sm-4">
+                        <div className="kartu-premium p-3 rounded-3 border-warning border-opacity-25" style={{ backgroundColor: 'rgba(245, 158, 11, 0.04)' }}>
+                          <div className="text-muted small mb-1" style={{ fontSize: '0.7rem' }}>👥 Total Pelanggan Berhutang:</div>
+                          <div className="fw-bold text-warning fs-4">{grandTotalPelanggan} Member</div>
+                          <div className="text-muted mt-1" style={{ fontSize: '0.65rem' }}>Member terdaftar berhutang</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Filter & Search Bar */}
+                    <div className="mb-4 position-relative" style={{ maxWidth: '450px' }}>
+                      <div className="position-absolute d-flex align-items-center justify-content-center" style={{ top: 0, bottom: 0, left: '12px', color: 'var(--text-secondary)', opacity: 0.7, pointerEvents: 'none' }}>
+                        <Search size={16} />
+                      </div>
+                      <input
+                        type="text"
+                        className="form-control input-premium py-2 text-main"
+                        style={{ paddingLeft: '38px', fontSize: '0.82rem', borderRadius: '10px' }}
+                        placeholder="Cari nama member atau nomor WhatsApp..."
+                        value={searchHutangUserQuery}
+                        onChange={e => setSearchHutangUserQuery(e.target.value)}
+                      />
+                    </div>
+
+                    {/* Grouped User Accordions */}
+                    {filteredUserGroups.length === 0 ? (
+                      <div className="kartu-premium p-5 text-center text-muted">
+                        <div className="fs-1 mb-2">🎉</div>
+                        <div className="fw-bold text-main">Tidak Ada Tagihan Hutang</div>
+                        <div className="small mt-1">Semua transaksi di kasir telah lunas diselesaikan.</div>
+                      </div>
+                    ) : (
+                      <div className="d-flex flex-column gap-3">
+                        {filteredUserGroups.map(userGroup => {
+                          const isExpanded = expandedHutangUsers[userGroup.key] ?? true;
+
+                          return (
+                            <div key={userGroup.key} className="kartu-premium p-3 p-sm-4 rounded-3" style={{ border: '1px solid var(--warna-border)' }}>
+                              {/* Accordion User Header */}
+                              <div className="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
+                                <div className="d-flex align-items-center gap-3">
+                                  <div className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold" style={{ width: '42px', height: '42px', backgroundColor: 'var(--warna-utama)', fontSize: '1rem', minWidth: '42px' }}>
+                                    {userGroup.nama.charAt(0).toUpperCase()}
+                                  </div>
+                                  <div>
+                                    <div className="fw-bold text-main fs-6 d-flex align-items-center gap-2">
+                                      <span>👤 {userGroup.nama}</span>
+                                      {userGroup.wa && (
+                                        <span className="text-muted fw-normal small" style={{ fontSize: '0.78rem' }}>({userGroup.wa})</span>
+                                      )}
+                                    </div>
+                                    
+                                    {/* Per User Stats */}
+                                    <div className="d-flex flex-wrap align-items-center gap-2 mt-1">
+                                      <span className="badge bg-secondary opacity-75" style={{ fontSize: '0.68rem' }}>
+                                        📊 {userGroup.transaksiList.length} Transaksi
+                                      </span>
+                                      <span className="badge bg-danger text-white fw-semibold" style={{ fontSize: '0.72rem' }}>
+                                        💰 Total Hutang: {formatRupiah(userGroup.totalHutang)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* User Action Buttons */}
+                                <div className="d-flex align-items-center gap-2 w-100 w-md-auto justify-content-end">
+                                  {/* WhatsApp Billing Button */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleKirimWAUser(userGroup)}
+                                    className="tombol-sekunder-premium border-0 py-1.5 px-3 small d-flex align-items-center gap-1"
+                                    style={{ fontSize: '0.75rem', borderRadius: '8px', color: '#25D366' }}
+                                    title="Kirim Penagihan via WhatsApp"
+                                  >
+                                    💬 WA Penagihan
+                                  </button>
+
+                                  {/* Batch Pelunasan Button */}
+                                  <button
+                                    type="button"
+                                    onClick={() => bukaModalBayarMassal(userGroup)}
+                                    className="tombol-premium border-0 py-1.5 px-3 small d-flex align-items-center gap-1 text-white"
+                                    style={{ fontSize: '0.75rem', borderRadius: '8px', backgroundColor: 'var(--bs-success)' }}
+                                  >
+                                    💵 Bayar Semua ({formatRupiah(userGroup.totalHutang)})
+                                  </button>
+
+                                  {/* Accordion Expand/Collapse Toggle Button */}
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleAccordionUser(userGroup.key)}
+                                    className="btn btn-link text-muted p-1 border-0 ms-1"
+                                    title={isExpanded ? "Tutup Rincian" : "Buka Rincian"}
+                                  >
+                                    <ChevronDown size={20} style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Accordion Content: List of Transactions */}
+                              {isExpanded && (
+                                <div className="mt-3 pt-3 fade-in" style={{ borderTop: '1px dashed var(--warna-border)' }}>
+                                  <div className="row g-3">
+                                    {userGroup.transaksiList.map(tx => (
+                                      <div key={tx.id} className="col-12 col-lg-6">
+                                        <div className="p-3 rounded-3 h-100 d-flex flex-column justify-content-between" style={{ backgroundColor: 'var(--bg-halaman)', border: '1px solid var(--warna-border)' }}>
+                                          <div>
+                                            <div className="d-flex align-items-center justify-content-between mb-2">
+                                              <span className="fw-bold text-main small" style={{ fontSize: '0.78rem' }}>
+                                                📄 Nota #{tx.nomor_invoice}
+                                              </span>
+                                              <span className="text-muted small" style={{ fontSize: '0.68rem' }}>
+                                                📅 {formatTanggal(tx.created_at, 'singkat')} {new Date(tx.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                                              </span>
+                                            </div>
+
+                                            {/* Transaction Detail Items */}
+                                            <div className="d-flex flex-column gap-1 mb-3">
+                                              {tx.detail?.map(d => (
+                                                <div key={d.id} className="d-flex justify-content-between align-items-center text-muted small" style={{ fontSize: '0.72rem' }}>
+                                                  <span>
+                                                    • {d.nama_produk} {d.tipe === 'sewa' ? (() => {
+                                                      const mnt = Number(d.durasi_menit || (Number(d.qty) >= 10 ? d.qty : Math.round(Number(d.qty) * 60)) || 0);
+                                                      const jamDec = (mnt / 60).toFixed(1);
+                                                      return mnt % 60 === 0 ? `(${mnt / 60} Jam)` : `(${mnt}m / ${jamDec} Jam)`;
+                                                    })() : `(x${d.qty})`}
+                                                  </span>
+                                                  <span className="fw-semibold text-main">
+                                                    {formatRupiah(d.subtotal || d.harga_satuan * d.qty)}
+                                                  </span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+
+                                          {/* Subtotal & Single Payment Button */}
+                                          <div className="pt-2 d-flex align-items-center justify-content-between mt-auto" style={{ borderTop: '1px dashed rgba(255,255,255,0.05)' }}>
+                                            <div>
+                                              <span className="text-muted small d-block" style={{ fontSize: '0.65rem' }}>Subtotal Nota:</span>
+                                              <span className="fw-bold text-warning" style={{ fontSize: '0.85rem' }}>
+                                                {formatRupiah(tx.total_harga)}
+                                              </span>
+                                            </div>
+
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setSelectedTransaksi(tx);
+                                                setShowDetailNotaModal(true);
+                                              }}
+                                              className="tombol-sekunder-premium py-1 px-2.5 small border-0 text-main"
+                                              style={{ fontSize: '0.72rem', borderRadius: '6px' }}
+                                            >
+                                              💳 Pelunasan Nota Ini
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 );
               })()}
@@ -10630,6 +11028,89 @@ const Dashboard = () => {
             >
               Tutup
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PELUNASAN MASSAL HUTANG PELANGGAN */}
+      {showBayarMassalModal && bayarMassalTarget && (
+        <div className="modal-backdrop-custom d-flex align-items-center justify-content-center fade-in p-3" style={{ zIndex: 10000, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}>
+          <div className="kartu-premium p-4 rounded-4 shadow-lg w-100" style={{ maxWidth: '450px', backgroundColor: '#1e293b', border: '1px solid var(--warna-border)' }}>
+            <div className="d-flex align-items-center justify-content-between mb-3 pb-2" style={{ borderBottom: '1px solid var(--warna-border)' }}>
+              <h5 className="fw-bold text-main mb-0 d-flex align-items-center gap-2" style={{ fontSize: '0.95rem' }}>
+                <CreditCard size={18} className="text-success" />
+                <span>Pelunasan Massal Hutang</span>
+              </h5>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBayarMassalModal(false);
+                  setBayarMassalTarget(null);
+                }}
+                className="btn btn-link text-muted p-0 border-0"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-3 rounded-3 mb-3" style={{ backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid var(--warna-border)' }}>
+              <div className="text-muted small" style={{ fontSize: '0.75rem' }}>Pelanggan:</div>
+              <div className="fw-bold text-main fs-6 mb-2">👤 {bayarMassalTarget.nama} {bayarMassalTarget.wa ? `(${bayarMassalTarget.wa})` : ''}</div>
+              
+              <div className="d-flex justify-content-between align-items-center text-muted small" style={{ fontSize: '0.72rem' }}>
+                <span>Jumlah Transaksi:</span>
+                <span className="fw-semibold text-main">{bayarMassalTarget.transaksiList.length} Nota</span>
+              </div>
+              <div className="d-flex justify-content-between align-items-center mt-1">
+                <span className="fw-bold text-main small" style={{ fontSize: '0.78rem' }}>Total Pelunasan:</span>
+                <span className="fw-bold text-success fs-5">{formatRupiah(bayarMassalTarget.totalHutang)}</span>
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="text-muted small d-block mb-1.5" style={{ fontSize: '0.75rem' }}>Pilih Metode Pembayaran:</label>
+              <div className="d-flex gap-2 p-1 rounded-3" style={{ backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid var(--warna-border)' }}>
+                {['cash', 'qris', 'tap'].map(m => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setMetodeBayarMassal(m)}
+                    className="border-0 flex-fill py-2 px-2 small text-center text-uppercase fw-bold"
+                    style={{
+                      fontSize: '0.75rem',
+                      borderRadius: '6px',
+                      backgroundColor: metodeBayarMassal === m ? 'var(--bs-success)' : 'transparent',
+                      color: metodeBayarMassal === m ? '#fff' : 'var(--teks-redup, #94a3b8)',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    {m === 'cash' ? '💵 Cash' : m === 'qris' ? '📱 QRIS' : '🔲 Tap'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="d-flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBayarMassalModal(false);
+                  setBayarMassalTarget(null);
+                }}
+                className="tombol-sekunder-premium border-0 flex-fill py-2 small"
+                style={{ fontSize: '0.78rem', borderRadius: '8px' }}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={prosesBayarMassal}
+                className="tombol-premium border-0 flex-fill py-2 small text-white"
+                style={{ fontSize: '0.78rem', borderRadius: '8px', backgroundColor: 'var(--bs-success)' }}
+              >
+                ✓ Pelunasan Sekarang
+              </button>
+            </div>
           </div>
         </div>
       )}
