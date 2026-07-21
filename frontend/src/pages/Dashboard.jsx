@@ -3578,10 +3578,24 @@ const Dashboard = () => {
       ui.loading(false);
       if (res.ok && json.status === 'sukses') {
         ui.notif('sukses', json.pesan || 'Pelunasan massal berhasil diproses!');
+        const targetId = bayarMassalTarget.transaksiList[0]?.id;
         setShowBayarMassalModal(false);
         setBayarMassalTarget(null);
-        fetchRiwayatTransaksi();
+        fetchRiwayatTransaksi(filterTanggalPos, filterUsahaHutang);
         fetchBilliardStatus();
+
+        if (targetId) {
+          try {
+            const detailRes = await fetch(`${API_BASE_URL}/transaksi-publik/detail/${targetId}`);
+            const detailJson = await detailRes.json();
+            if (detailRes.ok && detailJson.status === 'sukses') {
+              setSelectedTransaksi(detailJson.data);
+              setShowDetailNotaModal(true);
+            }
+          } catch (e) {
+            console.error(e);
+          }
+        }
       } else {
         ui.notif('gagal', json.pesan || 'Gagal memproses pelunasan massal.');
       }
@@ -8276,62 +8290,93 @@ const Dashboard = () => {
                               {isExpanded && (
                                 <div className="mt-3 pt-3 fade-in" style={{ borderTop: '1px dashed var(--warna-border)' }}>
                                   <div className="row g-3">
-                                    {userGroup.transaksiList.map(tx => (
-                                      <div key={tx.id} className="col-12 col-lg-6">
-                                        <div className="p-3 rounded-3 h-100 d-flex flex-column justify-content-between" style={{ backgroundColor: 'var(--bg-halaman)', border: '1px solid var(--warna-border)' }}>
-                                          <div>
-                                            <div className="d-flex align-items-center justify-content-between mb-2">
-                                              <span className="fw-bold text-main small" style={{ fontSize: '0.78rem' }}>
-                                                📄 Nota #{tx.nomor_invoice}
-                                              </span>
-                                              <span className="text-muted small" style={{ fontSize: '0.68rem' }}>
-                                                📅 {formatTanggal(tx.created_at, 'singkat')} {new Date(tx.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
-                                              </span>
-                                            </div>
+                                    {userGroup.transaksiList.map(tx => {
+                                      const isKadaluarsaKasir = (() => {
+                                        const shiftPertama = opsiShift[0];
+                                        const txDate = new Date(String(tx.created_at).replace(' ', 'T'));
+                                        const nowDate = new Date();
+                                        if (shiftPertama) {
+                                          const dapatkanSiklus = (dt) => {
+                                            const jamMulai = shiftPertama.jam_mulai;
+                                            const toleransi = Number(shiftPertama.toleransi_sebelum);
+                                            const [h, m, s] = jamMulai.split(':');
+                                            const cycleStart = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), Number(h), Number(m), Number(s) || 0).getTime() - (toleransi * 60 * 1000) + (15 * 60 * 1000);
+                                            const dateStr = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+                                            return dt.getTime() >= cycleStart ? dateStr : `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()-1).padStart(2,'0')}`;
+                                          };
+                                          return dapatkanSiklus(nowDate) !== dapatkanSiklus(txDate);
+                                        }
+                                        return txDate.toDateString() !== nowDate.toDateString();
+                                      })();
 
-                                            {/* Transaction Detail Items */}
-                                            <div className="d-flex flex-column gap-1 mb-3">
-                                              {tx.detail?.map(d => (
-                                                <div key={d.id} className="d-flex justify-content-between align-items-center text-muted small" style={{ fontSize: '0.72rem' }}>
-                                                  <span>
-                                                    • {d.nama_produk} {d.tipe === 'sewa' ? (() => {
-                                                      const mnt = Number(d.durasi_menit || (Number(d.qty) >= 10 ? d.qty : Math.round(Number(d.qty) * 60)) || 0);
-                                                      const jamDec = (mnt / 60).toFixed(1);
-                                                      return mnt % 60 === 0 ? `(${mnt / 60} Jam)` : `(${mnt}m / ${jamDec} Jam)`;
-                                                    })() : `(x${d.qty})`}
-                                                  </span>
-                                                  <span className="fw-semibold text-main">
-                                                    {formatRupiah(d.subtotal || d.harga_satuan * d.qty)}
-                                                  </span>
-                                                </div>
-                                              ))}
-                                            </div>
-                                          </div>
-
-                                          {/* Subtotal & Single Payment Button */}
-                                          <div className="pt-2 d-flex align-items-center justify-content-between mt-auto" style={{ borderTop: '1px dashed rgba(255,255,255,0.05)' }}>
+                                      return (
+                                        <div key={tx.id} className="col-12 col-lg-6">
+                                          <div className="p-3 rounded-3 h-100 d-flex flex-column justify-content-between" style={{ backgroundColor: 'var(--bg-halaman)', border: '1px solid var(--warna-border)' }}>
                                             <div>
-                                              <span className="text-muted small d-block" style={{ fontSize: '0.65rem' }}>Subtotal Nota:</span>
-                                              <span className="fw-bold text-warning" style={{ fontSize: '0.85rem' }}>
-                                                {formatRupiah(tx.total_harga)}
-                                              </span>
+                                              <div className="d-flex flex-wrap align-items-center justify-content-between gap-1 mb-2">
+                                                <div className="d-flex align-items-center gap-1.5">
+                                                  <span className="fw-bold text-main small" style={{ fontSize: '0.78rem' }}>
+                                                    📄 Nota #{tx.nomor_invoice}
+                                                  </span>
+                                                  {isKadaluarsaKasir ? (
+                                                    <span className="badge bg-warning text-dark fw-semibold" style={{ fontSize: '0.62rem' }}>
+                                                      ⏳ Kadaluarsa Kasir
+                                                    </span>
+                                                  ) : (
+                                                    <span className="badge bg-info text-dark fw-semibold" style={{ fontSize: '0.62rem' }}>
+                                                      ⏱️ Siklus Aktif
+                                                    </span>
+                                                  )}
+                                                </div>
+                                                <span className="text-muted small" style={{ fontSize: '0.68rem' }}>
+                                                  📅 {formatTanggal(tx.created_at, 'singkat')} {new Date(tx.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                              </div>
+
+                                              {/* Transaction Detail Items */}
+                                              <div className="d-flex flex-column gap-1 mb-3">
+                                                {tx.detail?.map(d => (
+                                                  <div key={d.id} className="d-flex justify-content-between align-items-center text-muted small" style={{ fontSize: '0.72rem' }}>
+                                                    <span>
+                                                      • {d.nama_produk} {d.tipe === 'sewa' ? (() => {
+                                                        const mnt = Number(d.durasi_menit || (Number(d.qty) >= 10 ? d.qty : Math.round(Number(d.qty) * 60)) || 0);
+                                                        const jamDec = (mnt / 60).toFixed(1);
+                                                        return mnt % 60 === 0 ? `(${mnt / 60} Jam)` : `(${mnt}m / ${jamDec} Jam)`;
+                                                      })() : `(x${d.qty})`}
+                                                    </span>
+                                                    <span className="fw-semibold text-main">
+                                                      {formatRupiah(d.subtotal || d.harga_satuan * d.qty)}
+                                                    </span>
+                                                  </div>
+                                                ))}
+                                              </div>
                                             </div>
 
-                                            <button
-                                              type="button"
-                                              onClick={() => {
-                                                setSelectedTransaksi(tx);
-                                                setShowDetailNotaModal(true);
-                                              }}
-                                              className="tombol-sekunder-premium py-1 px-2.5 small border-0 text-main"
-                                              style={{ fontSize: '0.72rem', borderRadius: '6px' }}
-                                            >
-                                              💳 Pelunasan Nota Ini
-                                            </button>
+                                            {/* Subtotal & Single Payment Button */}
+                                            <div className="pt-2 d-flex align-items-center justify-content-between mt-auto" style={{ borderTop: '1px dashed rgba(255,255,255,0.05)' }}>
+                                              <div>
+                                                <span className="text-muted small d-block" style={{ fontSize: '0.65rem' }}>Subtotal Nota:</span>
+                                                <span className="fw-bold text-warning" style={{ fontSize: '0.85rem' }}>
+                                                  {formatRupiah(tx.total_harga)}
+                                                </span>
+                                              </div>
+
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setSelectedTransaksi(tx);
+                                                  setShowDetailNotaModal(true);
+                                                }}
+                                                className="tombol-sekunder-premium py-1 px-2.5 small border-0 text-main"
+                                                style={{ fontSize: '0.72rem', borderRadius: '6px' }}
+                                              >
+                                                💳 Pelunasan Nota Ini
+                                              </button>
+                                            </div>
                                           </div>
                                         </div>
-                                      </div>
-                                    ))}
+                                      );
+                                    })}
                                   </div>
                                 </div>
                               )}
