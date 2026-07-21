@@ -290,47 +290,70 @@ class Transaksi extends ResourceController
             return $this->failUnauthorized('Token tidak valid.');
         }
 
+        // Tentukan Usaha ID
         $usahaId = $penggunaAktif['usaha_id'] ?? null;
-        if (!$usahaId) {
-            return $this->respond(['status' => 'gagal', 'pesan' => 'Konteks usaha tidak ditemukan.'], 400);
+        $reqUsahaId = $this->request->getGet('usaha_id');
+
+        // Jika ROOT / Admin memilih usaha_id via GET query parameter, prioritaskan reqUsahaId
+        if (!empty($reqUsahaId) && in_array(strtolower($penggunaAktif['role'] ?? ''), ['root', 'admin', 'supervisor'])) {
+            $usahaId = $reqUsahaId;
         }
 
         $tanggal = $this->request->getGet('tanggal') ?? date('Y-m-d');
+        $mode = $this->request->getGet('mode');
 
         $db = \Config\Database::connect();
 
-        // 1. Cari shift pertama untuk hitung waktu siklus
-        $shiftPertama = $db->table('shift')
-                           ->where('usaha_id', $usahaId)
-                           ->orderBy('jam_mulai', 'ASC')
-                           ->get()->getRowArray();
-
-        if ($shiftPertama) {
-            $jamMulai = $shiftPertama['jam_mulai'];
-            $toleransi = (int)$shiftPertama['toleransi_sebelum'];
-
-            $A_time = strtotime($tanggal . ' ' . $jamMulai) - ($toleransi * 60) + (15 * 60);
-            $A = date('Y-m-d H:i:s', $A_time);
-
-            $T_next = strtotime($tanggal . ' ' . $jamMulai) + 86400;
-            $A_next_time = $T_next - ($toleransi * 60) + (15 * 60);
-            $akhir_time = $A_next_time - (15 * 60);
-            $akhir = date('Y-m-d H:i:s', $akhir_time);
-        } else {
-            // Fallback kalender 24 jam jika tidak ada shift
-            $A = $tanggal . ' 00:00:00';
-            $akhir = $tanggal . ' 23:59:59';
-        }
-
-        $riwayat = $db->table('transaksi t')
-                      ->select('t.*, k.nama as nama_kasir, p.nama as nama_pelanggan, p.wa as wa_pelanggan')
+        // Query builder
+        $builder = $db->table('transaksi t')
+                      ->select('t.*, k.nama as nama_kasir, p.nama as nama_pelanggan, p.wa as wa_pelanggan, u.nama_usaha')
                       ->join('users k', 'k.id = t.kasir_id', 'left')
                       ->join('users p', 'p.id = t.pelanggan_id', 'left')
-                      ->where('t.usaha_id', $usahaId)
-                      ->where('t.created_at >=', $A)
-                      ->where('t.created_at <=', $akhir)
-                      ->orderBy('t.created_at', 'DESC')
-                      ->get()->getResultArray();
+                      ->join('usaha u', 'u.id = t.usaha_id', 'left');
+
+        // Filter per usaha jika usahaId diset
+        if ($usahaId) {
+            $builder->where('t.usaha_id', $usahaId);
+        }
+
+        if ($mode === 'hutang') {
+            // Mode hutang: Ambil SEMUA transaksi belum bayar tanpa batasan tanggal
+            $builder->where('t.status_pembayaran', 'belum_bayar');
+        } else {
+            // Mode normal kasir: Sertakan SEMUA transaksi BELUM BAYAR (hutang aktif dari tanggal berapapun)
+            // ATAU transaksi yang dibuat dalam siklus tanggal kasir hari ini.
+            $shiftPertama = $usahaId ? $db->table('shift')
+                               ->where('usaha_id', $usahaId)
+                               ->orderBy('jam_mulai', 'ASC')
+                               ->get()->getRowArray() : null;
+
+            if ($shiftPertama) {
+                $jamMulai = $shiftPertama['jam_mulai'];
+                $toleransi = (int)$shiftPertama['toleransi_sebelum'];
+
+                $A_time = strtotime($tanggal . ' ' . $jamMulai) - ($toleransi * 60) + (15 * 60);
+                $A = date('Y-m-d H:i:s', $A_time);
+
+                $T_next = strtotime($tanggal . ' ' . $jamMulai) + 86400;
+                $A_next_time = $T_next - ($toleransi * 60) + (15 * 60);
+                $akhir_time = $A_next_time - (15 * 60);
+                $akhir = date('Y-m-d H:i:s', $akhir_time);
+            } else {
+                $A = $tanggal . ' 00:00:00';
+                $akhir = $tanggal . ' 23:59:59';
+            }
+
+            $builder->groupStart()
+                        ->where('t.status_pembayaran', 'belum_bayar')
+                        ->orGroupStart()
+                            ->where('t.created_at >=', $A)
+                            ->where('t.created_at <=', $akhir)
+                        ->groupEnd()
+                    ->groupEnd();
+        }
+
+        $riwayat = $builder->orderBy('t.created_at', 'DESC')
+                           ->get()->getResultArray();
 
         // Ambil detail masing-masing transaksi
         foreach ($riwayat as &$r) {

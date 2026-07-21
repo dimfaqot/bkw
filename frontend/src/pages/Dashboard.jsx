@@ -3495,6 +3495,7 @@ const Dashboard = () => {
   const [showBayarMassalModal, setShowBayarMassalModal] = useState(false);
   const [bayarMassalTarget, setBayarMassalTarget] = useState(null);
   const [metodeBayarMassal, setMetodeBayarMassal] = useState('cash');
+  const [filterUsahaHutang, setFilterUsahaHutang] = useState('');
 
   const toggleAccordionUser = (userKey) => {
     setExpandedHutangUsers(prev => ({
@@ -3885,11 +3886,13 @@ const Dashboard = () => {
       return;
     }
     
-    if (menuAktif === 'kasir') {
+    if (menuAktif === 'kasir' || menuAktif === 'hutang') {
       setTabelTerpilih(null);
       lastTabelRef.current = null;
-      fetchPosProducts();
-      fetchPosStaff();
+      if (menuAktif === 'kasir') {
+        fetchPosProducts();
+        fetchPosStaff();
+      }
       fetchRiwayatTransaksi(filterTanggalPos);
       return;
     }
@@ -4368,10 +4371,12 @@ const Dashboard = () => {
     updateModal();
   };
 
-  const fetchRiwayatTransaksi = async (tgl = filterTanggalPos) => {
+  const fetchRiwayatTransaksi = async (tgl = filterTanggalPos, targetUsahaId = null) => {
     try {
       const token = localStorage.getItem('token');
-      const r = await fetch(`${API_BASE_URL}/transaksi/riwayat?tanggal=${tgl}`, {
+      const usahaIdToUse = targetUsahaId !== null ? targetUsahaId : (filterUsahaHutang || (profile?.role === 'root' ? '' : profile?.usaha_id || ''));
+      const paramUsaha = usahaIdToUse ? `&usaha_id=${usahaIdToUse}` : '';
+      const r = await fetch(`${API_BASE_URL}/transaksi/riwayat?tanggal=${tgl}${paramUsaha}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const json = await r.json();
@@ -8147,6 +8152,32 @@ const Dashboard = () => {
                         </div>
                       </div>
                     </div>
+
+                    {/* Requirement 1: Filter per Usaha khusus ROOT */}
+                    {profile?.role === 'root' && (
+                      <div className="mb-3 d-flex flex-column flex-sm-row align-items-start align-items-sm-center gap-2 p-2.5 rounded-3" style={{ backgroundColor: 'rgba(99, 102, 241, 0.05)', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
+                        <span className="fw-bold text-main small d-flex align-items-center gap-1.5" style={{ fontSize: '0.78rem' }}>
+                          🏢 Filter Usaha (Akses ROOT):
+                        </span>
+                        <select
+                          className="form-select input-premium py-1 px-3 text-main fw-semibold"
+                          style={{ width: 'auto', minWidth: '220px', fontSize: '0.78rem', borderRadius: '8px', backgroundColor: 'var(--bg-halaman)' }}
+                          value={filterUsahaHutang}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setFilterUsahaHutang(val);
+                            fetchRiwayatTransaksi(filterTanggalPos, val);
+                          }}
+                        >
+                          <option value="">-- Semua Unit Usaha --</option>
+                          {opsiUsaha.map(u => (
+                            <option key={u.id} value={u.id}>
+                              {u.nama_usaha} {u.unit ? `(${u.unit})` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
 
                     {/* Filter & Search Bar */}
                     <div className="mb-4 position-relative" style={{ maxWidth: '450px' }}>
