@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { API_BASE_URL } from '../config';
 
 const NotaPublik = () => {
   const { id } = useParams();
@@ -10,7 +11,7 @@ const NotaPublik = () => {
   useEffect(() => {
     const fetchNota = async () => {
       try {
-        const response = await fetch(`http://localhost:8080/api/transaksi-publik/detail/${id}`);
+        const response = await fetch(`${API_BASE_URL}/transaksi-publik/detail/${id}`);
         const res = await response.json();
         if (response.ok && res.status === 'sukses') {
           setTransaksi(res.data);
