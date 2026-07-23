@@ -3939,12 +3939,8 @@ const Dashboard = () => {
     }
   };
 
-  // Otomatis muat riwayat transaksi & counter hutang begitu profil user siap
-  useEffect(() => {
-    if (profile) {
-      fetchRiwayatTransaksi();
-    }
-  }, [profile]);
+  // Ref untuk melacak tanggal filter POS yang sebelumnya agar tidak terjadi double-fetch saat mount awal
+  const prevFilterTanggalPosRef = useRef(filterTanggalPos);
 
   // Memuat data tabel dinamis ketika menu berubah
   useEffect(() => {
@@ -4000,14 +3996,17 @@ const Dashboard = () => {
       setFilterTahunPoin('');
       setFilterUsahaGlobal('');
     }
-  }, [menuAktif, menuGroups]);
+  }, [menuAktif]);
 
-  // Memuat ulang riwayat transaksi saat filter tanggal berubah (tanpa reload katalog produk/jasa)
+  // Memuat ulang riwayat transaksi HANYA saat filter tanggal BERUBAH (bukan saat mount)
   useEffect(() => {
-    if (menuAktif === 'kasir' || menuAktif === 'hutang') {
-      fetchRiwayatTransaksi(filterTanggalPos);
+    if (prevFilterTanggalPosRef.current !== filterTanggalPos) {
+      prevFilterTanggalPosRef.current = filterTanggalPos;
+      if (menuAktif === 'kasir' || menuAktif === 'hutang') {
+        fetchRiwayatTransaksi(filterTanggalPos);
+      }
     }
-  }, [filterTanggalPos]);
+  }, [filterTanggalPos, menuAktif]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
