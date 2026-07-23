@@ -1402,12 +1402,13 @@ class Transaksi extends ResourceController
                 $alokasiId = (int)$al['id'];
                 $namaPerangkat = trim($al['nama_perangkat'] ?? '');
 
+                // Query transaksi belum lunas yang memiliki item meja ini
                 $txQuery = $db->table('transaksi_detail td')
-                              ->select('t.id as transaksi_id, t.nomor_invoice, COALESCE(p.nama, "Pelanggan") as nama_pelanggan, p.wa as wa_pelanggan')
+                              ->select('t.id as transaksi_id, t.nomor_invoice, COALESCE(NULLIF(p.nama, ""), NULLIF(t.catatan, ""), "Pelanggan") as nama_pelanggan, p.wa as wa_pelanggan')
                               ->join('transaksi t', 't.id = td.transaksi_id')
-                              ->join('produk_jasa pj', 'pj.id = td.produk_id')
+                              ->join('produk_jasa pj', 'pj.id = td.produk_id', 'left')
                               ->join('users p', 'p.id = t.pelanggan_id', 'left')
-                              ->where('t.status_pembayaran', 'belum_bayar');
+                              ->whereIn('t.status_pembayaran', ['belum_bayar', 'hutang', 'piutang', 'pending']);
 
                 if (!empty($namaPerangkat)) {
                     $escapedName = $db->escapeLikeString($namaPerangkat);
@@ -1415,16 +1416,8 @@ class Transaksi extends ResourceController
                                 ->where('pj.iot_id', $iotId)
                                 ->orWhere('pj.iot_id', $alokasiId)
                                 ->orWhere("pj.nama_produk LIKE '%{$escapedName}%'")
+                                ->orWhere("td.catatan LIKE '%{$escapedName}%'")
                             ->groupEnd();
-                } else {
-                    $txQuery->groupStart()
-                                ->where('pj.iot_id', $iotId)
-                                ->orWhere('pj.iot_id', $alokasiId)
-                            ->groupEnd();
-                }
-
-                if (!empty($usahaId)) {
-                    $txQuery->where('t.usaha_id', $usahaId);
                 }
 
                 $lastUnpaidTx = $txQuery->orderBy('t.id', 'DESC')->get()->getRowArray();

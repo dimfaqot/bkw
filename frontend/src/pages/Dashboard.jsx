@@ -7573,8 +7573,17 @@ const Dashboard = () => {
                                     const iotDev = billiardDevices.find(d => 
                                       (d.iot_id && prod.iot_id && Number(d.iot_id) === Number(prod.iot_id)) ||
                                       (d.nama_perangkat && prod.nama_produk && d.nama_perangkat.toLowerCase().trim() === prod.nama_produk.toLowerCase().trim()) ||
-                                      (d.nama_perangkat && prod.nama_produk && prod.nama_produk.toLowerCase().includes(d.nama_perangkat.toLowerCase().trim()))
+                                      (d.nama_perangkat && prod.nama_produk && prod.nama_produk.toLowerCase().includes(d.nama_perangkat.toLowerCase().trim())) ||
+                                      (d.nama_perangkat && prod.nama_produk && d.nama_perangkat.toLowerCase().includes(prod.nama_produk.toLowerCase().trim()))
                                     );
+                                    const lastUnpaidTx = iotDev?.last_unpaid_tx || billiardDevices.find(d => 
+                                      d.last_unpaid_tx && (
+                                        (d.iot_id && prod.iot_id && Number(d.iot_id) === Number(prod.iot_id)) ||
+                                        (d.nama_perangkat && prod.nama_produk && d.nama_perangkat.toLowerCase().trim() === prod.nama_produk.toLowerCase().trim()) ||
+                                        (d.nama_perangkat && prod.nama_produk && prod.nama_produk.toLowerCase().includes(d.nama_perangkat.toLowerCase().trim())) ||
+                                        (d.nama_perangkat && prod.nama_produk && d.nama_perangkat.toLowerCase().includes(prod.nama_produk.toLowerCase().trim()))
+                                      )
+                                    )?.last_unpaid_tx;
                                     const isUsed = iotDev?.status_penggunaan === 'dipakai';
                                     const isWaitingPayment = iotDev?.status_penggunaan === 'selesai_menunggu_pembayaran';
                                     const isRegular = isUsed && (iotDev?.prepaid_durasi_menit > 0);
@@ -7742,20 +7751,20 @@ const Dashboard = () => {
                                             </div>
                                           ) : (
                                             <div className="d-flex flex-column gap-1.5">
-                                              {iotDev?.last_unpaid_tx && (
+                                              {lastUnpaidTx && (
                                                 <button
                                                   onClick={() => {
                                                     bukaModalTambahDurasi({
-                                                      ...iotDev,
+                                                      ...(iotDev || {}),
                                                       status_pembayaran: 'belum_bayar',
-                                                      transaksi_aktif_id: iotDev.last_unpaid_tx.transaksi_id
+                                                      transaksi_aktif_id: lastUnpaidTx.transaksi_id
                                                     });
                                                   }}
                                                   className="tombol-sekunder-premium border-0 w-100 py-1 px-2 d-flex align-items-center justify-content-center gap-1 text-warning mb-1"
                                                   style={{ fontSize: '0.68rem', borderRadius: '8px', backgroundColor: 'rgba(234, 179, 8, 0.12)' }}
-                                                  title={`Perpanjang Sesi ${iotDev.last_unpaid_tx.nama_pelanggan || 'Pelanggan'} (${iotDev.last_unpaid_tx.nomor_invoice})`}
+                                                  title={`Perpanjang Sesi ${lastUnpaidTx.nama_pelanggan || 'Pelanggan'} (${lastUnpaidTx.nomor_invoice})`}
                                                 >
-                                                  <span>⏱️ Tambah Waktu ({iotDev.last_unpaid_tx.nama_pelanggan || 'Pelanggan'})</span>
+                                                  <span>⏱️ Tambah Waktu ({lastUnpaidTx.nama_pelanggan || 'Pelanggan'})</span>
                                                 </button>
                                               )}
                                               <div className="d-flex gap-1">
