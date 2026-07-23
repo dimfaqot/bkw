@@ -1383,15 +1383,17 @@ class Transaksi extends ResourceController
                     }
                 }
             } else if ($al['status_penggunaan'] === 'selesai_menunggu_pembayaran') {
-                if ($al['transaksi_aktif_id']) {
-                    $detail = $db->table('transaksi_detail')
-                                ->where('transaksi_id', $al['transaksi_aktif_id'])
-                                ->get()->getRow();
-                    if ($detail) {
-                        $device['akumulasi_biaya'] = (float)$detail->subtotal;
-                        $device['durasi_berjalan_detik'] = (int)($detail->qty * 3600);
-                    }
-                }
+                // Auto-heal 'selesai_menunggu_pembayaran' ke 'tersedia' agar meja bebas & tombol Tambah Waktu muncul
+                $db->table('iot_alokasi')->where('id', $al['id'])->update([
+                    'status_penggunaan'    => 'tersedia',
+                    'transaksi_aktif_id'   => null,
+                    'prepaid_durasi_menit' => null,
+                    'waktu_mulai'          => null,
+                    'warning_sent'         => 0,
+                    'updated_at'           => date('Y-m-d H:i:s')
+                ]);
+                $device['status_penggunaan'] = 'tersedia';
+                $device['transaksi_aktif_id'] = null;
             }
 
             // Jika status penggunaan meja saat ini adalah 'tersedia' (kosong), cari transaksi belum lunas (hutang) terakhir
@@ -1805,19 +1807,14 @@ class Transaksi extends ResourceController
         }
 
         $updateData = [
-            'status_relay' => 0,
-            'updated_at'   => $now
+            'status_relay'         => 0,
+            'status_penggunaan'    => 'tersedia',
+            'transaksi_aktif_id'   => null,
+            'prepaid_durasi_menit' => null,
+            'waktu_mulai'          => null,
+            'warning_sent'         => 0,
+            'updated_at'           => $now
         ];
-
-        if ($isLunas) {
-            $updateData['status_penggunaan']    = 'tersedia';
-            $updateData['transaksi_aktif_id']   = null;
-            $updateData['prepaid_durasi_menit'] = null;
-            $updateData['waktu_mulai']          = null;
-            $updateData['warning_sent']         = 0;
-        } else {
-            $updateData['status_penggunaan']    = 'selesai_menunggu_pembayaran';
-        }
 
         $db->table('iot_alokasi')->where('id', $alokasiId)->update($updateData);
 
