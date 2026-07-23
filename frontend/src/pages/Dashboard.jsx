@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext.jsx';
 import { useUI, LazyLoading } from '../contexts/UIContext.jsx';
 import { 
@@ -2663,12 +2663,34 @@ const Dashboard = () => {
   const { theme, toggleTheme } = useTheme();
   const ui = useUI();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Inisialisasi menuAktif dari URL query parameter (?menu=...)
+  const initialMenuParam = searchParams.get('menu') || 'beranda';
+  const [menuAktif, setMenuAktifState] = useState(initialMenuParam);
+
+  const setMenuAktif = useCallback((newMenu) => {
+    setMenuAktifState(newMenu);
+    if (!newMenu || newMenu === 'beranda' || newMenu === '/dashboard') {
+      setSearchParams({}, { replace: true });
+    } else {
+      setSearchParams({ menu: newMenu }, { replace: true });
+    }
+  }, [setSearchParams]);
+
+  // Pantau perubahan URL (misal tombol back/forward di browser)
+  useEffect(() => {
+    const urlMenu = searchParams.get('menu') || 'beranda';
+    if (urlMenu !== menuAktif) {
+      setMenuAktifState(urlMenu);
+    }
+  }, [searchParams]);
+
   const [profile, setProfile] = useState(null);
   const [logoDataUrl, setLogoDataUrl] = useState(null); // base64 data URL logo untuk cetak PDF
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [error, setError] = useState('');
   const [sidebarTerbuka, setSidebarTerbuka] = useState(true);
-  const [menuAktif, setMenuAktif] = useState('beranda');
   const [openAccordion, setOpenAccordion] = useState(null); // Track opened accordion group
   const [mobileSubmenuGroup, setMobileSubmenuGroup] = useState(null); // Track opened mobile submenu
   
@@ -3784,7 +3806,7 @@ const Dashboard = () => {
     const token = localStorage.getItem('token');
     if (!token) return;
     try {
-      const response = await fetch('http://localhost:8080/api/auth/profil', {
+      const response = await fetch(`${API_BASE_URL}/auth/profil`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -3795,6 +3817,12 @@ const Dashboard = () => {
       if (response.ok && data.status === 'sukses') {
         setProfile(data.data);
       } else {
+        if (response.status === 401 || data.pesan?.toLowerCase().includes('token')) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('usaha_id');
+          navigate('/login');
+          return;
+        }
         setError(data.pesan || 'Gagal mengambil data profil.');
       }
     } catch (err) {
@@ -3802,7 +3830,7 @@ const Dashboard = () => {
     } finally {
       setLoadingProfile(false);
     }
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -3815,21 +3843,7 @@ const Dashboard = () => {
     fetchTotalPoin();
     ambilNotifikasi();
     fetchRiwayatTransaksi();
-
-    // Baca parameter menu dari URL (?menu=nama_menu) untuk navigasi otomatis
-    const queryParams = new URLSearchParams(window.location.search);
-    const menuParam = queryParams.get('menu');
-    if (menuParam) {
-      if (menuParam === '/dashboard' || menuParam === 'beranda') {
-        setMenuAktif('beranda');
-        scrollKeJobBoard(800);
-      } else {
-        setMenuAktif(menuParam);
-      }
-      // Bersihkan query param agar jika di-refresh tidak terus membuka menu tersebut
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-  }, [navigate]);
+  }, [navigate, fetchProfile]);
 
   // Efek untuk memantau pesan real-time dari Service Worker PWA
   useEffect(() => {
