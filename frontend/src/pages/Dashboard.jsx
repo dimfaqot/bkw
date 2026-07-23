@@ -3957,7 +3957,7 @@ const Dashboard = () => {
       const m = g.menus.find(x => x.url === menuAktif);
       if (m) currentMenu = m;
     });
- 
+
     if (currentMenu) {
       if (currentMenu.grup) {
         setOpenAccordion(currentMenu.grup);
@@ -3986,7 +3986,14 @@ const Dashboard = () => {
       setFilterTahunPoin('');
       setFilterUsahaGlobal('');
     }
-  }, [menuAktif, menuGroups, filterTanggalPos]);
+  }, [menuAktif, menuGroups]);
+
+  // Memuat ulang riwayat transaksi saat filter tanggal berubah (tanpa reload katalog produk/jasa)
+  useEffect(() => {
+    if (menuAktif === 'kasir' || menuAktif === 'hutang') {
+      fetchRiwayatTransaksi(filterTanggalPos);
+    }
+  }, [filterTanggalPos]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
