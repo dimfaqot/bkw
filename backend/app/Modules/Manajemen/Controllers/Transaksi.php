@@ -1382,18 +1382,22 @@ class Transaksi extends ResourceController
                         }
                     }
                 }
-            } else if ($al['status_penggunaan'] === 'selesai_menunggu_pembayaran') {
-                // Auto-heal 'selesai_menunggu_pembayaran' ke 'tersedia' agar meja bebas & tombol Tambah Waktu muncul
-                $db->table('iot_alokasi')->where('id', $al['id'])->update([
-                    'status_penggunaan'    => 'tersedia',
-                    'transaksi_aktif_id'   => null,
-                    'prepaid_durasi_menit' => null,
-                    'waktu_mulai'          => null,
-                    'warning_sent'         => 0,
-                    'updated_at'           => date('Y-m-d H:i:s')
-                ]);
-                $device['status_penggunaan'] = 'tersedia';
-                $device['transaksi_aktif_id'] = null;
+            }
+
+            // Bebaskan/normalisasi status_penggunaan jika meja tidak dalam kondisi 'dipakai' (misal "" atau "selesai_menunggu_pembayaran")
+            if (empty($device['status_penggunaan']) || $device['status_penggunaan'] !== 'dipakai') {
+                if ($device['status_penggunaan'] !== 'tersedia') {
+                    $db->table('iot_alokasi')->where('id', $al['id'])->update([
+                        'status_penggunaan'    => 'tersedia',
+                        'transaksi_aktif_id'   => null,
+                        'prepaid_durasi_menit' => null,
+                        'waktu_mulai'          => null,
+                        'warning_sent'         => 0,
+                        'updated_at'           => date('Y-m-d H:i:s')
+                    ]);
+                    $device['status_penggunaan'] = 'tersedia';
+                    $device['transaksi_aktif_id'] = null;
+                }
             }
 
             // Jika status penggunaan meja saat ini adalah 'tersedia' (kosong), cari transaksi belum lunas (hutang) terakhir
@@ -1404,7 +1408,7 @@ class Transaksi extends ResourceController
 
                 // Query transaksi belum lunas yang memiliki item meja ini
                 $txQuery = $db->table('transaksi_detail td')
-                              ->select('t.id as transaksi_id, t.nomor_invoice, COALESCE(NULLIF(p.nama, ""), NULLIF(t.catatan, ""), "Pelanggan") as nama_pelanggan, p.wa as wa_pelanggan')
+                              ->select('t.id as transaksi_id, t.nomor_invoice, COALESCE(NULLIF(p.nama, ""), "Pelanggan") as nama_pelanggan, p.wa as wa_pelanggan')
                               ->join('transaksi t', 't.id = td.transaksi_id')
                               ->join('produk_jasa pj', 'pj.id = td.produk_id', 'left')
                               ->join('users p', 'p.id = t.pelanggan_id', 'left')
@@ -1416,7 +1420,11 @@ class Transaksi extends ResourceController
                                 ->where('pj.iot_id', $iotId)
                                 ->orWhere('pj.iot_id', $alokasiId)
                                 ->orWhere("pj.nama_produk LIKE '%{$escapedName}%'")
-                                ->orWhere("td.catatan LIKE '%{$escapedName}%'")
+                            ->groupEnd();
+                } else {
+                    $txQuery->groupStart()
+                                ->where('pj.iot_id', $iotId)
+                                ->orWhere('pj.iot_id', $alokasiId)
                             ->groupEnd();
                 }
 
