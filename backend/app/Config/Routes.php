@@ -99,7 +99,7 @@ $routes->group('api/transaksi', ['filter' => 'jwt'], function($routes) {
 
 // Rute Transaksi Publik (tanpa JWT filter untuk Nota digital Opsi B)
 $routes->group('api/transaksi-publik', function($routes) {
-    $routes->get('detail/(:num)', '\App\Modules\Manajemen\Controllers\Transaksi::publikDetail/$1');
+    $routes->get('detail/(:any)', '\App\Modules\Manajemen\Controllers\Transaksi::publikDetail/$1');
 });
 
 // Menangani request preflight OPTIONS secara global untuk CORS
