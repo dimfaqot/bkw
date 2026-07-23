@@ -110,10 +110,12 @@ class Transaksi extends ResourceController
         $nomorInvoice = $prefix . $nextNo;
 
         $now = date('Y-m-d H:i:s');
+        $publicToken = bin2hex(random_bytes(16));
         $transaksiData = [
             'usaha_id'           => $usahaId,
             'unit_id'            => $unitId,
             'nomor_invoice'      => $nomorInvoice,
+            'public_token'       => $publicToken,
             'kasir_id'           => $kasirId,
             'pelanggan_id'       => $pelangganId,
             'total_harga'        => 0.00, // dihitung ulang
@@ -445,18 +447,24 @@ class Transaksi extends ResourceController
     }
 
     // GET /api/transaksi-publik/detail/:id (Bypass JWT)
-    public function publikDetail($id)
+    public function publikDetail($identifier)
     {
         $db = \Config\Database::connect();
 
-        $tx = $db->table('transaksi t')
-                 ->select('t.*, k.nama as nama_kasir, p.nama as nama_pelanggan, p.wa as wa_pelanggan, u.nama_usaha, un.nama_unit')
-                 ->join('users k', 'k.id = t.kasir_id', 'left')
-                 ->join('users p', 'p.id = t.pelanggan_id', 'left')
-                 ->join('usaha u', 'u.id = t.usaha_id', 'left')
-                 ->join('unit un', 'un.id = t.unit_id', 'left')
-                 ->where('t.id', $id)
-                 ->get()->getRowArray();
+        $builder = $db->table('transaksi t')
+                     ->select('t.*, k.nama as nama_kasir, p.nama as nama_pelanggan, p.wa as wa_pelanggan, u.nama_usaha, un.nama_unit')
+                     ->join('users k', 'k.id = t.kasir_id', 'left')
+                     ->join('users p', 'p.id = t.pelanggan_id', 'left')
+                     ->join('usaha u', 'u.id = t.usaha_id', 'left')
+                     ->join('unit un', 'un.id = t.unit_id', 'left');
+
+        if (is_numeric($identifier) && strlen((string)$identifier) < 10) {
+            $builder->where('t.id', $identifier);
+        } else {
+            $builder->where('t.public_token', $identifier);
+        }
+
+        $tx = $builder->get()->getRowArray();
 
         if (!$tx) {
             return $this->respond(['status' => 'gagal', 'pesan' => 'Transaksi tidak ditemukan.'], 404);
@@ -466,7 +474,7 @@ class Transaksi extends ResourceController
                            ->select('td.*, p.nama_produk, p.satuan, p.tipe, p.iot_id, u.nama as nama_petugas')
                            ->join('produk_jasa p', 'p.id = td.produk_id', 'left')
                            ->join('users u', 'u.id = td.petugas_id', 'left')
-                           ->where('td.transaksi_id', $id)
+                           ->where('td.transaksi_id', $tx['id'])
                            ->get()->getResultArray();
 
         return $this->respond([

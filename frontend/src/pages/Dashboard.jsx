@@ -11624,7 +11624,7 @@ const Dashboard = () => {
                           let clean = selectedTransaksi.wa_pelanggan.replace(/[^0-9]/g, '');
                           return clean.startsWith('0') ? '62' + clean.slice(1) : clean;
                         })()}?text=${encodeURIComponent(
-                          `Halo ${selectedTransaksi.nama_pelanggan},\nKami dari BKW ingin mengingatkan mengenai tagihan belanja Anda sebesar ${formatRupiah(selectedTransaksi.total_harga)} (Nomor Invoice: ${selectedTransaksi.nomor_invoice}) yang saat ini berstatus belum lunas.\n\nAnda dapat melihat detail nota digital Anda melalui tautan berikut:\nhttp://localhost:5173/nota/${selectedTransaksi.id}\n\nTerima kasih atas kerja samanya.`
+                          `Halo ${selectedTransaksi.nama_pelanggan},\nKami dari BKW ingin mengingatkan mengenai tagihan belanja Anda sebesar ${formatRupiah(selectedTransaksi.total_harga)} (Nomor Invoice: ${selectedTransaksi.nomor_invoice}) yang saat ini berstatus belum lunas.\n\nAnda dapat melihat detail nota digital Anda melalui tautan berikut:\nhttp://localhost:5173/nota/${selectedTransaksi.public_token || selectedTransaksi.id}\n\nTerima kasih atas kerja samanya.`
                         )}`}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -11642,7 +11642,7 @@ const Dashboard = () => {
                 {/* Cetak Struk */}
                 <button
                   type="button"
-                  onClick={() => window.open(`http://localhost:5173/nota/${selectedTransaksi.id}`, '_blank')}
+                  onClick={() => window.open(`http://localhost:5173/nota/${selectedTransaksi.public_token || selectedTransaksi.id}`, '_blank')}
                   className="tombol-premium border-0 w-100 text-center py-2.5 small d-flex align-items-center justify-content-center gap-2"
                   style={{ fontSize: '0.78rem', borderRadius: '10px' }}
                 >
@@ -11656,7 +11656,7 @@ const Dashboard = () => {
                       let clean = selectedTransaksi.wa_pelanggan.replace(/[^0-9]/g, '');
                       return clean.startsWith('0') ? '62' + clean.slice(1) : clean;
                     })()}?text=${encodeURIComponent(
-                      `Halo ${selectedTransaksi.nama_pelanggan},\nTerima kasih telah berbelanja di BKW!\n\nBerikut adalah tautan nota digital resmi untuk transaksi belanja Anda (Nomor Invoice: ${selectedTransaksi.nomor_invoice}) sebesar ${formatRupiah(selectedTransaksi.total_harga)}:\nhttp://localhost:5173/nota/${selectedTransaksi.id}\n\nSemoga hari Anda menyenangkan!`
+                      `Halo ${selectedTransaksi.nama_pelanggan},\nTerima kasih telah berbelanja di BKW!\n\nBerikut adalah tautan nota digital resmi untuk transaksi belanja Anda (Nomor Invoice: ${selectedTransaksi.nomor_invoice}) sebesar ${formatRupiah(selectedTransaksi.total_harga)}:\nhttp://localhost:5173/nota/${selectedTransaksi.public_token || selectedTransaksi.id}\n\nSemoga hari Anda menyenangkan!`
                     )}`}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -11690,7 +11690,7 @@ const Dashboard = () => {
                             return;
                           }
                           window.open(`https://wa.me/${cleanWa}?text=${encodeURIComponent(
-                            `Halo,\nTerima kasih telah berbelanja di BKW!\n\nBerikut adalah tautan nota digital resmi untuk transaksi belanja Anda (Nomor Invoice: ${selectedTransaksi.nomor_invoice}) sebesar ${formatRupiah(selectedTransaksi.total_harga)}:\nhttp://localhost:5173/nota/${selectedTransaksi.id}\n\nSemoga hari Anda menyenangkan!`
+                            `Halo,\nTerima kasih telah berbelanja di BKW!\n\nBerikut adalah tautan nota digital resmi untuk transaksi belanja Anda (Nomor Invoice: ${selectedTransaksi.nomor_invoice}) sebesar ${formatRupiah(selectedTransaksi.total_harga)}:\nhttp://localhost:5173/nota/${selectedTransaksi.public_token || selectedTransaksi.id}\n\nSemoga hari Anda menyenangkan!`
                           )}`, '_blank');
                         }}
                         className="tombol-sekunder-premium border-0 py-1.5 px-3 small d-flex align-items-center justify-content-center gap-1.5"
