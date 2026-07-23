@@ -4038,6 +4038,51 @@ const Dashboard = () => {
     }
   };
 
+  // Web Audio API & Alarm Ref untuk Notifikasi Suara 5 Menit & Habis Waktu Billiard
+  const audioCtxRef = useRef(null);
+  const alarmIntervalRef = useRef(null);
+  const alerted5MinRef = useRef({});
+  const alertedFinishedRef = useRef({});
+  const prevDevicesStateRef = useRef({});
+
+  const startAlarmSound = () => {
+    try {
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtxRef.current.state === 'suspended') {
+        audioCtxRef.current.resume();
+      }
+      if (alarmIntervalRef.current) clearInterval(alarmIntervalRef.current);
+
+      const playBeep = () => {
+        if (!audioCtxRef.current) return;
+        const osc = audioCtxRef.current.createOscillator();
+        const gain = audioCtxRef.current.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, audioCtxRef.current.currentTime);
+        gain.gain.setValueAtTime(0.35, audioCtxRef.current.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtxRef.current.currentTime + 0.4);
+        osc.connect(gain);
+        gain.connect(audioCtxRef.current.destination);
+        osc.start();
+        osc.stop(audioCtxRef.current.currentTime + 0.4);
+      };
+
+      playBeep();
+      alarmIntervalRef.current = setInterval(playBeep, 750);
+    } catch (err) {
+      console.error("Gagal memutar suara alarm:", err);
+    }
+  };
+
+  const stopAlarmSound = () => {
+    if (alarmIntervalRef.current) {
+      clearInterval(alarmIntervalRef.current);
+      alarmIntervalRef.current = null;
+    }
+  };
+
   const fetchBilliardStatus = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -4047,7 +4092,55 @@ const Dashboard = () => {
       });
       const json = await r.json();
       if (r.ok && json.status === 'sukses') {
-        setBilliardDevices(json.data || []);
+        const newList = json.data || [];
+        setBilliardDevices(newList);
+
+        // Periksa peringatan 5 menit & waktu habis
+        newList.forEach(dev => {
+          const iotId = dev.iot_id;
+          const txId = dev.transaksi_aktif_id || 'no_tx';
+          const alertKey = `${iotId}_${txId}`;
+
+          // 1. Peringatan 5 Menit Sesi Regular
+          if (
+            dev.status_penggunaan === 'dipakai' &&
+            Number(dev.prepaid_durasi_menit || 0) > 0 &&
+            Number(dev.sisa_detik || 0) > 0 &&
+            Number(dev.sisa_detik || 0) <= 300 &&
+            !alerted5MinRef.current[alertKey]
+          ) {
+            alerted5MinRef.current[alertKey] = true;
+            startAlarmSound();
+            ui.notif(
+              'konfirmasi',
+              `⚠️ PERINGATAN MEJA (Sisa 5 Menit)!\n\nWaktu bermain Sesi Regular ${dev.nama_perangkat} menyisakan ${Math.ceil(dev.sisa_detik / 60)} menit lagi!`
+            ).then(() => {
+              stopAlarmSound();
+            });
+          }
+
+          // 2. Peringatan Waktu Habis Sesi Regular (Auto-Stop)
+          const prevDev = prevDevicesStateRef.current[iotId];
+          if (
+            prevDev &&
+            prevDev.status_penggunaan === 'dipakai' &&
+            Number(prevDev.prepaid_durasi_menit || 0) > 0 &&
+            dev.status_penggunaan === 'tersedia' &&
+            !alertedFinishedRef.current[`${iotId}_${prevDev.transaksi_aktif_id}`]
+          ) {
+            alertedFinishedRef.current[`${iotId}_${prevDev.transaksi_aktif_id}`] = true;
+            startAlarmSound();
+            ui.notif(
+              'konfirmasi',
+              `🔔 WAKTU BERMAIN HABIS!\n\nWaktu bermain Sesi Regular ${dev.nama_perangkat} telah HABIS! Lampu otomatis dimatikan.`
+            ).then(() => {
+              stopAlarmSound();
+            });
+          }
+
+          // Simpan status terkini untuk komparasi siklus berikutnya
+          prevDevicesStateRef.current[iotId] = { ...dev };
+        });
       }
     } catch (err) {
       console.error(err);
