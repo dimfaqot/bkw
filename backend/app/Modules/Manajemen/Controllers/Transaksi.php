@@ -346,8 +346,7 @@ class Transaksi extends ResourceController
             }
 
             $builder->groupStart()
-                        ->where('t.status_pembayaran', 'belum_bayar')
-                        ->orGroupStart()
+                        ->groupStart()
                             ->where('t.created_at >=', $A)
                             ->where('t.created_at <=', $akhir)
                         ->groupEnd()

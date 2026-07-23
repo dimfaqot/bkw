@@ -11419,73 +11419,92 @@ const Dashboard = () => {
                         )}
                       </div>
                     ) : (
-                      <>
-                        <div className="alert alert-warning py-2 px-3 small mb-3 border-0" style={{ borderRadius: '8px', color: '#fbbf24', backgroundColor: 'rgba(251,191,36,0.06)' }}>
-                          ⚠️ Transaksi ini berada di luar siklus berjalan dan telah bersifat <strong>FINAL</strong> sebagai hutang. Item pesanan tidak dapat diubah kembali, namun pelunasan tagihan dapat dilakukan di bawah ini.
+                      menuAktif === 'kasir' ? (
+                        <div className="p-3 mb-4 rounded-3 text-center" style={{ border: '1px solid rgba(239,68,68,0.2)', backgroundColor: 'rgba(239,68,68,0.04)' }}>
+                          <div className="alert alert-warning py-2 px-3 small mb-3 border-0 text-start" style={{ borderRadius: '8px', color: '#fbbf24', backgroundColor: 'rgba(251,191,36,0.06)', fontSize: '0.75rem' }}>
+                            ⏱️ Transaksi ini dibuat pada <strong>siklus kadaluarsa</strong>. Pelunasan transaksi kadaluarsa tidak dapat dilakukan melalui Kasir POS, melainkan wajib melalui <strong>Menu Manajemen Hutang</strong>.
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowDetailNotaModal(false);
+                              setMenuAktif('hutang');
+                            }}
+                            className="tombol-premium border-0 w-100 py-2 small text-center text-white"
+                            style={{ fontSize: '0.78rem', borderRadius: '8px', backgroundColor: 'var(--warna-utama)' }}
+                          >
+                            📋 Buka di Menu Hutang Pelanggan untuk Pelunasan
+                          </button>
                         </div>
+                      ) : (
+                        <>
+                          <div className="alert alert-warning py-2 px-3 small mb-3 border-0" style={{ borderRadius: '8px', color: '#fbbf24', backgroundColor: 'rgba(251,191,36,0.06)' }}>
+                            ⚠️ Transaksi ini berada di luar siklus berjalan dan telah bersifat <strong>FINAL</strong> sebagai hutang. Item pesanan tidak dapat diubah kembali, namun pelunasan tagihan dapat dilakukan di bawah ini.
+                          </div>
 
-                        {/* Pelunasan Panel Khusus Transaksi Kadaluarsa di Hutang */}
-                        <div className="p-3 mb-4 rounded-3" style={{ border: '1px solid var(--warna-border)', backgroundColor: 'rgba(255,255,255,0.02)' }}>
-                          <label className="text-muted small mb-2 d-block fw-semibold" style={{ fontSize: '0.78rem' }}>Pilih Metode Pelunasan Tagihan Kadaluarsa:</label>
-                          <div className="d-flex flex-column gap-2">
-                            <div className="d-flex gap-1.5 p-1 rounded-3" style={{ backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid var(--warna-border)' }}>
+                          {/* Pelunasan Panel Khusus Transaksi Kadaluarsa di Hutang */}
+                          <div className="p-3 mb-4 rounded-3" style={{ border: '1px solid var(--warna-border)', backgroundColor: 'rgba(255,255,255,0.02)' }}>
+                            <label className="text-muted small mb-2 d-block fw-semibold" style={{ fontSize: '0.78rem' }}>Pilih Metode Pelunasan Tagihan Kadaluarsa:</label>
+                            <div className="d-flex flex-column gap-2">
+                              <div className="d-flex gap-1.5 p-1 rounded-3" style={{ backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid var(--warna-border)' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => setMetodePelunasanHutang('cash')}
+                                  className="border-0 flex-fill py-1.5 px-2 small text-center"
+                                  style={{
+                                    fontSize: '0.74rem',
+                                    borderRadius: '6px',
+                                    backgroundColor: metodePelunasanHutang === 'cash' ? 'var(--warna-utama, #6366f1)' : 'transparent',
+                                    color: metodePelunasanHutang === 'cash' ? '#fff' : 'var(--teks-redup, #94a3b8)',
+                                    fontWeight: 600,
+                                    transition: 'all 0.2s'
+                                  }}
+                                >
+                                  💵 Cash
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setMetodePelunasanHutang('qris')}
+                                  className="border-0 flex-fill py-1.5 px-2 small text-center"
+                                  style={{
+                                    fontSize: '0.74rem',
+                                    borderRadius: '6px',
+                                    backgroundColor: metodePelunasanHutang === 'qris' ? 'var(--warna-utama, #6366f1)' : 'transparent',
+                                    color: metodePelunasanHutang === 'qris' ? '#fff' : 'var(--teks-redup, #94a3b8)',
+                                    fontWeight: 600,
+                                    transition: 'all 0.2s'
+                                  }}
+                                >
+                                  📱 QRIS
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setMetodePelunasanHutang('tap')}
+                                  className="border-0 flex-fill py-1.5 px-2 small text-center"
+                                  style={{
+                                    fontSize: '0.74rem',
+                                    borderRadius: '6px',
+                                    backgroundColor: metodePelunasanHutang === 'tap' ? 'var(--warna-utama, #6366f1)' : 'transparent',
+                                    color: metodePelunasanHutang === 'tap' ? '#fff' : 'var(--teks-redup, #94a3b8)',
+                                    fontWeight: 600,
+                                    transition: 'all 0.2s'
+                                  }}
+                                >
+                                  🔲 Tap
+                                </button>
+                              </div>
                               <button
                                 type="button"
-                                onClick={() => setMetodePelunasanHutang('cash')}
-                                className="border-0 flex-fill py-1.5 px-2 small text-center"
-                                style={{
-                                  fontSize: '0.74rem',
-                                  borderRadius: '6px',
-                                  backgroundColor: metodePelunasanHutang === 'cash' ? 'var(--warna-utama, #6366f1)' : 'transparent',
-                                  color: metodePelunasanHutang === 'cash' ? '#fff' : 'var(--teks-redup, #94a3b8)',
-                                  fontWeight: 600,
-                                  transition: 'all 0.2s'
-                                }}
+                                onClick={bayarLunasHutang}
+                                className="tombol-premium border-0 w-100 py-2 small text-center mt-1 text-white"
+                                style={{ fontSize: '0.78rem', borderRadius: '8px', backgroundColor: 'var(--bs-success)' }}
                               >
-                                💵 Cash
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setMetodePelunasanHutang('qris')}
-                                className="border-0 flex-fill py-1.5 px-2 small text-center"
-                                style={{
-                                  fontSize: '0.74rem',
-                                  borderRadius: '6px',
-                                  backgroundColor: metodePelunasanHutang === 'qris' ? 'var(--warna-utama, #6366f1)' : 'transparent',
-                                  color: metodePelunasanHutang === 'qris' ? '#fff' : 'var(--teks-redup, #94a3b8)',
-                                  fontWeight: 600,
-                                  transition: 'all 0.2s'
-                                }}
-                              >
-                                📱 QRIS
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setMetodePelunasanHutang('tap')}
-                                className="border-0 flex-fill py-1.5 px-2 small text-center"
-                                style={{
-                                  fontSize: '0.74rem',
-                                  borderRadius: '6px',
-                                  backgroundColor: metodePelunasanHutang === 'tap' ? 'var(--warna-utama, #6366f1)' : 'transparent',
-                                  color: metodePelunasanHutang === 'tap' ? '#fff' : 'var(--teks-redup, #94a3b8)',
-                                  fontWeight: 600,
-                                  transition: 'all 0.2s'
-                                }}
-                              >
-                                🔲 Tap
+                                💰 Pelunasan Hutang Kadaluarsa ({formatRupiah(selectedTransaksi.total_harga)})
                               </button>
                             </div>
-                            <button
-                              type="button"
-                              onClick={bayarLunasHutang}
-                              className="tombol-premium border-0 w-100 py-2 small text-center mt-1 text-white"
-                              style={{ fontSize: '0.78rem', borderRadius: '8px', backgroundColor: 'var(--bs-success)' }}
-                            >
-                              💰 Pelunasan Hutang Kadaluarsa ({formatRupiah(selectedTransaksi.total_harga)})
-                            </button>
                           </div>
-                        </div>
-                      </>
+                        </>
+                      )
                     )}
 
                     {/* WA Penagihan link */}
