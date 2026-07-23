@@ -1687,6 +1687,215 @@ class Transaksi extends ResourceController
         return $this->respond(['status' => 'sukses', 'pesan' => "Durasi sewa berhasil ditambah $tambahanMenit menit & lampu dinyalakan kembali."]);
     }
 
+    public function konversiRegularKeOpen()
+    {
+        $penggunaAktif = \App\Modules\Auth\Filters\JWTFilter::getPenggunaAktif();
+        if (!$penggunaAktif) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Token tidak valid.'], 401);
+        }
+        $usahaId = $penggunaAktif['usaha_id'];
+
+        $input = $this->request->getJSON(true) ?: $this->request->getPost();
+        $alokasiId = $input['iot_alokasi_id'] ?? null;
+
+        if (!$alokasiId) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'ID alokasi wajib diisi.'], 400);
+        }
+
+        $db = \Config\Database::connect();
+        $alokasi = $db->table('iot_alokasi')->where('id', $alokasiId)->where('usaha_id', $usahaId)->get()->getRow();
+        if (!$alokasi || $alokasi->status_penggunaan !== 'dipakai') {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Alokasi meja aktif tidak ditemukan.'], 404);
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $db->transStart();
+
+        // 1. Ubah prepaid_durasi_menit di iot_alokasi menjadi null (mode Open Billing)
+        $db->table('iot_alokasi')->where('id', $alokasiId)->update([
+            'status_relay'         => 1,
+            'status_penggunaan'    => 'dipakai',
+            'prepaid_durasi_menit' => null,
+            'warning_sent'         => 0,
+            'updated_at'           => $now
+        ]);
+
+        $device = $db->table('iot')->where('id', $alokasi->iot_id)->get()->getRow();
+        if ($device && $device->ip_address) {
+            $this->kirimSinyalRelay($device->ip_address, 'on');
+        }
+
+        // 2. Reset qty & durasi item sewa meja pada transaksi ini agar dihitung murni sebagai Open Billing berjalan dari jam_mulai
+        if ($alokasi->transaksi_aktif_id) {
+            $namaPerangkat = trim($device->nama_perangkat ?? '');
+            $detail = $db->table('transaksi_detail td')
+                         ->select('td.*')
+                         ->join('produk_jasa pj', 'pj.id = td.produk_id', 'left')
+                         ->where('td.transaksi_id', $alokasi->transaksi_aktif_id)
+                         ->groupStart()
+                             ->where('pj.iot_id', $alokasi->iot_id)
+                             ->orWhere('pj.iot_id', $alokasi->id)
+                             ->orWhere("pj.nama_produk LIKE '%{$namaPerangkat}%'")
+                         ->groupEnd()
+                         ->get()->getRow();
+
+            if ($detail) {
+                $db->table('transaksi_detail')->where('id', $detail->id)->update([
+                    'qty'          => 0.00,
+                    'durasi_menit' => 0,
+                    'subtotal'     => 0.00,
+                    'updated_at'   => $now
+                ]);
+
+                // Recalculate invoice total
+                $detailSum = $db->table('transaksi_detail')->where('transaksi_id', $alokasi->transaksi_aktif_id)->selectSum('subtotal')->get()->getRow();
+                $db->table('transaksi')->where('id', $alokasi->transaksi_aktif_id)->update([
+                    'total_harga' => (float)($detailSum->subtotal ?? 0.00),
+                    'updated_at'  => $now
+                ]);
+            }
+        }
+
+        $db->transComplete();
+
+        if ($db->transStatus() === false) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Gagal konversi ke Open Billing.'], 500);
+        }
+
+        return $this->respond(['status' => 'sukses', 'pesan' => 'Sesi berhasil dikonversi ke Open Billing. Biaya berjalan real-time sejak jam awal masuk.']);
+    }
+
+    public function konversiOpenKeRegular()
+    {
+        $penggunaAktif = \App\Modules\Auth\Filters\JWTFilter::getPenggunaAktif();
+        if (!$penggunaAktif) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Token tidak valid.'], 401);
+        }
+        $usahaId = $penggunaAktif['usaha_id'];
+
+        $input = $this->request->getJSON(true) ?: $this->request->getPost();
+        $alokasiId = $input['iot_alokasi_id'] ?? null;
+        $durasiMenit = isset($input['durasi_menit']) ? (int)$input['durasi_menit'] : 60;
+        $produkIdInput = $input['produk_id'] ?? null;
+
+        if (!$alokasiId || $durasiMenit <= 0) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'ID alokasi dan durasi regular wajib diisi.'], 400);
+        }
+
+        $db = \Config\Database::connect();
+        $alokasi = $db->table('iot_alokasi')->where('id', $alokasiId)->where('usaha_id', $usahaId)->get()->getRow();
+        if (!$alokasi || $alokasi->status_penggunaan !== 'dipakai') {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Alokasi meja aktif tidak ditemukan.'], 404);
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $transaksiId = $alokasi->transaksi_aktif_id;
+        if (!$transaksiId) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Sesi transaksi aktif tidak ditemukan.'], 400);
+        }
+
+        $db->transStart();
+
+        $device = $db->table('iot')->where('id', $alokasi->iot_id)->get()->getRow();
+        $namaPerangkat = trim($device->nama_perangkat ?? '');
+
+        // 1. Finalkan Sesi Open berjalan saat ini
+        $startTime = strtotime($alokasi->waktu_mulai ?: $now);
+        $elapsedSeconds = max(0, time() - $startTime);
+        $elapsedMenit = (int)ceil($elapsedSeconds / 60);
+        if ($elapsedMenit < 1) $elapsedMenit = 1;
+
+        $openDetail = $db->table('transaksi_detail td')
+                         ->select('td.*, pj.harga_jual as produk_harga_jual')
+                         ->join('produk_jasa pj', 'pj.id = td.produk_id', 'left')
+                         ->where('td.transaksi_id', $transaksiId)
+                         ->groupStart()
+                             ->where('pj.iot_id', $alokasi->iot_id)
+                             ->orWhere('pj.iot_id', $alokasi->id)
+                             ->orWhere("pj.nama_produk LIKE '%{$namaPerangkat}%'")
+                         ->groupEnd()
+                         ->get()->getRow();
+
+        if ($openDetail) {
+            $hargaSatuanOpen = (float)($openDetail->harga_satuan > 0 ? $openDetail->harga_satuan : $openDetail->produk_harga_jual);
+            if ($hargaSatuanOpen <= 0) $hargaSatuanOpen = 25000;
+            $subtotalMentah = $elapsedMenit * ($hargaSatuanOpen / 60);
+            $subtotalOpen = ceil($subtotalMentah / 500) * 500;
+            $qtyOpen = round($elapsedMenit / 60, 2);
+
+            $db->table('transaksi_detail')->where('id', $openDetail->id)->update([
+                'qty'               => $qtyOpen,
+                'durasi_menit'      => $elapsedMenit,
+                'subtotal'          => $subtotalOpen,
+                'status_pengerjaan' => 'Selesai',
+                'catatan'           => "Sesi Open Selesai ({$elapsedMenit}m)",
+                'updated_at'        => $now
+            ]);
+        }
+
+        // 2. Buat item transaksi_detail baru untuk Sesi Regular baru
+        $produkId = $produkIdInput ?: ($openDetail->produk_id ?? null);
+        if (!$produkId) {
+            $pj = $db->table('produk_jasa')->where('usaha_id', $usahaId)->where('iot_id', $alokasi->iot_id)->get()->getRow();
+            $produkId = $pj ? $pj->id : null;
+        }
+
+        $hargaRegular = 25000;
+        if ($produkId) {
+            $pjObj = $db->table('produk_jasa')->where('id', $produkId)->get()->getRow();
+            if ($pjObj && (float)$pjObj->harga_jual > 0) {
+                $hargaRegular = (float)$pjObj->harga_jual;
+            }
+        }
+
+        $qtyRegular = round($durasiMenit / 60, 2);
+        $subtotalRegular = $qtyRegular * $hargaRegular;
+
+        if ($produkId) {
+            $db->table('transaksi_detail')->insert([
+                'transaksi_id'      => $transaksiId,
+                'produk_id'         => $produkId,
+                'qty'               => $qtyRegular,
+                'harga_satuan'      => $hargaRegular,
+                'subtotal'          => $subtotalRegular,
+                'durasi_menit'      => $durasiMenit,
+                'status_pengerjaan' => 'Selesai',
+                'catatan'           => "Paket Regular Baru ({$durasiMenit}m)",
+                'created_at'        => $now,
+                'updated_at'        => $now
+            ]);
+        }
+
+        // 3. Update status alokasi meja ke Regular baru (timer hitung mundur mulai dari $now)
+        $db->table('iot_alokasi')->where('id', $alokasiId)->update([
+            'status_relay'         => 1,
+            'status_penggunaan'    => 'dipakai',
+            'prepaid_durasi_menit' => $durasiMenit,
+            'waktu_mulai'          => $now,
+            'warning_sent'         => 0,
+            'updated_at'           => $now
+        ]);
+
+        if ($device && $device->ip_address) {
+            $this->kirimSinyalRelay($device->ip_address, 'on');
+        }
+
+        // 4. Update total harga transaksi
+        $detailSum = $db->table('transaksi_detail')->where('transaksi_id', $transaksiId)->selectSum('subtotal')->get()->getRow();
+        $db->table('transaksi')->where('id', $transaksiId)->update([
+            'total_harga' => (float)($detailSum->subtotal ?? 0.00),
+            'updated_at'  => $now
+        ]);
+
+        $db->transComplete();
+
+        if ($db->transStatus() === false) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Gagal konversi ke Sesi Regular.'], 500);
+        }
+
+        return $this->respond(['status' => 'sukses', 'pesan' => "Sesi Open difinalkan ($elapsedMenit m) & Paket Regular Baru ($durasiMenit m) berhasil dimulai!"]);
+    }
+
     public function kedipBilliard()
     {
         $penggunaAktif = \App\Modules\Auth\Filters\JWTFilter::getPenggunaAktif();

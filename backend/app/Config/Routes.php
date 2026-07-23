@@ -93,6 +93,8 @@ $routes->group('api/transaksi', ['filter' => 'jwt'], function($routes) {
     $routes->post('billiard/mulai', '\App\Modules\Manajemen\Controllers\Transaksi::mulaiBilliard');
     $routes->post('billiard/stop', '\App\Modules\Manajemen\Controllers\Transaksi::stopBilliard');
     $routes->post('billiard/tambah-durasi', '\App\Modules\Manajemen\Controllers\Transaksi::tambahDurasiBilliard');
+    $routes->post('billiard/konversi-regular-ke-open', '\App\Modules\Manajemen\Controllers\Transaksi::konversiRegularKeOpen');
+    $routes->post('billiard/konversi-open-ke-regular', '\App\Modules\Manajemen\Controllers\Transaksi::konversiOpenKeRegular');
     $routes->post('billiard/kedip', '\App\Modules\Manajemen\Controllers\Transaksi::kedipBilliard');
     $routes->get('billiard/status', '\App\Modules\Manajemen\Controllers\Transaksi::statusBilliard');
 });

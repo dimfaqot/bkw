@@ -4277,6 +4277,127 @@ const Dashboard = () => {
     }
   };
 
+  const handleKonversiRegularKeOpen = (alokasi) => {
+    ui.modal({
+      title: `🔀 Konversi ke Open Billing - ${alokasi.nama_perangkat}`,
+      content: (
+        <div className="py-2">
+          <p className="small text-muted mb-3" style={{ fontSize: '0.78rem' }}>
+            Sesi Regular yang sedang berjalan akan dikonversi menjadi <strong>Sesi Open Billing</strong> (Play & Pay).
+          </p>
+          <div className="p-3 rounded-3 mb-3" style={{ backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid var(--warna-border)' }}>
+            <div className="d-flex justify-content-between small text-main mb-1">
+              <span>Perangkat:</span>
+              <strong className="text-warning">{alokasi.nama_perangkat}</strong>
+            </div>
+            <div className="d-flex justify-content-between small text-main mb-1">
+              <span>Durasi Berjalan Saat Ini:</span>
+              <strong>⏱️ {Math.max(1, Math.ceil((alokasi.durasi_berjalan_detik || 0) / 60))} Menit</strong>
+            </div>
+            <div className="d-flex justify-content-between small text-main">
+              <span>Tarif Selanjutnya:</span>
+              <strong className="text-success">Biaya Berjalan Real-Time</strong>
+            </div>
+          </div>
+          <div className="alert alert-info py-2 px-3 small mb-0 border-0" style={{ fontSize: '0.74rem', borderRadius: '8px' }}>
+            💡 Lampu meja akan tetap <strong>NYALA 🟢</strong> dan biaya dihitung per menit sejak jam masuk pertama.
+          </div>
+        </div>
+      ),
+      confirmText: '🚀 Ya, Konversi ke Open Billing',
+      confirmClass: 'tombol-premium',
+      onConfirm: async () => {
+        ui.loading(true, 'fullscreen', 'Mengonversi ke Open Billing...');
+        try {
+          const token = localStorage.getItem('token');
+          const res = await fetch(`${API_BASE_URL}/transaksi/billiard/konversi-regular-ke-open`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ iot_alokasi_id: alokasi.id })
+          });
+          const json = await res.json();
+          ui.loading(false);
+          if (res.ok && json.status === 'sukses') {
+            ui.notif('sukses', json.pesan || 'Sesi berhasil dikonversi ke Open Billing!');
+            fetchBilliardStatus();
+            fetchRiwayatTransaksi();
+          } else {
+            ui.notif('gagal', json.pesan || 'Gagal konversi ke Open Billing.');
+          }
+        } catch {
+          ui.loading(false);
+          ui.notif('gagal', 'Kesalahan koneksi internet.');
+        }
+      }
+    });
+  };
+
+  const handleKonversiOpenKeRegular = (alokasi, prod) => {
+    let selectedDurasi = 60;
+    ui.modal({
+      title: `🔀 Ganti Mode ke Regular - ${alokasi.nama_perangkat}`,
+      content: (
+        <div className="py-2">
+          <p className="small text-muted mb-3" style={{ fontSize: '0.78rem' }}>
+            Sesi Open yang sudah berjalan (<strong>⏱️ {Math.max(1, Math.ceil((alokasi.durasi_berjalan_detik || 0) / 60))} Menit</strong>) akan difinalkan di nota. Paket Regular baru akan dimulai sekarang.
+          </p>
+          <div className="mb-3">
+            <label className="form-label small text-main fw-semibold mb-1" style={{ fontSize: '0.78rem' }}>Pilih Durasi Paket Regular Baru:</label>
+            <select
+              className="form-select input-kustom small"
+              defaultValue={60}
+              onChange={(e) => { selectedDurasi = Number(e.target.value); }}
+              style={{ fontSize: '0.8rem', borderRadius: '8px' }}
+            >
+              <option value={60}>⏱️ 1 Jam (60 Menit)</option>
+              <option value={120}>⏱️ 2 Jam (120 Menit)</option>
+              <option value={180}>⏱️ 3 Jam (180 Menit)</option>
+              <option value={240}>⏱️ 4 Jam (240 Menit)</option>
+            </select>
+          </div>
+          <div className="alert alert-warning py-2 px-3 small mb-0 border-0" style={{ fontSize: '0.74rem', borderRadius: '8px' }}>
+            💡 Sesi Open 1 akan difinalkan di nota, dan Paket Regular baru akan hitung mundur dari jam sekarang.
+          </div>
+        </div>
+      ),
+      confirmText: '⏱️ Mulai Sesi Regular Baru',
+      confirmClass: 'tombol-premium',
+      onConfirm: async () => {
+        ui.loading(true, 'fullscreen', 'Mengonversi ke Paket Regular...');
+        try {
+          const token = localStorage.getItem('token');
+          const res = await fetch(`${API_BASE_URL}/transaksi/billiard/konversi-open-ke-regular`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              iot_alokasi_id: alokasi.id,
+              durasi_menit: Number(selectedDurasi),
+              produk_id: prod?.id
+            })
+          });
+          const json = await res.json();
+          ui.loading(false);
+          if (res.ok && json.status === 'sukses') {
+            ui.notif('sukses', json.pesan || 'Sesi berhasil dikonversi ke Regular!');
+            fetchBilliardStatus();
+            fetchRiwayatTransaksi();
+          } else {
+            ui.notif('gagal', json.pesan || 'Gagal konversi ke Regular.');
+          }
+        } catch {
+          ui.loading(false);
+          ui.notif('gagal', 'Kesalahan koneksi internet.');
+        }
+      }
+    });
+  };
+
   const bukaModalMulaiBilliard = (dev) => {
     const linkedProd = posProducts.find(p => Number(p.iot_id) === Number(dev.iot_id));
     let initialProdukId = linkedProd ? linkedProd.id : '';
@@ -7697,28 +7818,46 @@ const Dashboard = () => {
                                               {iotDev?.status_pembayaran === 'belum_bayar' && (
                                                 <button
                                                   onClick={() => bukaModalTambahDurasi(iotDev)}
-                                                  className="tombol-sekunder-premium border-0 flex-fill py-1 px-2"
-                                                  style={{ fontSize: '0.68rem', borderRadius: '8px' }}
+                                                  className="tombol-sekunder-premium border-0 flex-fill py-1 px-1.5"
+                                                  style={{ fontSize: '0.65rem', borderRadius: '8px' }}
                                                 >
                                                   ➕ Waktu
                                                 </button>
                                               )}
                                               <button
+                                                onClick={() => handleKonversiRegularKeOpen(iotDev)}
+                                                className="tombol-sekunder-premium border-0 flex-fill py-1 px-1.5 text-warning"
+                                                style={{ fontSize: '0.65rem', borderRadius: '8px', borderColor: 'rgba(255,193,7,0.3)' }}
+                                                title="Konversi Sesi Ini ke Open Billing Murni"
+                                              >
+                                                🔀 ke Open
+                                              </button>
+                                              <button
                                                 onClick={() => handleStopBilliard(iotDev)}
-                                                className="tombol-premium border-0 flex-fill py-1 px-2"
-                                                style={{ fontSize: '0.68rem', backgroundColor: 'var(--bs-danger)', borderColor: 'var(--bs-danger)' }}
+                                                className="tombol-premium border-0 flex-fill py-1 px-1.5"
+                                                style={{ fontSize: '0.65rem', backgroundColor: 'var(--bs-danger)', borderColor: 'var(--bs-danger)' }}
                                               >
                                                 🛑 Stop
                                               </button>
                                             </div>
                                           ) : isOpen ? (
-                                            <button
-                                              onClick={() => handleStopBilliard(iotDev)}
-                                              className="tombol-premium w-100 py-1 text-white"
-                                              style={{ fontSize: '0.68rem', backgroundColor: 'var(--bs-danger)', borderColor: 'var(--bs-danger)' }}
-                                            >
-                                              🛑 Stop
-                                            </button>
+                                            <div className="d-flex gap-1">
+                                              <button
+                                                onClick={() => handleKonversiOpenKeRegular(iotDev, prod)}
+                                                className="tombol-sekunder-premium border-0 flex-fill py-1 px-1.5 text-info"
+                                                style={{ fontSize: '0.65rem', borderRadius: '8px', borderColor: 'rgba(96,165,250,0.3)' }}
+                                                title="Ganti Mode ke Paket Regular Baru"
+                                              >
+                                                🔀 ke Regular
+                                              </button>
+                                              <button
+                                                onClick={() => handleStopBilliard(iotDev)}
+                                                className="tombol-premium border-0 flex-fill py-1 px-1.5 text-white"
+                                                style={{ fontSize: '0.65rem', backgroundColor: 'var(--bs-danger)', borderColor: 'var(--bs-danger)' }}
+                                              >
+                                                🛑 Stop
+                                              </button>
+                                            </div>
                                           ) : isWaitingPayment ? (
                                             <button
                                               className="tombol-premium w-100 py-1"
