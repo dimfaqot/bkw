@@ -1394,13 +1394,21 @@ class Transaksi extends ResourceController
                 }
             } else if ($al['status_penggunaan'] === 'tersedia') {
                 // Cari transaksi belum bayar (hutang) terbaru yang pernah menggunakan meja ini
+                $iotId = (int)$al['iot_id'];
+                $alokasiId = (int)$al['id'];
+                $namaPerangkat = $db->escapeLikeString($al['nama_perangkat'] ?? '');
+
                 $txQuery = $db->table('transaksi_detail td')
                               ->select('t.id as transaksi_id, t.nomor_invoice, COALESCE(p.nama, "Pelanggan") as nama_pelanggan, p.wa as wa_pelanggan')
                               ->join('transaksi t', 't.id = td.transaksi_id')
                               ->join('produk_jasa pj', 'pj.id = td.produk_id')
                               ->join('users p', 'p.id = t.pelanggan_id', 'left')
                               ->where('t.status_pembayaran', 'belum_bayar')
-                              ->where('pj.iot_id', $al['iot_id']);
+                              ->groupStart()
+                                  ->where('pj.iot_id', $iotId)
+                                  ->orWhere('pj.iot_id', $alokasiId)
+                                  ->orWhere("pj.nama_produk LIKE '%{$namaPerangkat}%'")
+                              ->groupEnd();
 
                 if (!empty($usahaId)) {
                     $txQuery->where('t.usaha_id', $usahaId);
