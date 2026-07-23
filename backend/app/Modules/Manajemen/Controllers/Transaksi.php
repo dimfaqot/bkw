@@ -1483,23 +1483,35 @@ class Transaksi extends ResourceController
         $now = date('Y-m-d H:i:s');
         $db->transStart();
 
-        $nomorInvoice = 'INV/BILLIARD/' . date('Ymd') . '/' . sprintf('%04d', rand(1, 9999));
-        
-        $db->table('transaksi')->insert([
-            'usaha_id'          => $usahaId,
-            'unit_id'           => $alokasi->unit_id,
-            'nomor_invoice'     => $nomorInvoice,
-            'kasir_id'          => $kasirId,
-            'pelanggan_id'      => null,
-            'total_harga'       => 0.00,
-            'uang_jaminan'      => 0.00,
-            'status_pembayaran' => 'belum_bayar',
-            'metode_pembayaran' => null,
-            'created_at'        => $now,
-            'updated_at'        => $now
-        ]);
+        $targetTxId = $input['transaksi_id'] ?? null;
+        $transaksiId = null;
+        $nomorInvoice = null;
 
-        $transaksiId = $db->insertID();
+        if ($targetTxId) {
+            $txObj = $db->table('transaksi')->where('id', $targetTxId)->where('usaha_id', $usahaId)->get()->getRow();
+            if ($txObj && $txObj->status_pembayaran === 'belum_bayar') {
+                $transaksiId = $txObj->id;
+                $nomorInvoice = $txObj->nomor_invoice;
+            }
+        }
+
+        if (!$transaksiId) {
+            $nomorInvoice = 'INV/BILLIARD/' . date('Ymd') . '/' . sprintf('%04d', rand(1, 9999));
+            $db->table('transaksi')->insert([
+                'usaha_id'          => $usahaId,
+                'unit_id'           => $alokasi->unit_id,
+                'nomor_invoice'     => $nomorInvoice,
+                'kasir_id'          => $kasirId,
+                'pelanggan_id'      => null,
+                'total_harga'       => 0.00,
+                'uang_jaminan'      => 0.00,
+                'status_pembayaran' => 'belum_bayar',
+                'metode_pembayaran' => null,
+                'created_at'        => $now,
+                'updated_at'        => $now
+            ]);
+            $transaksiId = $db->insertID();
+        }
 
         $qty = ($tipeBilling === 'regular') ? round($durasiMenit / 60, 2) : 0.00;
         $subtotal = $qty * (float)$produk->harga_jual;
