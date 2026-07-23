@@ -1394,16 +1394,19 @@ class Transaksi extends ResourceController
                 }
             } else if ($al['status_penggunaan'] === 'tersedia') {
                 // Cari transaksi belum bayar (hutang) terbaru yang pernah menggunakan meja ini
-                $lastUnpaidTx = $db->table('transaksi_detail td')
-                                   ->select('t.id as transaksi_id, t.nomor_invoice, p.nama as nama_pelanggan, p.wa as wa_pelanggan')
-                                   ->join('transaksi t', 't.id = td.transaksi_id')
-                                   ->join('produk_jasa pj', 'pj.id = td.produk_id')
-                                   ->join('users p', 'p.id = t.pelanggan_id', 'left')
-                                   ->where('t.usaha_id', $usahaId)
-                                   ->where('t.status_pembayaran', 'belum_bayar')
-                                   ->where('pj.iot_id', $al['iot_id'])
-                                   ->orderBy('t.id', 'DESC')
-                                   ->get()->getRowArray();
+                $txQuery = $db->table('transaksi_detail td')
+                              ->select('t.id as transaksi_id, t.nomor_invoice, COALESCE(p.nama, "Pelanggan") as nama_pelanggan, p.wa as wa_pelanggan')
+                              ->join('transaksi t', 't.id = td.transaksi_id')
+                              ->join('produk_jasa pj', 'pj.id = td.produk_id')
+                              ->join('users p', 'p.id = t.pelanggan_id', 'left')
+                              ->where('t.status_pembayaran', 'belum_bayar')
+                              ->where('pj.iot_id', $al['iot_id']);
+
+                if (!empty($usahaId)) {
+                    $txQuery->where('t.usaha_id', $usahaId);
+                }
+
+                $lastUnpaidTx = $txQuery->orderBy('t.id', 'DESC')->get()->getRowArray();
                 if ($lastUnpaidTx) {
                     $device['last_unpaid_tx'] = $lastUnpaidTx;
                 }
