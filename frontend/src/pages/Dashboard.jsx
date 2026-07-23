@@ -4422,7 +4422,10 @@ const Dashboard = () => {
     updateModal();
   };
 
+  const [loadingRiwayatTransaksi, setLoadingRiwayatTransaksi] = useState(false);
+
   const fetchRiwayatTransaksi = async (tgl = filterTanggalPos, targetUsahaId = null) => {
+    setLoadingRiwayatTransaksi(true);
     try {
       const token = localStorage.getItem('token');
       const usahaIdToUse = targetUsahaId !== null ? targetUsahaId : (filterUsahaHutang || (profile?.role === 'root' ? '' : profile?.usaha_id || ''));
@@ -4436,6 +4439,8 @@ const Dashboard = () => {
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      setLoadingRiwayatTransaksi(false);
     }
   };
 
@@ -8094,7 +8099,12 @@ const Dashboard = () => {
                           );
                         })()}
                         
-                        {riwayatTransaksi.length === 0 ? (
+                        {loadingRiwayatTransaksi ? (
+                          <div className="text-center py-4 my-2">
+                            <div className="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                            <span className="small text-muted" style={{ fontSize: '0.78rem' }}>Memuat data riwayat transaksi siklus...</span>
+                          </div>
+                        ) : riwayatTransaksi.length === 0 ? (
                           <div className="text-muted small py-3 italic text-center">Belum ada riwayat transaksi penjualan untuk cabang usaha ini.</div>
                         ) : (
                           (() => {
