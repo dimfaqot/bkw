@@ -7737,27 +7737,45 @@ const Dashboard = () => {
                                               >+</button>
                                             </div>
                                           ) : (
-                                            <div className="d-flex gap-1">
-                                              <button
-                                                onClick={() => tambahKeKeranjang(prod)}
-                                                className="tombol-premium border-0 flex-fill py-1 px-2 d-flex align-items-center justify-content-center gap-1"
-                                                style={{ fontSize: '0.72rem', borderRadius: '8px' }}
-                                                disabled={prod.is_stok_dikelola == 1 && prod.stok <= 0}
-                                                title="Sewa Regular (Prepaid Jam)"
-                                              >
-                                                <Plus size={12} />
-                                                <span>{prod.tipe === 'sewa' ? '⏱️ Regular' : 'Pilih'}</span>
-                                              </button>
-                                              {prod.tipe === 'sewa' && (
+                                            <div className="d-flex flex-column gap-1.5">
+                                              {iotDev?.last_unpaid_tx && (
                                                 <button
-                                                  onClick={() => tambahKeKeranjangOpen(prod)}
-                                                  className="tombol-sekunder-premium border-0 py-1 px-2"
-                                                  style={{ fontSize: '0.68rem', borderRadius: '8px' }}
-                                                  title="Mulai Sesi Open (Play & Pay)"
+                                                  onClick={() => {
+                                                    bukaModalTambahDurasi({
+                                                      ...iotDev,
+                                                      status_pembayaran: 'belum_bayar',
+                                                      transaksi_aktif_id: iotDev.last_unpaid_tx.transaksi_id
+                                                    });
+                                                  }}
+                                                  className="tombol-sekunder-premium border-0 w-100 py-1 px-2 d-flex align-items-center justify-content-center gap-1 text-warning mb-1"
+                                                  style={{ fontSize: '0.68rem', borderRadius: '8px', backgroundColor: 'rgba(234, 179, 8, 0.12)' }}
+                                                  title={`Perpanjang Sesi ${iotDev.last_unpaid_tx.nama_pelanggan || 'Pelanggan'} (${iotDev.last_unpaid_tx.nomor_invoice})`}
                                                 >
-                                                  🚀 Open
+                                                  <span>⏱️ Tambah Waktu ({iotDev.last_unpaid_tx.nama_pelanggan || 'Pelanggan'})</span>
                                                 </button>
                                               )}
+                                              <div className="d-flex gap-1">
+                                                <button
+                                                  onClick={() => tambahKeKeranjang(prod)}
+                                                  className="tombol-premium border-0 flex-fill py-1 px-2 d-flex align-items-center justify-content-center gap-1"
+                                                  style={{ fontSize: '0.72rem', borderRadius: '8px' }}
+                                                  disabled={prod.is_stok_dikelola == 1 && prod.stok <= 0}
+                                                  title="Sewa Regular (Prepaid Jam)"
+                                                >
+                                                  <Plus size={12} />
+                                                  <span>{prod.tipe === 'sewa' ? '⏱️ Regular' : 'Pilih'}</span>
+                                                </button>
+                                                {prod.tipe === 'sewa' && (
+                                                  <button
+                                                    onClick={() => tambahKeKeranjangOpen(prod)}
+                                                    className="tombol-sekunder-premium border-0 py-1 px-2"
+                                                    style={{ fontSize: '0.68rem', borderRadius: '8px' }}
+                                                    title="Mulai Sesi Open (Play & Pay)"
+                                                  >
+                                                    🚀 Open
+                                                  </button>
+                                                )}
+                                              </div>
                                             </div>
                                           )}
                                         </div>

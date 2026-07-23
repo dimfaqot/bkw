@@ -1392,6 +1392,21 @@ class Transaksi extends ResourceController
                         $device['durasi_berjalan_detik'] = (int)($detail->qty * 3600);
                     }
                 }
+            } else if ($al['status_penggunaan'] === 'tersedia') {
+                // Cari transaksi belum bayar (hutang) terbaru yang pernah menggunakan meja ini
+                $lastUnpaidTx = $db->table('transaksi_detail td')
+                                   ->select('t.id as transaksi_id, t.nomor_invoice, p.nama as nama_pelanggan, p.wa as wa_pelanggan')
+                                   ->join('transaksi t', 't.id = td.transaksi_id')
+                                   ->join('produk_jasa pj', 'pj.id = td.produk_id')
+                                   ->join('users p', 'p.id = t.pelanggan_id', 'left')
+                                   ->where('t.usaha_id', $usahaId)
+                                   ->where('t.status_pembayaran', 'belum_bayar')
+                                   ->where('pj.iot_id', $al['iot_id'])
+                                   ->orderBy('t.id', 'DESC')
+                                   ->get()->getRowArray();
+                if ($lastUnpaidTx) {
+                    $device['last_unpaid_tx'] = $lastUnpaidTx;
+                }
             }
 
             $updatedList[] = $device;
@@ -1514,12 +1529,12 @@ class Transaksi extends ResourceController
         if (!$penggunaAktif) {
             return $this->respond(['status' => 'gagal', 'pesan' => 'Token tidak valid.'], 401);
         }
-
         $usahaId = $penggunaAktif['usaha_id'];
 
         $input = $this->request->getJSON(true) ?: $this->request->getPost();
         $alokasiId = $input['iot_alokasi_id'] ?? null;
         $tambahanMenit = isset($input['tambahan_menit']) ? (int)$input['tambahan_menit'] : 0;
+        $targetTxId = isset($input['transaksi_id']) ? (int)$input['transaksi_id'] : null;
 
         if (!$alokasiId || $tambahanMenit <= 0) {
             return $this->respond(['status' => 'gagal', 'pesan' => 'ID alokasi dan tambahan durasi wajib diisi.'], 400);
@@ -1528,38 +1543,77 @@ class Transaksi extends ResourceController
         $db = \Config\Database::connect();
 
         $alokasi = $db->table('iot_alokasi')->where('id', $alokasiId)->where('usaha_id', $usahaId)->get()->getRow();
-        if (!$alokasi || $alokasi->status_penggunaan !== 'dipakai' || !$alokasi->prepaid_durasi_menit) {
-            return $this->respond(['status' => 'gagal', 'pesan' => 'Hanya sesi regular aktif yang dapat ditambahkan durasi.'], 400);
+        if (!$alokasi) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Alokasi meja tidak ditemukan.'], 404);
+        }
+
+        $transaksiId = $alokasi->transaksi_aktif_id ?: $targetTxId;
+        if (!$transaksiId && $alokasi->status_penggunaan === 'tersedia') {
+            // Cari transaksi belum bayar terakhir yang terikat dengan meja ini
+            $lastTx = $db->table('transaksi_detail td')
+                         ->select('t.id')
+                         ->join('transaksi t', 't.id = td.transaksi_id')
+                         ->join('produk_jasa pj', 'pj.id = td.produk_id')
+                         ->where('t.usaha_id', $usahaId)
+                         ->where('t.status_pembayaran', 'belum_bayar')
+                         ->where('pj.iot_id', $alokasi->iot_id)
+                         ->orderBy('t.id', 'DESC')
+                         ->get()->getRow();
+            if ($lastTx) {
+                $transaksiId = $lastTx->id;
+            }
+        }
+
+        if (!$transaksiId) {
+            return $this->respond(['status' => 'gagal', 'pesan' => 'Sesi transaksi tidak ditemukan untuk perpanjangan.'], 400);
         }
 
         $now = date('Y-m-d H:i:s');
         $db->transStart();
 
-        $durasiBaru = $alokasi->prepaid_durasi_menit + $tambahanMenit;
+        $currentPrepaid = (int)($alokasi->prepaid_durasi_menit ?? 0);
+        $durasiBaru = $currentPrepaid + $tambahanMenit;
+
         $db->table('iot_alokasi')->where('id', $alokasiId)->update([
+            'status_relay'         => 1,
+            'status_penggunaan'    => 'dipakai',
+            'transaksi_aktif_id'   => $transaksiId,
             'prepaid_durasi_menit' => $durasiBaru,
+            'waktu_mulai'          => $alokasi->waktu_mulai ?: $now,
             'warning_sent'         => 0,
             'updated_at'           => $now
         ]);
 
-        if ($alokasi->transaksi_aktif_id) {
-            $detail = $db->table('transaksi_detail')->where('transaksi_id', $alokasi->transaksi_aktif_id)->get()->getRow();
-            if ($detail) {
-                $qtyBaru = round($durasiBaru / 60, 2);
-                $subtotalBaru = $qtyBaru * (float)$detail->harga_satuan;
+        $device = $db->table('iot')->where('id', $alokasi->iot_id)->get()->getRow();
+        if ($device && $device->ip_address) {
+            $this->kirimSinyalRelay($device->ip_address, 'on');
+        }
 
-                $db->table('transaksi_detail')->where('id', $detail->id)->update([
-                    'qty'          => $qtyBaru,
-                    'durasi_menit' => $durasiBaru,
-                    'subtotal'     => $subtotalBaru,
-                    'updated_at'   => $now
-                ]);
+        $detail = $db->table('transaksi_detail td')
+                     ->select('td.*, pj.harga_jual as produk_harga_jual')
+                     ->join('produk_jasa pj', 'pj.id = td.produk_id')
+                     ->where('td.transaksi_id', $transaksiId)
+                     ->where('pj.iot_id', $alokasi->iot_id)
+                     ->get()->getRow();
 
-                $db->table('transaksi')->where('id', $alokasi->transaksi_aktif_id)->update([
-                    'total_harga' => $subtotalBaru,
-                    'updated_at'  => $now
-                ]);
-            }
+        if ($detail) {
+            $qtyBaru = round($durasiBaru / 60, 2);
+            $hargaSatuan = (float)($detail->harga_satuan > 0 ? $detail->harga_satuan : $detail->produk_harga_jual);
+            $subtotalBaru = $qtyBaru * $hargaSatuan;
+
+            $db->table('transaksi_detail')->where('id', $detail->id)->update([
+                'qty'          => $qtyBaru,
+                'durasi_menit' => $durasiBaru,
+                'subtotal'     => $subtotalBaru,
+                'updated_at'   => $now
+            ]);
+
+            // Hitung ulang total transaksi
+            $detailSum = $db->table('transaksi_detail')->where('transaksi_id', $transaksiId)->selectSum('subtotal')->get()->getRow();
+            $db->table('transaksi')->where('id', $transaksiId)->update([
+                'total_harga' => (float)($detailSum->subtotal ?? $subtotalBaru),
+                'updated_at'  => $now
+            ]);
         }
 
         $db->transComplete();
@@ -1568,7 +1622,7 @@ class Transaksi extends ResourceController
             return $this->respond(['status' => 'gagal', 'pesan' => 'Gagal menambahkan durasi.'], 500);
         }
 
-        return $this->respond(['status' => 'sukses', 'pesan' => "Durasi sewa berhasil ditambah $tambahanMenit menit."]);
+        return $this->respond(['status' => 'sukses', 'pesan' => "Durasi sewa berhasil ditambah $tambahanMenit menit & lampu dinyalakan kembali."]);
     }
 
     public function kedipBilliard()
