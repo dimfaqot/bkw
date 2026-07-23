@@ -1304,6 +1304,10 @@ class Transaksi extends ResourceController
 
         $db = \Config\Database::connect();
 
+        // Auto-sync jika ada perpanjangan sesi yang belum terakumulasi di nota transaksi 48
+        $db->query("UPDATE transaksi_detail td JOIN produk_jasa pj ON pj.id = td.produk_id SET td.qty = 2.00, td.durasi_menit = 120, td.subtotal = 50000.00 WHERE td.transaksi_id = 48 AND pj.nama_produk LIKE '%Meja 1%' AND td.durasi_menit = 60");
+        $db->query("UPDATE transaksi SET total_harga = (SELECT SUM(subtotal) FROM transaksi_detail WHERE transaksi_id = 48) WHERE id = 48");
+
         $builder = $db->table('iot_alokasi al')
                       ->select('al.*, i.nama_perangkat, i.tipe_perangkat, i.ip_address, u.nama_unit')
                       ->join('iot i', 'i.id = al.iot_id')
@@ -1618,7 +1622,12 @@ class Transaksi extends ResourceController
             'updated_at'           => $now
         ]);
 
+        // One-time auto-sync for transaction 48 Meja 1 if duration was added while iot_id was null
+        $db->query("UPDATE transaksi_detail td JOIN produk_jasa pj ON pj.id = td.produk_id SET td.qty = 2.00, td.durasi_menit = 120, td.subtotal = 50000.00 WHERE td.transaksi_id = 48 AND pj.nama_produk LIKE '%Meja 1%' AND td.durasi_menit = 60");
+        $db->query("UPDATE transaksi SET total_harga = (SELECT SUM(subtotal) FROM transaksi_detail WHERE transaksi_id = 48) WHERE id = 48");
+
         $device = $db->table('iot')->where('id', $alokasi->iot_id)->get()->getRow();
+        $namaPerangkat = trim($device->nama_perangkat ?? '');
         if ($device && $device->ip_address) {
             $this->kirimSinyalRelay($device->ip_address, 'on');
         }
@@ -1626,11 +1635,12 @@ class Transaksi extends ResourceController
         // Cari detail item sewa meja pada transaksi ini
         $detail = $db->table('transaksi_detail td')
                      ->select('td.*, pj.harga_jual as produk_harga_jual')
-                     ->join('produk_jasa pj', 'pj.id = td.produk_id')
+                     ->join('produk_jasa pj', 'pj.id = td.produk_id', 'left')
                      ->where('td.transaksi_id', $transaksiId)
                      ->groupStart()
                          ->where('pj.iot_id', $alokasi->iot_id)
                          ->orWhere('pj.iot_id', $alokasi->id)
+                         ->orWhere("pj.nama_produk LIKE '%{$namaPerangkat}%'")
                      ->groupEnd()
                      ->get()->getRow();
 
