@@ -1828,7 +1828,6 @@ class Transaksi extends ResourceController
                 'durasi_menit'      => $elapsedMenit,
                 'subtotal'          => $subtotalOpen,
                 'status_pengerjaan' => 'Selesai',
-                'catatan'           => "Sesi Open Selesai ({$elapsedMenit}m)",
                 'updated_at'        => $now
             ]);
         }
@@ -1860,7 +1859,6 @@ class Transaksi extends ResourceController
                 'subtotal'          => $subtotalRegular,
                 'durasi_menit'      => $durasiMenit,
                 'status_pengerjaan' => 'Selesai',
-                'catatan'           => "Paket Regular Baru ({$durasiMenit}m)",
                 'created_at'        => $now,
                 'updated_at'        => $now
             ]);
