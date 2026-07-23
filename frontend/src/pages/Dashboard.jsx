@@ -10902,7 +10902,10 @@ const Dashboard = () => {
               {(() => {
                 let calculatedTotalTagihan = 0;
                 const processedDetail = selectedTransaksi.detail?.map(d => {
-                  const activeDev = billiardDevices.find(dev => Number(dev.transaksi_aktif_id) === Number(selectedTransaksi.id) || (Number(dev.iot_id) === Number(d.iot_id) && dev.status_penggunaan === 'dipakai'));
+                  const activeDev = billiardDevices.find(dev => {
+                    if (d.iot_id) return Number(dev.iot_id) === Number(d.iot_id);
+                    return Number(dev.transaksi_aktif_id) === Number(selectedTransaksi.id);
+                  });
                   const isOpenSewa = selectedTransaksi.status_pembayaran !== 'lunas' && 
                                      (d.tipe_billing === 'open' || (d.qty == 0 && d.tipe === 'sewa')) && 
                                      activeDev && activeDev.status_penggunaan === 'dipakai' && 
@@ -11370,7 +11373,29 @@ const Dashboard = () => {
                                   className="tombol-premium border-0 w-100 py-2 small text-center mt-1 text-white"
                                   style={{ fontSize: '0.78rem', borderRadius: '8px', backgroundColor: 'var(--bs-success)' }}
                                 >
-                                  💰 Bayar Lunas Sekarang ({formatRupiah(selectedTransaksi.total_harga)})
+                                  💰 Bayar Lunas Sekarang ({(() => {
+                                    let liveAddon = 0;
+                                    let fixedTotal = 0;
+                                    selectedTransaksi?.detail?.forEach(d => {
+                                      const dev = billiardDevices.find(x => {
+                                        if (d.iot_id) return Number(x.iot_id) === Number(d.iot_id);
+                                        return Number(x.transaksi_aktif_id) === Number(selectedTransaksi.id);
+                                      });
+                                      const isOpenSewa = selectedTransaksi.status_pembayaran !== 'lunas' && 
+                                                         (d.tipe_billing === 'open' || (d.qty == 0 && d.tipe === 'sewa')) && 
+                                                         dev && dev.status_penggunaan === 'dipakai' && 
+                                                         Number(dev.prepaid_durasi_menit || 0) == 0;
+                                      if (isOpenSewa) {
+                                        const liveMinutes = Math.max(1, Number(dev.durasi_berjalan_menit || Math.ceil((dev.durasi_berjalan_detik || 0) / 60)));
+                                        const rawCost = liveMinutes * (Number(d.harga_satuan) / 60);
+                                        liveAddon += Math.ceil(rawCost / 500) * 500;
+                                      } else {
+                                        fixedTotal += (d.subtotal && Number(d.subtotal) > 0) ? Number(d.subtotal) : Number(d.harga_satuan) * Number(d.qty);
+                                      }
+                                    });
+                                    const grand = (fixedTotal + liveAddon) > 0 ? (fixedTotal + liveAddon) : selectedTransaksi.total_harga;
+                                    return formatRupiah(grand);
+                                  })()})
                                 </button>
                               </div>
                             </div>

@@ -1360,6 +1360,7 @@ class Transaksi extends ResourceController
                                     ->select('td.*, p.harga_jual as produk_harga_jual')
                                     ->join('produk_jasa p', 'p.id = td.produk_id', 'left')
                                     ->where('td.transaksi_id', $al['transaksi_aktif_id'])
+                                    ->where('p.iot_id', $al['iot_id'])
                                     ->get()->getRow();
                         if ($detail) {
                             $hargaSatuan = (float)($detail->harga_satuan > 0 ? $detail->harga_satuan : $detail->produk_harga_jual);
@@ -1771,7 +1772,7 @@ class Transaksi extends ResourceController
                     if ($detail) {
                         $hargaPerJam = (float)$detail->harga_satuan;
                         if ($alokasi['prepaid_durasi_menit'] > 0) {
-                            $subtotal = round(($elapsedMinutes / 60) * $hargaPerJam);
+                            $subtotal = (float)$detail->subtotal;
                         } else {
                             $hargaMentah = $elapsedMinutes * ($hargaPerJam / 60);
                             $subtotal = ceil($hargaMentah / 500) * 500;
