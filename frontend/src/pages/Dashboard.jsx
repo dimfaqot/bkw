@@ -4132,13 +4132,16 @@ const Dashboard = () => {
             });
           }
 
-          // 2. Peringatan Waktu Habis Sesi Regular (Auto-Stop)
+          // 2. Peringatan Waktu Habis Sesi Regular (Hanya jika waktu benar-benar habis/nol alami)
           const prevDev = prevDevicesStateRef.current[iotId];
+          const isNaturalTimeExpiry = prevDev &&
+                                      prevDev.status_penggunaan === 'dipakai' &&
+                                      Number(prevDev.prepaid_durasi_menit || 0) > 0 &&
+                                      Number(prevDev.sisa_detik || 0) <= 15 &&
+                                      dev.status_penggunaan === 'tersedia';
+
           if (
-            prevDev &&
-            prevDev.status_penggunaan === 'dipakai' &&
-            Number(prevDev.prepaid_durasi_menit || 0) > 0 &&
-            dev.status_penggunaan === 'tersedia' &&
+            isNaturalTimeExpiry &&
             !alertedFinishedRef.current[`${iotId}_${prevDev.transaksi_aktif_id}`]
           ) {
             alertedFinishedRef.current[`${iotId}_${prevDev.transaksi_aktif_id}`] = true;
