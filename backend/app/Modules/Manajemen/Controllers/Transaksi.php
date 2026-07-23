@@ -162,11 +162,11 @@ class Transaksi extends ResourceController
             $subtotal = $hargaSatuan * $qty;
             $totalHarga += $subtotal;
 
-            $statusPengerjaan = ($produk->butuh_persiapan == 1) ? 'Menunggu' : 'Selesai';
-            
             // Integrasi pemilihan stylist/petugas dan hitung komisi
             $petugasId = !empty($item['petugas_id']) ? (int)$item['petugas_id'] : null;
             $komisiPetugas = isset($item['komisi_petugas']) && $item['komisi_petugas'] !== '' ? (float)$item['komisi_petugas'] : null;
+
+            $statusPengerjaan = ($produk->butuh_persiapan == 1 || ($produk->tipe === 'jasa' && empty($petugasId))) ? 'Menunggu' : 'Selesai';
 
             if ($petugasId && $komisiPetugas === null) {
                 // Hitung komisi default jika petugas terpilih namun nominal komisi kosong
@@ -252,11 +252,12 @@ class Transaksi extends ResourceController
             return $this->respond(['status' => 'gagal', 'pesan' => 'Gagal menyimpan transaksi ke database. Silakan coba lagi.'], 500);
         }
 
-        // Kirim Notifikasi jika ada item yang butuh pengerjaan dapur/kru
+        // Kirim Notifikasi jika ada item yang butuh pengerjaan dapur/kru/job board
         $adaPekerjaan = false;
         foreach ($items as $item) {
             $prod = $db->table('produk_jasa')->where('id', $item['produk_id'])->get()->getRow();
-            if ($prod && $prod->butuh_persiapan == 1) {
+            $pId = !empty($item['petugas_id']) ? (int)$item['petugas_id'] : null;
+            if ($prod && ($prod->butuh_persiapan == 1 || ($prod->tipe === 'jasa' && empty($pId)))) {
                 $adaPekerjaan = true;
                 break;
             }
@@ -609,7 +610,8 @@ class Transaksi extends ResourceController
                     return $this->respond(['status' => 'gagal', 'pesan' => $err], 400);
                 }
 
-                $statusPengerjaan = ($produk->butuh_persiapan == 1) ? 'Menunggu' : 'Selesai';
+                $pIdHutang = !empty($item['petugas_id']) ? (int)$item['petugas_id'] : null;
+                $statusPengerjaan = ($produk->butuh_persiapan == 1 || ($produk->tipe === 'jasa' && empty($pIdHutang))) ? 'Menunggu' : 'Selesai';
                 $subtotal = $isBillingOpen ? 0.00 : ($hargaSatuan * $qtyBaru);
                 $db->table('transaksi_detail')->insert([
                     'transaksi_id'      => $id,
@@ -619,6 +621,7 @@ class Transaksi extends ResourceController
                     'subtotal'          => $subtotal,
                     'tipe_billing'      => $isBillingOpen ? 'open' : 'regular',
                     'status_pengerjaan' => $statusPengerjaan,
+                    'petugas_id'        => $pIdHutang,
                     'created_at'        => $dateTimeNow,
                     'updated_at'        => $dateTimeNow
                 ]);
