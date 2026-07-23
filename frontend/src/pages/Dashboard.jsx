@@ -7570,7 +7570,11 @@ const Dashboard = () => {
                               return (
                                 <div key={prod.id} className="col-12 col-sm-6">
                                   {(() => {
-                                    const iotDev = billiardDevices.find(d => Number(d.iot_id) === Number(prod.iot_id));
+                                    const iotDev = billiardDevices.find(d => 
+                                      (d.iot_id && prod.iot_id && Number(d.iot_id) === Number(prod.iot_id)) ||
+                                      (d.nama_perangkat && prod.nama_produk && d.nama_perangkat.toLowerCase().trim() === prod.nama_produk.toLowerCase().trim()) ||
+                                      (d.nama_perangkat && prod.nama_produk && prod.nama_produk.toLowerCase().includes(d.nama_perangkat.toLowerCase().trim()))
+                                    );
                                     const isUsed = iotDev?.status_penggunaan === 'dipakai';
                                     const isWaitingPayment = iotDev?.status_penggunaan === 'selesai_menunggu_pembayaran';
                                     const isRegular = isUsed && (iotDev?.prepaid_durasi_menit > 0);
