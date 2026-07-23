@@ -1596,15 +1596,24 @@ class Transaksi extends ResourceController
         $now = date('Y-m-d H:i:s');
         $db->transStart();
 
-        $currentPrepaid = (int)($alokasi->prepaid_durasi_menit ?? 0);
-        $durasiBaru = $currentPrepaid + $tambahanMenit;
+        $isCurrentlyActive = ($alokasi->status_penggunaan === 'dipakai' && !empty($alokasi->prepaid_durasi_menit));
+
+        if ($isCurrentlyActive) {
+            // Sesi masih berjalan: tambah sisa durasi prepaid & pertahankan waktu_mulai awal
+            $durasiPrepaidBaru = (int)$alokasi->prepaid_durasi_menit + $tambahanMenit;
+            $waktuMulaiBaru = $alokasi->waktu_mulai ?: $now;
+        } else {
+            // Sesi baru/perpanjangan setelah mati: timer baru sebesar tambahan_menit & reset waktu_mulai ke saat ini
+            $durasiPrepaidBaru = $tambahanMenit;
+            $waktuMulaiBaru = $now;
+        }
 
         $db->table('iot_alokasi')->where('id', $alokasiId)->update([
             'status_relay'         => 1,
             'status_penggunaan'    => 'dipakai',
             'transaksi_aktif_id'   => $transaksiId,
-            'prepaid_durasi_menit' => $durasiBaru,
-            'waktu_mulai'          => $alokasi->waktu_mulai ?: $now,
+            'prepaid_durasi_menit' => $durasiPrepaidBaru,
+            'waktu_mulai'          => $waktuMulaiBaru,
             'warning_sent'         => 0,
             'updated_at'           => $now
         ]);
@@ -1614,26 +1623,32 @@ class Transaksi extends ResourceController
             $this->kirimSinyalRelay($device->ip_address, 'on');
         }
 
+        // Cari detail item sewa meja pada transaksi ini
         $detail = $db->table('transaksi_detail td')
                      ->select('td.*, pj.harga_jual as produk_harga_jual')
                      ->join('produk_jasa pj', 'pj.id = td.produk_id')
                      ->where('td.transaksi_id', $transaksiId)
-                     ->where('pj.iot_id', $alokasi->iot_id)
+                     ->groupStart()
+                         ->where('pj.iot_id', $alokasi->iot_id)
+                         ->orWhere('pj.iot_id', $alokasi->id)
+                     ->groupEnd()
                      ->get()->getRow();
 
         if ($detail) {
-            $qtyBaru = round($durasiBaru / 60, 2);
+            $durasiLama = (int)($detail->durasi_menit ?? round($detail->qty * 60));
+            $durasiTotalBaru = $durasiLama + $tambahanMenit;
+            $qtyBaru = round($durasiTotalBaru / 60, 2);
             $hargaSatuan = (float)($detail->harga_satuan > 0 ? $detail->harga_satuan : $detail->produk_harga_jual);
             $subtotalBaru = $qtyBaru * $hargaSatuan;
 
             $db->table('transaksi_detail')->where('id', $detail->id)->update([
                 'qty'          => $qtyBaru,
-                'durasi_menit' => $durasiBaru,
+                'durasi_menit' => $durasiTotalBaru,
                 'subtotal'     => $subtotalBaru,
                 'updated_at'   => $now
             ]);
 
-            // Hitung ulang total transaksi
+            // Hitung ulang total harga seluruh nota transaksi
             $detailSum = $db->table('transaksi_detail')->where('transaksi_id', $transaksiId)->selectSum('subtotal')->get()->getRow();
             $db->table('transaksi')->where('id', $transaksiId)->update([
                 'total_harga' => (float)($detailSum->subtotal ?? $subtotalBaru),
